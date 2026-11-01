@@ -17,9 +17,16 @@ import {
   renderQuestion,
   validatePage,
   conditionHolds,
+  chooseLanguage,
+  classifyDevice,
+  fillMessage,
+  localizeDefinition,
+  localizeMessages,
+  type DeviceHints,
   type FieldError,
+  type SystemMessages,
 } from '@zapx/logic-engine';
-import type { Answers, OutcomeStatus, Question, SurveyDefinition } from '@zapx/survey-schema';
+import { defaultPresentation, parsePresentation, type Answers, type DeviceType, type OutcomeStatus, type Presentation, type Question, type SurveyDefinition, type Theme } from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -29,7 +36,7 @@ import { isAllowedReturnUrl, verifySignedParams } from '../vendors/redirects';
 const MAX_PARAMS = 30;
 const MAX_PARAM_LENGTH = 2000;
 const UID_PATTERN = /^[\x21-\x7e]{1,200}$/; // printable ASCII, no spaces
-const RESERVED = new Set(['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig']);
+const RESERVED = new Set(['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig', 'lang']);
 
 export type PublicQuestion = Question & {
   renderedText: string;
@@ -37,10 +44,20 @@ export type PublicQuestion = Question & {
   condition?: string;
 };
 
+/** How the respondent screens look: theme, grid layout, button labels and the language menu. */
+export interface Look {
+  theme: Theme;
+  gridOnMobile: 'cards' | 'scroll';
+  language: string;
+  languages: Array<{ tag: string; name: string }>;
+  ui: Pick<SystemMessages, 'next' | 'back' | 'saving' | 'language' | 'fixErrors'>;
+}
+
 export type InterviewState =
   | {
       state: 'in_progress';
       token?: string;
+      look: Look;
       survey: { title: string; welcome?: string; showProgress: boolean; allowBack: boolean; language: string };
       page: { id: string; title?: string; questions: PublicQuestion[] };
       /** Answers already given for this page (when resuming or going back). */
@@ -51,7 +68,7 @@ export type InterviewState =
       isFirstPage: boolean;
       isTest: boolean;
     }
-  | { state: 'finished'; status: OutcomeStatus; message: string; redirectUrl: string | null; isTest: boolean }
+  | { state: 'finished'; status: OutcomeStatus; message: string; redirectUrl: string | null; isTest: boolean; look?: Look }
   | { state: 'unavailable'; message: string };
 
 export class InterviewValidationError extends UnprocessableEntityException {
@@ -64,14 +81,52 @@ const hashToken = (token: string) => createHash('sha256').update(token).digest('
 const toEnum = (s: OutcomeStatus) => s.toUpperCase() as Response['status'];
 const fromEnum = (s: Response['status']) => s.toLowerCase() as OutcomeStatus;
 
-const MESSAGES: Record<OutcomeStatus, string> = {
-  complete: 'Thank you, your answers have been recorded.',
-  terminate: 'Thank you for your time. Unfortunately you do not qualify for this survey.',
-  quota_full: 'Thank you for your interest. We already have enough responses from people like you.',
-  quality_fail: 'Thank you for your time.',
-  security_reject: 'This survey link is not valid.',
-  duplicate: 'You have already taken part in this survey. Thank you.',
+const OUTCOME_MESSAGE: Record<OutcomeStatus, keyof SystemMessages> = {
+  complete: 'outcomeComplete',
+  terminate: 'outcomeTerminate',
+  quota_full: 'outcomeQuotaFull',
+  quality_fail: 'outcomeQualityFail',
+  security_reject: 'outcomeSecurityReject',
+  duplicate: 'outcomeDuplicate',
 };
+
+/** A survey version as one respondent sees it: localized definition, messages and look. */
+interface Ctx {
+  /** Definition in the respondent's language. Ids, codes and logic are identical to the source. */
+  def: SurveyDefinition;
+  presentation: Presentation;
+  msg: SystemMessages;
+  look: Look;
+}
+
+export function interviewContext(version: { definition: unknown; presentation: unknown }, requested: string | null | undefined): Ctx {
+  const source = version.definition as SurveyDefinition;
+  const parsed = parsePresentation(version.presentation);
+  const presentation = parsed.ok ? parsed.presentation : defaultPresentation();
+  const offered = presentation.languages.filter((l) => l.enabled);
+  const lang = offered.find((l) => l.tag === requested);
+  const msg = localizeMessages(presentation, lang);
+  return {
+    def: localizeDefinition(source, lang),
+    presentation,
+    msg,
+    look: {
+      theme: presentation.theme,
+      gridOnMobile: presentation.devices.gridOnMobile,
+      language: lang?.tag ?? source.language,
+      languages: offered.length
+        ? [{ tag: source.language, name: presentation.sourceLanguageName ?? source.language }, ...offered.map((l) => ({ tag: l.tag, name: l.name }))]
+        : [],
+      ui: { next: msg.next, back: msg.back, saving: msg.saving, language: msg.language, fixErrors: msg.fixErrors },
+    },
+  };
+}
+
+export interface EntryMeta {
+  userAgent?: string;
+  acceptLanguage?: string;
+  client?: DeviceHints;
+}
 
 /** Test links are signed with the server secret so that only the studio can create them. */
 export function testSignature(surveyId: string, uid: string): string {
@@ -101,7 +156,7 @@ export class InterviewService {
 
   // ---- Entry --------------------------------------------------------------------------------
 
-  async start(surveyId: string, rawQuery: Record<string, unknown>, userAgent?: string): Promise<InterviewState & { token?: string }> {
+  async start(surveyId: string, rawQuery: Record<string, unknown>, meta: EntryMeta = {}): Promise<InterviewState & { token?: string }> {
     const survey = await this.prisma.survey.findUnique({ where: { id: surveyId } });
     if (!survey || !survey.liveVersionId) return { state: 'unavailable', message: 'This survey is not available.' };
 
@@ -110,28 +165,35 @@ export class InterviewService {
       if (typeof v === 'string' && /^[A-Za-z0-9_.-]{1,64}$/.test(k)) params[k] = v.slice(0, MAX_PARAM_LENGTH);
     }
 
+    const version = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: survey.liveVersionId } });
+    const sourceDef = version.definition as unknown as SurveyDefinition;
+    const sourcePresentation = parsePresentation(version.presentation);
+    const offered = sourcePresentation.ok ? sourcePresentation.presentation.languages.filter((l) => l.enabled).map((l) => l.tag) : [];
+    const language = chooseLanguage(sourceDef.language, offered, params.lang, meta.acceptLanguage);
+    const ctx = interviewContext(version, language);
+
     const isTest = params.test === '1' && !!params.uid && validTestSignature(surveyId, params.uid, params.tsig);
 
     let vendor: Vendor | null = null;
     if (params.vid) {
       vendor = await this.prisma.vendor.findUnique({ where: { projectId_code: { projectId: survey.projectId, code: params.vid } } });
-      if (!vendor) return { state: 'unavailable', message: 'This survey link is not valid.' };
+      if (!vendor) return { state: 'unavailable', message: ctx.msg.outcomeSecurityReject };
     } else if (!isTest) {
-      return { state: 'unavailable', message: 'This survey link is not valid.' };
+      return { state: 'unavailable', message: ctx.msg.outcomeSecurityReject };
     }
 
     const uid = params.uid;
     if (!uid || !UID_PATTERN.test(uid)) {
-      return this.rejectWithoutRecord(survey, vendor, uid ?? '', params, 'security_reject', 'missing_or_invalid_uid');
+      return this.rejectWithoutRecord(survey, vendor, uid ?? '', params, 'security_reject', 'missing_or_invalid_uid', ctx);
     }
 
     if (vendor?.requireSignedEntry && !isTest) {
       const check = verifySignedParams(params, vendor.secret);
-      if (!check.ok) return this.rejectWithoutRecord(survey, vendor, uid, params, 'security_reject', check.reason);
+      if (!check.ok) return this.rejectWithoutRecord(survey, vendor, uid, params, 'security_reject', check.reason, ctx);
     }
 
     if (survey.status !== 'LIVE' && !isTest) {
-      return this.rejectWithoutRecord(survey, vendor, uid, params, 'quota_full', `survey_${survey.status.toLowerCase()}`);
+      return this.rejectWithoutRecord(survey, vendor, uid, params, 'quota_full', `survey_${survey.status.toLowerCase()}`, ctx);
     }
 
     // Dynamic return URL (only stored when it points at an allowed host).
@@ -151,8 +213,15 @@ export class InterviewService {
       : await this.prisma.response.findFirst({ where: { surveyId, vendorId: null, uid } });
     if (existing) return this.reenter(existing, vendor);
 
-    const version = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: survey.liveVersionId } });
-    const def = version.definition as unknown as SurveyDefinition;
+    // Device rules apply to new interviews; a respondent resuming elsewhere is not cut off.
+    const device: DeviceType = classifyDevice(meta.userAgent, meta.client);
+    if (!ctx.presentation.devices.allowed.includes(device)) {
+      const preferred = ctx.presentation.devices.allowed[0]!;
+      const deviceWord = { desktop: ctx.msg.deviceDesktop, tablet: ctx.msg.deviceTablet, mobile: ctx.msg.deviceMobile }[preferred];
+      return this.rejectWithoutRecord(survey, vendor, uid, params, 'terminate', `device_not_allowed:${device}`, ctx, fillMessage(ctx.msg.deviceNotAllowed, { device: deviceWord }));
+    }
+
+    const def = sourceDef;
     const token = randomBytes(32).toString('base64url');
     try {
       const response = await this.prisma.response.create({
@@ -168,10 +237,12 @@ export class InterviewService {
           entryParams: entryParams as Prisma.InputJsonValue,
           returnUrl,
           sessionTokenHash: hashToken(token),
-          userAgent: userAgent?.slice(0, 500),
+          userAgent: meta.userAgent?.slice(0, 500),
+          language: ctx.look.language,
+          device,
         },
       });
-      return { ...(await this.stateOf(response, def, vendor)), token };
+      return { ...(await this.stateOf(response, ctx, vendor)), token };
     } catch (e) {
       // Two simultaneous entries with the same UID: the second one is a re-entry.
       const again = vendor
@@ -187,9 +258,9 @@ export class InterviewService {
     if (existing.status === 'IN_PROGRESS') {
       const token = randomBytes(32).toString('base64url');
       const updated = await this.prisma.response.update({ where: { id: existing.id }, data: { sessionTokenHash: hashToken(token) } });
-      return { ...(await this.stateOf(updated, await this.definitionOf(updated), vendor)), token };
+      return { ...(await this.stateOf(updated, await this.ctxOf(updated), vendor)), token };
     }
-    return this.outcomeState(vendor, existing, 'duplicate');
+    return this.outcomeState(vendor, existing, 'duplicate', await this.ctxOf(existing));
   }
 
   private async rejectWithoutRecord(
@@ -199,6 +270,8 @@ export class InterviewService {
     params: Record<string, string>,
     status: OutcomeStatus,
     reason: string,
+    ctx: Ctx,
+    message?: string,
   ): Promise<InterviewState> {
     await this.audit.record({ tenantId: survey.tenantId }, `interview.${status}`, 'survey', survey.id, {
       reason,
@@ -206,7 +279,7 @@ export class InterviewService {
       uid: uid.slice(0, 200),
     });
     const pseudo = { id: 'none', uid, country: params.cc ?? null, returnUrl: null, entryParams: {}, isTest: false } as unknown as Response;
-    return this.outcomeState(vendor, pseudo, status);
+    return this.outcomeState(vendor, pseudo, status, ctx, message);
   }
 
   // ---- Session ------------------------------------------------------------------------------
@@ -218,9 +291,9 @@ export class InterviewService {
     return r;
   }
 
-  private async definitionOf(r: Response): Promise<SurveyDefinition> {
+  private async ctxOf(r: Response): Promise<Ctx> {
     const v = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: r.versionId } });
-    return v.definition as unknown as SurveyDefinition;
+    return interviewContext(v, r.language);
   }
 
   private vendorOf(r: Response) {
@@ -229,10 +302,19 @@ export class InterviewService {
 
   async state(token: string): Promise<InterviewState> {
     const r = await this.byToken(token);
-    return this.stateOf(r, await this.definitionOf(r), await this.vendorOf(r));
+    return this.stateOf(r, await this.ctxOf(r), await this.vendorOf(r));
   }
 
-  private async outcomeState(vendor: Vendor | null, r: Response, status: OutcomeStatus): Promise<InterviewState> {
+  /** Switch the respondent's language (only to a language the survey offers). */
+  async setLanguage(token: string, language: string): Promise<InterviewState> {
+    const r = await this.byToken(token);
+    const ctx = await this.ctxOf(r);
+    if (!ctx.look.languages.some((l) => l.tag === language)) throw new NotFoundException('Language not available');
+    const updated = await this.prisma.response.update({ where: { id: r.id }, data: { language } });
+    return this.stateOf(updated, await this.ctxOf(updated), await this.vendorOf(updated));
+  }
+
+  private async outcomeState(vendor: Vendor | null, r: Response, status: OutcomeStatus, ctx: Ctx, message?: string): Promise<InterviewState> {
     const redirect = vendor
       ? await this.redirects.resolve(
           vendor,
@@ -246,15 +328,16 @@ export class InterviewService {
           status,
         )
       : { url: null };
-    return { state: 'finished', status, message: MESSAGES[status], redirectUrl: r.isTest ? null : redirect.url, isTest: r.isTest };
+    let text = message ?? ctx.msg[OUTCOME_MESSAGE[status]];
+    if (status === 'complete' && !message && ctx.def.thankYou) text = ctx.def.thankYou;
+    return { state: 'finished', status, message: text, redirectUrl: r.isTest ? null : redirect.url, isTest: r.isTest, look: ctx.look };
   }
 
-  private async stateOf(r: Response, def: SurveyDefinition, vendor: Vendor | null): Promise<InterviewState> {
+  private async stateOf(r: Response, ctx: Ctx, vendor: Vendor | null): Promise<InterviewState> {
+    const def = ctx.def;
     if (r.status !== 'IN_PROGRESS' || r.currentPage < 0) {
       const status = fromEnum(r.status === 'IN_PROGRESS' ? 'COMPLETE' : r.status);
-      const finished = await this.outcomeState(vendor, r, status);
-      if (finished.state === 'finished' && status === 'complete' && def.thankYou) finished.message = def.thankYou;
-      return finished;
+      return this.outcomeState(vendor, r, status, ctx);
     }
     const answers = (r.answers ?? {}) as Answers;
     const page = def.pages[r.currentPage]!;
@@ -280,6 +363,7 @@ export class InterviewService {
     const first = nextPageIndex(def, answers, -1);
     return {
       state: 'in_progress',
+      look: ctx.look,
       survey: {
         title: def.title,
         welcome: r.currentPage === first ? def.welcome : undefined,
@@ -300,41 +384,43 @@ export class InterviewService {
 
   async submit(token: string, pageId: string, submitted: Record<string, unknown>): Promise<InterviewState> {
     const r = await this.byToken(token);
-    const def = await this.definitionOf(r);
+    const ctx = await this.ctxOf(r);
+    const def = ctx.def;
     const vendor = await this.vendorOf(r);
-    if (r.status !== 'IN_PROGRESS') return this.stateOf(r, def, vendor);
+    if (r.status !== 'IN_PROGRESS') return this.stateOf(r, ctx, vendor);
     const page = def.pages[r.currentPage];
     if (!page || page.id !== pageId) throw new ConflictException('This page is out of date. Reload to continue.');
 
     const prior = (r.answers ?? {}) as Answers;
-    const result = validatePage(def, page, prior, submitted);
+    const result = validatePage(def, page, prior, submitted, ctx.msg);
     if (!result.ok) throw new InterviewValidationError(result.errors);
     const answers: Answers = { ...prior, ...result.answers };
 
     const termination = firstMatchingTermination(def, answers);
-    if (termination) return this.finish(r, def, vendor, answers, termination.status, termination.id);
+    if (termination) return this.finish(r, ctx, vendor, answers, termination.status, termination.id);
 
     if (!r.isTest) {
       const full = await this.firstFullQuota(r.surveyId, def, answers);
-      if (full) return this.finish(r, def, vendor, answers, 'quota_full', full);
+      if (full) return this.finish(r, ctx, vendor, answers, 'quota_full', full);
     }
 
     const next = nextPageIndex(def, answers, r.currentPage);
-    if (next === -1) return this.complete(r, def, vendor, answers);
+    if (next === -1) return this.complete(r, ctx, vendor, answers);
 
     const moved = await this.prisma.response.updateMany({
       where: { id: r.id, status: 'IN_PROGRESS', currentPage: r.currentPage },
       data: { answers: answers as Prisma.InputJsonValue, currentPage: next },
     });
     if (moved.count === 0) throw new ConflictException('This page was already submitted. Reload to continue.');
-    return this.stateOf({ ...r, answers: answers as Prisma.JsonValue, currentPage: next }, def, vendor);
+    return this.stateOf({ ...r, answers: answers as Prisma.JsonValue, currentPage: next }, ctx, vendor);
   }
 
   async back(token: string): Promise<InterviewState> {
     const r = await this.byToken(token);
-    const def = await this.definitionOf(r);
+    const ctx = await this.ctxOf(r);
+    const def = ctx.def;
     const vendor = await this.vendorOf(r);
-    if (r.status !== 'IN_PROGRESS' || !def.settings.allowBack) return this.stateOf(r, def, vendor);
+    if (r.status !== 'IN_PROGRESS' || !def.settings.allowBack) return this.stateOf(r, ctx, vendor);
     const answers = (r.answers ?? {}) as Answers;
     let prev = -1;
     for (let i = r.currentPage - 1; i >= 0; i--) {
@@ -343,9 +429,9 @@ export class InterviewService {
         break;
       }
     }
-    if (prev === -1) return this.stateOf(r, def, vendor);
+    if (prev === -1) return this.stateOf(r, ctx, vendor);
     await this.prisma.response.update({ where: { id: r.id }, data: { currentPage: prev } });
-    return this.stateOf({ ...r, currentPage: prev }, def, vendor);
+    return this.stateOf({ ...r, currentPage: prev }, ctx, vendor);
   }
 
   private async firstFullQuota(surveyId: string, def: SurveyDefinition, answers: Answers): Promise<string | null> {
@@ -360,7 +446,8 @@ export class InterviewService {
   }
 
   /** Complete the interview, counting it toward every matching quota atomically (no overfill). */
-  private async complete(r: Response, def: SurveyDefinition, vendor: Vendor | null, answers: Answers): Promise<InterviewState> {
+  private async complete(r: Response, ctx: Ctx, vendor: Vendor | null, answers: Answers): Promise<InterviewState> {
+    const def = ctx.def;
     const quotas = r.isTest ? [] : matchingQuotas(def, answers);
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -376,17 +463,15 @@ export class InterviewService {
         if (done.count === 0) throw new ConflictException('This interview has already finished.');
       });
     } catch (e) {
-      if (e instanceof QuotaFull) return this.finish(r, def, vendor, answers, 'quota_full', e.quotaId);
+      if (e instanceof QuotaFull) return this.finish(r, ctx, vendor, answers, 'quota_full', e.quotaId);
       throw e;
     }
-    const finished = await this.outcomeState(vendor, r, 'complete');
-    if (finished.state === 'finished' && def.thankYou) finished.message = def.thankYou;
-    return finished;
+    return this.outcomeState(vendor, r, 'complete', ctx);
   }
 
   private async finish(
     r: Response,
-    def: SurveyDefinition,
+    ctx: Ctx,
     vendor: Vendor | null,
     answers: Answers,
     status: OutcomeStatus,
@@ -397,6 +482,6 @@ export class InterviewService {
       data: { status: toEnum(status), outcomeReason: reason, answers: answers as Prisma.InputJsonValue, currentPage: -1, completedAt: new Date() },
     });
     const fresh = await this.prisma.response.findUniqueOrThrow({ where: { id: r.id } });
-    return this.stateOf(fresh, def, vendor);
+    return this.stateOf(fresh, ctx, vendor);
   }
 }

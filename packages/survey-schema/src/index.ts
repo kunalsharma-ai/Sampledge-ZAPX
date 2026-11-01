@@ -241,3 +241,93 @@ export function emptySurvey(title: string): SurveyDefinition {
     ],
   });
 }
+
+// ---- Presentation layer (Milestone 3) ---------------------------------------------------------
+// Themes, translations and device settings are layered on top of the definition. They are keyed by
+// question id and text key and can never change ids, answer codes or routing.
+
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #2f5bea');
+
+/** Logos are embedded as small data URLs (PNG, JPEG or WebP only; SVG can carry script). */
+export const LOGO_MAX_BYTES = 200_000;
+const logoDataUrl = z
+  .string()
+  .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/, 'Logo must be a PNG, JPEG or WebP image')
+  .refine((v) => Math.floor(((v.length - v.indexOf(',') - 1) * 3) / 4) <= LOGO_MAX_BYTES, 'Logo must be 200 KB or smaller');
+
+export const THEME_FONTS = ['system', 'humanist', 'rounded', 'serif'] as const;
+export const THEME_MOTION = ['none', 'subtle', 'lively'] as const;
+
+export const themeSchema = z.object({
+  preset: z.string().max(40).default('zapx'),
+  /** Buttons, selected answers, progress. */
+  accent: hexColor.default('#2f5bea'),
+  background: hexColor.default('#f6f7fb'),
+  surface: hexColor.default('#ffffff'),
+  text: hexColor.default('#1b1f2a'),
+  /** auto: respondents in dark mode get the built-in dark palette; light: always this palette. */
+  colorScheme: z.enum(['auto', 'light']).default('auto'),
+  font: z.enum(THEME_FONTS).default('system'),
+  /** Corner radius of cards, answers and buttons, in pixels. */
+  radius: z.number().int().min(0).max(28).default(12),
+  density: z.enum(['comfortable', 'compact']).default('comfortable'),
+  /** Page and answer animations. Always off for respondents who ask for reduced motion. */
+  motion: z.enum(THEME_MOTION).default('subtle'),
+  progress: z.enum(['bar', 'percent', 'none']).default('bar'),
+  logo: logoDataUrl.optional(),
+  logoAlt: z.string().max(120).optional(),
+  nextLabel: z.string().max(40).optional(),
+  backLabel: z.string().max(40).optional(),
+});
+export type Theme = z.infer<typeof themeSchema>;
+
+export const DEVICE_TYPES = ['desktop', 'tablet', 'mobile'] as const;
+export type DeviceType = (typeof DEVICE_TYPES)[number];
+
+export const deviceSettingsSchema = z.object({
+  /** Devices allowed to take the survey. Others are screened out before a response is created. */
+  allowed: z.array(z.enum(DEVICE_TYPES)).min(1).default(['desktop', 'tablet', 'mobile']),
+  /** How grids appear on narrow screens: one card per row, or the full table with sideways scrolling. */
+  gridOnMobile: z.enum(['cards', 'scroll']).default('cards'),
+});
+export type DeviceSettings = z.infer<typeof deviceSettingsSchema>;
+
+/** A translated text. `source` is the source text it was translated from, to detect outdated entries. */
+export const translationEntrySchema = z.object({
+  text: z.string().max(10000),
+  source: z.string().max(10000),
+  /** machine: written by AI and not yet approved by a person. */
+  status: z.enum(['machine', 'reviewed']),
+});
+export type TranslationEntry = z.infer<typeof translationEntrySchema>;
+
+export const LANGUAGE_TAG = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8}){0,2}$/;
+
+export const languageSchema = z.object({
+  tag: z.string().regex(LANGUAGE_TAG, 'Use a language tag such as fr, es-MX or zh-Hans'),
+  name: z.string().min(1).max(60),
+  /** Offered to respondents only when enabled (publishing then requires it to be complete and reviewed). */
+  enabled: z.boolean().default(false),
+  texts: z.record(z.string().max(200), translationEntrySchema).default({}),
+});
+export type Language = z.infer<typeof languageSchema>;
+
+export const presentationSchema = z.object({
+  theme: themeSchema.default({}),
+  devices: deviceSettingsSchema.default({}),
+  /** Name of the source language, shown in the respondent language menu. */
+  sourceLanguageName: z.string().max(60).optional(),
+  languages: z.array(languageSchema).max(60).default([]),
+});
+export type Presentation = z.infer<typeof presentationSchema>;
+export type PresentationInput = z.input<typeof presentationSchema>;
+
+export function parsePresentation(input: unknown): { ok: true; presentation: Presentation } | { ok: false; issues: SchemaIssue[] } {
+  const result = presentationSchema.safeParse(input ?? {});
+  if (result.success) return { ok: true, presentation: result.data };
+  return { ok: false, issues: result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) };
+}
+
+export function defaultPresentation(): Presentation {
+  return presentationSchema.parse({});
+}

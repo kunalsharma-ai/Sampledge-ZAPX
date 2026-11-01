@@ -9,6 +9,9 @@ it through vendor links with redirects, quotas and data export.
 **Milestone 2 (AI programming and QA)** adds the AI Survey Architect, questionnaire file import,
 reviewable change sets, and the QA Laboratory.
 
+**Milestone 3 (experience, languages, devices)** adds the Experience Studio (themes), the Global
+Language Studio (translations with AI assistance and human review) and device rules.
+
 ## What works today
 
 | Area | What you can do |
@@ -31,8 +34,12 @@ reviewable change sets, and the QA Laboratory.
 | Change sets | AI output, imports and pasted definitions become proposals with a structured diff, data-impact warning, logic check and a 200-respondent QA preview. A programmer applies or rejects them; applying fails if the draft changed since the proposal was made |
 | QA Laboratory | Simulate up to 2,000 synthetic respondents per run on the draft or live version: outcome mix, coverage of pages, questions, options, branches and outcomes, and defects (never shown, constant conditions, impossible completes, stuck pages) with an example respondent. Runs are deterministic per seed, saved, and never touch responses or quotas |
 
-Not yet built (later milestones): themes and animations,
-translations, CAPI and CATI apps, fraud scoring, analytics dashboards, SSO and billing. See
+| Experience Studio | Theme presets, brand colours, logo, font, corner radius, spacing, progress style, button labels and motion (always off for respondents who ask for reduced motion), with contrast warnings and a live preview at desktop, tablet and phone width. Presentation only: it cannot change questions, codes or logic |
+| Languages | Add any number of languages; translate by hand or with AI (marked "AI, to review"); every text shows missing, outdated, AI or reviewed status, and broken `{{piping}}` is flagged. A language is offered to respondents only when enabled, and publishing is blocked until every enabled language is complete and reviewed. Validation messages, buttons and end messages are translated too |
+| Respondent language | Chosen from the link (`&lang=fr`), else the browser's language, else the source; respondents can switch mid-survey without losing answers. Answer codes are identical in every language |
+| Devices | Each interview records desktop, tablet or phone. Surveys can exclude device types (screened out before a response is created, redirected as terminate). Grids show as cards or a scrolling table on narrow screens. Language and device are in the exports |
+
+Not yet built (later milestones): voice-over and transcription, rich media and custom animations, CAPI and CATI apps, fraud scoring, analytics dashboards, SSO and billing. See
 [docs/architecture.md](docs/architecture.md).
 
 ## Repository layout

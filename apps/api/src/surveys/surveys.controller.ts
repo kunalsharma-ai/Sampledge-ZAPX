@@ -14,7 +14,8 @@ import { signParams } from '../vendors/redirects';
 import { testSignature } from '../interview/interview.service';
 
 const createSchema = z.object({ name: z.string().min(1).max(200) });
-const draftSchema = z.object({ definition: z.unknown(), expectedUpdatedAt: z.string().optional() });
+const draftSchema = z.object({ definition: z.unknown(), presentation: z.unknown().optional(), expectedUpdatedAt: z.string().optional() });
+const presentationBody = z.object({ presentation: z.unknown(), expectedUpdatedAt: z.string().optional() });
 const statusSchema = z.object({ status: z.enum(['LIVE', 'PAUSED', 'CLOSED']) });
 const linkSchema = z.object({
   vendorId: z.string().optional(),
@@ -52,7 +53,7 @@ export class SurveysController {
   @Get('surveys/:id/draft')
   async draft(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const draft = user.role === 'VIEWER' ? await this.latest(user, id) : await this.surveys.draft(user, id);
-    return { version: draft, check: this.surveys.check(draft.definition) };
+    return { version: draft, check: this.surveys.check(draft.definition, draft.presentation) };
   }
 
   private async latest(user: AuthUser, id: string) {
@@ -67,11 +68,19 @@ export class SurveysController {
     return this.surveys.saveDraft(user, id, input.definition, input.expectedUpdatedAt);
   }
 
+  @Put('surveys/:id/draft/presentation')
+  @Roles(...CAN_EDIT)
+  savePresentation(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
+    const input = parseBody(presentationBody, body);
+    return this.surveys.savePresentation(user, id, input.presentation, input.expectedUpdatedAt);
+  }
+
   /** Check any definition (e.g. unsaved edits) without saving it. */
   @Post('surveys/:id/check')
   async check(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     await this.surveys.getSurvey(user, id);
-    return this.surveys.check(parseBody(draftSchema, body).definition);
+    const input = parseBody(draftSchema, body);
+    return this.surveys.check(input.definition, input.presentation);
   }
 
   @Post('surveys/:id/publish')

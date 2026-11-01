@@ -3,3 +3,5 @@ export * from './interview.js';
 export * from './analyze.js';
 export * from './simulate.js';
 export * from './diff.js';
+export * from './localize.js';
+export * from './device.js';

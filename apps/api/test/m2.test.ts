@@ -31,6 +31,9 @@ class FakeAiProvider extends AiProvider {
     if (!next) throw new Error('FakeAiProvider: no answer queued');
     return { summary: 'Built the survey. Details follow.', assumptions: [], model: this.model, servedByFallback: false, ...next };
   }
+  async translate(): Promise<never> {
+    throw new Error('not used in these tests');
+  }
 }
 
 const fake = new FakeAiProvider();

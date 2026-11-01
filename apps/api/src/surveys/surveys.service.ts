@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma, Survey, SurveyVersion } from '@zapx/db';
-import { analyzeSurvey, type AnalysisReport } from '@zapx/logic-engine';
-import { emptySurvey, parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
+import { analyzeSurvey, translationStatus, type AnalysisReport, type TranslationStatus } from '@zapx/logic-engine';
+import { emptySurvey, parsePresentation, parseSurveyDefinition, type SchemaIssue, type SurveyDefinition } from '@zapx/survey-schema';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../auth/auth.types';
@@ -10,6 +10,11 @@ export interface CheckResult {
   schemaOk: boolean;
   schemaIssues: Array<{ path: string; message: string }>;
   analysis: AnalysisReport | null;
+  /** Problems in the theme, language or device settings. */
+  presentationIssues: SchemaIssue[];
+  translations: TranslationStatus[];
+  /** Enabled languages that are not complete and reviewed (they block publishing). */
+  languageBlockers: string[];
   publishable: boolean;
 }
 
@@ -75,6 +80,7 @@ export class SurveysService {
           surveyId: id,
           version: latest.version + 1,
           definition: latest.definition as Prisma.InputJsonValue,
+          presentation: latest.presentation as Prisma.InputJsonValue,
           createdById: user.id,
         },
       });
@@ -84,11 +90,56 @@ export class SurveysService {
     }
   }
 
-  check(definition: unknown): CheckResult {
+  check(definition: unknown, presentation?: unknown): CheckResult {
     const parsed = parseSurveyDefinition(definition);
-    if (!parsed.ok) return { schemaOk: false, schemaIssues: parsed.issues, analysis: null, publishable: false };
+    const pres = parsePresentation(presentation ?? {});
+    const presentationIssues = pres.ok ? [] : pres.issues;
+    if (!parsed.ok) {
+      return { schemaOk: false, schemaIssues: parsed.issues, analysis: null, presentationIssues, translations: [], languageBlockers: [], publishable: false };
+    }
     const analysis = analyzeSurvey(parsed.definition);
-    return { schemaOk: true, schemaIssues: [], analysis, publishable: analysis.ok };
+    const translations = pres.ok ? translationStatus(parsed.definition, pres.presentation) : [];
+    const languageBlockers = translations
+      .filter((t) => t.enabled && !t.complete)
+      .map(
+        (t) =>
+          `${t.name} (${t.tag}) is offered to respondents but is not ready: ${[
+            t.missing.length && `${t.missing.length} missing`,
+            t.outdated.length && `${t.outdated.length} outdated`,
+            t.unreviewed.length && `${t.unreviewed.length} not reviewed`,
+            t.placeholderMismatch.length && `${t.placeholderMismatch.length} with broken {{piping}}`,
+          ]
+            .filter(Boolean)
+            .join(', ')}.`,
+      );
+    return {
+      schemaOk: true,
+      schemaIssues: [],
+      analysis,
+      presentationIssues,
+      translations,
+      languageBlockers,
+      publishable: analysis.ok && pres.ok && languageBlockers.length === 0,
+    };
+  }
+
+  /** Save the theme, languages and device settings of the draft. */
+  async savePresentation(user: AuthUser, id: string, presentation: unknown, expectedUpdatedAt?: string) {
+    const draft = await this.draft(user, id);
+    const parsed = parsePresentation(presentation);
+    if (!parsed.ok) throw new BadRequestException({ message: 'The design or language settings are not valid', issues: parsed.issues });
+    if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== draft.updatedAt.getTime()) {
+      throw new ConflictException('Someone else saved this draft since you opened it. Reload to see their changes.');
+    }
+    const saved = await this.prisma.surveyVersion.update({
+      where: { id: draft.id },
+      data: { presentation: parsed.presentation as unknown as Prisma.InputJsonValue },
+    });
+    await this.audit.record(user, 'survey.presentation.save', 'survey', id, {
+      version: saved.version,
+      languages: parsed.presentation.languages.map((l) => `${l.tag}${l.enabled ? '' : ' (off)'}`),
+    });
+    return { version: saved, check: this.check(saved.definition, saved.presentation) };
   }
 
   /** Save the draft. Structurally invalid definitions are rejected; logic issues are reported. */
@@ -104,7 +155,7 @@ export class SurveysService {
       data: { definition: parsed.definition as unknown as Prisma.InputJsonValue },
     });
     await this.audit.record(user, 'survey.draft.save', 'survey', id, { version: saved.version });
-    return { version: saved, check: this.check(parsed.definition) };
+    return { version: saved, check: this.check(parsed.definition, saved.presentation) };
   }
 
   /** Publish the draft after schema and logic checks pass. */
@@ -112,9 +163,10 @@ export class SurveysService {
     const survey = await this.getSurvey(user, id);
     const draft = await this.prisma.surveyVersion.findFirst({ where: { surveyId: id, status: 'DRAFT' } });
     if (!draft) throw new ConflictException('There is no draft to publish');
-    const check = this.check(draft.definition);
+    const check = this.check(draft.definition, draft.presentation);
     if (!check.publishable) {
-      throw new UnprocessableEntityException({ message: 'Fix the logic errors before publishing', check });
+      const message = check.languageBlockers.length && check.analysis?.ok ? `Finish the translations before publishing. ${check.languageBlockers.join(' ')}` : 'Fix the logic errors before publishing';
+      throw new UnprocessableEntityException({ message, check });
     }
     const def = draft.definition as unknown as SurveyDefinition;
     const published = await this.prisma.$transaction(async (tx) => {
@@ -181,6 +233,8 @@ export class SurveysService {
         id: true,
         uid: true,
         country: true,
+        language: true,
+        device: true,
         status: true,
         outcomeReason: true,
         isTest: true,

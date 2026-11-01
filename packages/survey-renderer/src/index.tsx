@@ -7,7 +7,7 @@
  */
 import { useId } from 'react';
 import { conditionHoldsFor } from '@zapx/logic-engine';
-import type { AnswerValue, Answers, Option, Question } from '@zapx/survey-schema';
+import type { AnswerValue, Answers, DeviceSettings, Option, Question, Theme } from '@zapx/survey-schema';
 
 export type DisplayQuestion = Question & { renderedText?: string; condition?: string };
 
@@ -220,7 +220,7 @@ function Grid({
 /** Default respondent theme. Themes in later milestones replace these tokens, never the logic. */
 export const defaultThemeCss = `
 .zx-root{--zx-bg:#f6f7fb;--zx-card:#ffffff;--zx-text:#1b1f2a;--zx-muted:#5b6475;--zx-accent:#2f5bea;--zx-accent-soft:#e8eefe;--zx-border:#d9deea;--zx-error:#c62828;--zx-radius:12px;
-  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--zx-text);background:var(--zx-bg);min-height:100vh;}
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--zx-text);background:var(--zx-bg);min-height:100vh;container:zx/inline-size;}
 @media (prefers-color-scheme:dark){.zx-root{--zx-bg:#0f1219;--zx-card:#181c26;--zx-text:#e8ebf2;--zx-muted:#9aa3b5;--zx-accent:#7c9bff;--zx-accent-soft:#1f2a4a;--zx-border:#2c3344;--zx-error:#ff8a80;}}
 .zx-shell{max-width:720px;margin:0 auto;padding:24px 16px 64px;}
 .zx-card{background:var(--zx-card);border:1px solid var(--zx-border);border-radius:var(--zx-radius);padding:24px;}
@@ -253,9 +253,13 @@ export const defaultThemeCss = `
 .zx-button{font:inherit;font-weight:600;padding:12px 22px;border-radius:10px;border:1px solid var(--zx-accent);background:var(--zx-accent);color:#fff;cursor:pointer;min-height:44px;}
 .zx-button.zx-secondary{background:transparent;color:var(--zx-accent);}
 .zx-button:disabled{opacity:.6;cursor:default;}
+.zx-logo{display:block;max-height:48px;max-width:200px;margin:0 0 16px;}
+.zx-progress-text{color:var(--zx-muted);font-size:.85rem;margin:0 0 12px;text-align:right;}
+.zx-lang{display:flex;justify-content:flex-end;margin:0 0 8px;}
+.zx-lang select{font:inherit;padding:4px 8px;border:1px solid var(--zx-border);border-radius:8px;background:var(--zx-card);color:var(--zx-text);}
 .zx-test-banner{background:#fff4d6;color:#5c4400;border-radius:8px;padding:6px 10px;font-size:.85rem;margin:0 0 12px;}
 .zx-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
-@media (max-width:560px){
+@container zx (max-width:560px){
   .zx-card{padding:18px;}
   .zx-grid thead{display:none;}
   .zx-grid tr{display:block;border-bottom:1px solid var(--zx-border);padding:8px 0;}
@@ -265,3 +269,115 @@ export const defaultThemeCss = `
 }
 @media (prefers-reduced-motion:reduce){.zx-root *{transition:none!important;animation:none!important;}}
 `;
+
+// ---- Themes (Milestone 3) -------------------------------------------------------------------
+
+/** Ready-made looks offered in the Experience Studio. Each is a partial theme. */
+export const THEME_PRESETS: Record<string, { name: string; theme: Partial<Theme> }> = {
+  zapx: { name: 'ZAPX', theme: { accent: '#2f5bea', background: '#f6f7fb', surface: '#ffffff', text: '#1b1f2a', font: 'system', radius: 12 } },
+  clinical: { name: 'Clinical', theme: { accent: '#0f766e', background: '#f3f7f7', surface: '#ffffff', text: '#12201f', font: 'humanist', radius: 6, motion: 'none' } },
+  warm: { name: 'Warm', theme: { accent: '#c2410c', background: '#fbf6f1', surface: '#fffdfa', text: '#2a1d14', font: 'rounded', radius: 18 } },
+  editorial: { name: 'Editorial', theme: { accent: '#1f2937', background: '#f7f5f0', surface: '#ffffff', text: '#111111', font: 'serif', radius: 2, motion: 'subtle' } },
+  vivid: { name: 'Vivid', theme: { accent: '#7c3aed', background: '#f5f3ff', surface: '#ffffff', text: '#1e1b2e', font: 'rounded', radius: 20, motion: 'lively' } },
+  midnight: { name: 'Midnight', theme: { accent: '#38bdf8', background: '#0b1220', surface: '#121a2b', text: '#e6edf7', font: 'system', radius: 12, colorScheme: 'light' } },
+};
+
+const FONT_STACKS: Record<Theme['font'], string> = {
+  system: 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',
+  humanist: '"Segoe UI","Gill Sans","Trebuchet MS",Candara,Optima,sans-serif',
+  rounded: 'ui-rounded,"SF Pro Rounded","Nunito","Varela Round","Arial Rounded MT Bold",system-ui,sans-serif',
+  serif: 'Charter,"Bitstream Charter","Sitka Text",Cambria,Georgia,serif',
+};
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function mix(a: string, b: string, weightOfA: number): string {
+  const x = hexToRgb(a);
+  const y = hexToRgb(b);
+  const c = x.map((v, i) => Math.round(v * weightOfA + y[i]! * (1 - weightOfA)));
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+}
+function luminance(hex: string): number {
+  const [r, g, b] = hexToRgb(hex).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+/** WCAG contrast ratio between two colours (1 to 21). */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
+/** Accessibility warnings for a theme (text and button contrast below WCAG AA). */
+export function themeWarnings(theme: Theme): string[] {
+  const w: string[] = [];
+  if (contrastRatio(theme.text, theme.surface) < 4.5) w.push('Question text does not stand out enough from the card colour (contrast below 4.5:1).');
+  if (contrastRatio(theme.text, theme.background) < 4.5) w.push('Text on the page background is hard to read (contrast below 4.5:1).');
+  const onAccent = contrastRatio('#ffffff', theme.accent) >= contrastRatio('#111111', theme.accent) ? '#ffffff' : '#111111';
+  if (contrastRatio(onAccent, theme.accent) < 4.5) w.push('Button text is hard to read on the accent colour (contrast below 4.5:1).');
+  return w;
+}
+
+/**
+ * CSS for a theme, scoped to `.zx-root`. Only design tokens, fonts and motion change; markup and
+ * behaviour are the same for every theme. Values come from the validated theme schema, so they
+ * cannot inject CSS.
+ */
+export function themeCss(theme: Theme, devices?: DeviceSettings): string {
+  const onAccent = contrastRatio('#ffffff', theme.accent) >= contrastRatio('#111111', theme.accent) ? '#ffffff' : '#111111';
+  const vars = [
+    `--zx-bg:${theme.background}`,
+    `--zx-card:${theme.surface}`,
+    `--zx-text:${theme.text}`,
+    `--zx-muted:${mix(theme.text, theme.surface, 0.68)}`,
+    `--zx-accent:${theme.accent}`,
+    `--zx-on-accent:${onAccent}`,
+    `--zx-accent-soft:${mix(theme.accent, theme.surface, 0.12)}`,
+    `--zx-border:${mix(theme.text, theme.surface, 0.16)}`,
+    `--zx-radius:${theme.radius}px`,
+    `--zx-option-radius:${Math.max(0, Math.round(theme.radius * 0.8))}px`,
+  ].join(';');
+  const parts = [`.zx-root{font-family:${FONT_STACKS[theme.font]};--zx-radius:${theme.radius}px;--zx-option-radius:${Math.max(0, Math.round(theme.radius * 0.8))}px}`];
+  // auto: the theme palette in light mode, the built-in dark palette for respondents in dark mode.
+  parts.push(theme.colorScheme === 'light' ? `.zx-root{${vars}}` : `@media not all and (prefers-color-scheme:dark){.zx-root{${vars}}}`);
+  if (theme.density === 'compact') {
+    parts.push('.zx-root .zx-page{gap:12px}.zx-root .zx-option{padding:8px 12px;min-height:40px}.zx-root .zx-card{padding:18px}');
+  }
+  if (theme.motion === 'subtle') {
+    parts.push('@keyframes zx-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.zx-root .zx-card{animation:zx-in .28s ease-out}');
+  } else if (theme.motion === 'lively') {
+    parts.push(
+      '@keyframes zx-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}@keyframes zx-pop{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}' +
+        '.zx-root .zx-card{animation:zx-in .35s cubic-bezier(.2,.8,.2,1)}.zx-root .zx-option.zx-selected{animation:zx-pop .25s ease-out}.zx-root .zx-question{animation:zx-in .35s cubic-bezier(.2,.8,.2,1) both}',
+    );
+  }
+  if (devices?.gridOnMobile === 'scroll') {
+    parts.push(
+      '@container zx (max-width:560px){.zx-root .zx-grid thead{display:table-header-group}.zx-root .zx-grid tr{display:table-row;padding:0}.zx-root .zx-grid tbody th{display:table-cell;padding:10px 8px}.zx-root .zx-grid td{display:table-cell;text-align:center;padding:10px 8px;border-bottom:1px solid var(--zx-border)}.zx-root .zx-grid td::after{content:none}}',
+    );
+  }
+  parts.push('.zx-root .zx-option{border-radius:var(--zx-option-radius)}.zx-root .zx-input{border-radius:var(--zx-option-radius)}.zx-root .zx-button{border-radius:var(--zx-option-radius);color:var(--zx-on-accent,#fff)}.zx-root .zx-button.zx-secondary{color:var(--zx-accent)}');
+  // Respondents who ask for less motion always get none, whatever the theme says.
+  parts.push('@media (prefers-reduced-motion:reduce){.zx-root *{transition:none!important;animation:none!important}}');
+  return parts.join('\n');
+}
+
+/** Logo and progress header shared by the runtime and the studio preview. */
+export function SurveyHeader({ theme, progress, progressLabel }: { theme?: Theme; progress?: number; progressLabel?: string }) {
+  const style = theme?.progress ?? 'bar';
+  return (
+    <>
+      {theme?.logo ? <img className="zx-logo" src={theme.logo} alt={theme.logoAlt ?? ''} /> : null}
+      {progress !== undefined && style === 'bar' ? (
+        <div className="zx-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={progressLabel}>
+          <div style={{ width: `${progress}%` }} />
+        </div>
+      ) : null}
+      {progress !== undefined && style === 'percent' ? <p className="zx-progress-text">{progress}%</p> : null}
+    </>
+  );
+}

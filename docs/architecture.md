@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 and 2)
+# ZAPX architecture (Milestones 1 to 3)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -48,6 +48,30 @@ termination and quota functions as live interviews. Answers are generated determ
 seed, favour options chosen least so far, and use boundary values taken from the literals in
 conditions. The report lists outcome counts, coverage items with hit counts, and defects with an
 example respondent. The API stores each run (`QaRun`) with the version it tested.
+
+## Presentation layer: themes, languages, devices (Milestone 3)
+
+Each `SurveyVersion` has a `presentation` document next to its `definition`
+(`presentationSchema` in `packages/survey-schema`): `theme`, `devices` and `languages`. It is
+versioned and frozen with the definition at publish, so a published version always looks the same.
+It never contains logic.
+
+- **Themes** become CSS custom properties through `themeCss` in `packages/survey-renderer`, shared by
+  the runtime and studio preview. Values are schema-validated (hex colours, fixed font stacks,
+  numeric radius), so a theme cannot inject CSS. Logos are small PNG/JPEG/WebP data URLs; SVG is
+  rejected because it can carry script. No web fonts are loaded. The narrow layout uses a container
+  query, so the studio's phone-width preview matches a real phone.
+- **Translations** are maps from stable text keys (`q.Q1.text`, `q.Q1.opt.2`, `ui.next`, ...) to
+  `{ text, source, status }`. `localizeDefinition` overlays them on the definition at run time;
+  ids, codes and conditions are untouched, so the logic engine, piping, QA and exports work the same
+  in every language. `source` records what was translated, so an edit to the source marks the
+  translation outdated. AI translations are stored as `machine` and an enabled language blocks
+  publishing until every text is current and `reviewed` by a person. System messages
+  (validation errors, buttons, end messages) are keys too (`SYSTEM_MESSAGES` in the logic engine).
+- **Devices**: the runtime sends two coarse hints (touch support, short screen side) with the user
+  agent; `classifyDevice` returns desktop, tablet or mobile. Only that type is stored. A device that
+  is not allowed is screened out before a response is created, so the respondent can retry on an
+  allowed device with the same link.
 
 ## Request flow for a respondent
 

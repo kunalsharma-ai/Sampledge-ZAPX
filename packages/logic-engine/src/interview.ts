@@ -121,6 +121,49 @@ export function matchingQuotas(def: SurveyDefinition, answers: Answers): Quota[]
 // Validation
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Text the respondent sees that is not part of the questionnaire: validation messages, buttons and
+ * end-of-survey messages. English defaults; each survey language can translate them (keys `ui.*`).
+ * `{n}` and `{label}` are filled in at run time.
+ */
+export const SYSTEM_MESSAGES = {
+  required: 'This question requires an answer.',
+  chooseListed: 'Choose one of the listed options.',
+  chooseOneOrMore: 'Choose one or more of the listed options.',
+  chooseOnlyListed: 'Choose only the listed options.',
+  exclusive: '"{label}" cannot be combined with other answers.',
+  minSelected: 'Choose at least {n}.',
+  maxSelected: 'Choose at most {n}.',
+  enterText: 'Enter text.',
+  maxLength: 'Use at most {n} characters.',
+  enterNumber: 'Enter a number.',
+  wholeNumber: 'Enter a whole number.',
+  min: 'Enter a number of at least {n}.',
+  max: 'Enter a number no greater than {n}.',
+  answerRows: 'Answer every row.',
+  gridListed: 'Choose one of the listed options in each row.',
+  next: 'Next',
+  back: 'Back',
+  saving: 'Saving…',
+  language: 'Language',
+  fixErrors: 'Please check the highlighted answers.',
+  outcomeComplete: 'Thank you, your answers have been recorded.',
+  outcomeTerminate: 'Thank you for your time. Unfortunately you do not qualify for this survey.',
+  outcomeQuotaFull: 'Thank you for your interest. We already have enough responses from people like you.',
+  outcomeQualityFail: 'Thank you for your time.',
+  outcomeSecurityReject: 'This survey link is not valid.',
+  outcomeDuplicate: 'You have already taken part in this survey. Thank you.',
+  deviceNotAllowed: 'This survey cannot be taken on this device. Please open the link on a {device}.',
+  deviceDesktop: 'computer',
+  deviceTablet: 'tablet',
+  deviceMobile: 'phone',
+};
+export type SystemMessages = typeof SYSTEM_MESSAGES;
+
+export function fillMessage(template: string, values: Record<string, string | number | undefined>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (values[k] === undefined ? m : String(values[k])));
+}
+
 export interface FieldError {
   questionId: string;
   message: string;
@@ -148,61 +191,61 @@ function isEmpty(v: unknown): boolean {
 }
 
 /** Coerce and check one submitted answer. Returns the normalized value or an error message. */
-export function normalizeAnswer(q: Question, raw: unknown): { value: AnswerValue } | { error: string } {
+export function normalizeAnswer(q: Question, raw: unknown, msg: SystemMessages = SYSTEM_MESSAGES): { value: AnswerValue } | { error: string } {
   if (q.type === 'info') return { value: null };
   if (isEmpty(raw)) {
-    return q.required ? { error: 'This question requires an answer.' } : { value: null };
+    return q.required ? { error: msg.required } : { value: null };
   }
   switch (q.type) {
     case 'single': {
       const n = typeof raw === 'string' ? Number(raw) : raw;
-      if (typeof n !== 'number' || !optionCodes(q.options).has(n)) return { error: 'Choose one of the listed options.' };
+      if (typeof n !== 'number' || !optionCodes(q.options).has(n)) return { error: msg.chooseListed };
       return { value: n };
     }
     case 'multi': {
-      if (!Array.isArray(raw)) return { error: 'Choose one or more of the listed options.' };
+      if (!Array.isArray(raw)) return { error: msg.chooseOneOrMore };
       const codes = optionCodes(q.options);
       const vals = [...new Set(raw.map((x) => (typeof x === 'string' ? Number(x) : x)))];
       if (!vals.every((v): v is number => typeof v === 'number' && codes.has(v)))
-        return { error: 'Choose only the listed options.' };
+        return { error: msg.chooseOnlyListed };
       const exclusive = q.options.filter((o) => o.exclusive).map((o) => o.code);
       if (vals.length > 1 && vals.some((v) => exclusive.includes(v))) {
-        const label = q.options.find((o) => o.exclusive && vals.includes(o.code))?.label ?? 'This option';
-        return { error: `"${label}" cannot be combined with other answers.` };
+        const label = q.options.find((o) => o.exclusive && vals.includes(o.code))?.label ?? '';
+        return { error: fillMessage(msg.exclusive, { label }) };
       }
       if (q.minSelected !== undefined && vals.length < q.minSelected)
-        return { error: `Choose at least ${q.minSelected}.` };
+        return { error: fillMessage(msg.minSelected, { n: q.minSelected }) };
       if (q.maxSelected !== undefined && vals.length > q.maxSelected)
-        return { error: `Choose at most ${q.maxSelected}.` };
+        return { error: fillMessage(msg.maxSelected, { n: q.maxSelected }) };
       return { value: vals.sort((a, b) => a - b) };
     }
     case 'open': {
-      if (typeof raw !== 'string') return { error: 'Enter text.' };
+      if (typeof raw !== 'string') return { error: msg.enterText };
       const text = raw.trim();
-      if (text.length > q.maxLength) return { error: `Use at most ${q.maxLength} characters.` };
+      if (text.length > q.maxLength) return { error: fillMessage(msg.maxLength, { n: q.maxLength }) };
       return { value: text };
     }
     case 'numeric': {
       const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
-      if (typeof n !== 'number' || !Number.isFinite(n)) return { error: 'Enter a number.' };
-      if (q.integer && !Number.isInteger(n)) return { error: 'Enter a whole number.' };
-      if (q.min !== undefined && n < q.min) return { error: `Enter a number of at least ${q.min}.` };
-      if (q.max !== undefined && n > q.max) return { error: `Enter a number no greater than ${q.max}.` };
+      if (typeof n !== 'number' || !Number.isFinite(n)) return { error: msg.enterNumber };
+      if (q.integer && !Number.isInteger(n)) return { error: msg.wholeNumber };
+      if (q.min !== undefined && n < q.min) return { error: fillMessage(msg.min, { n: q.min }) };
+      if (q.max !== undefined && n > q.max) return { error: fillMessage(msg.max, { n: q.max }) };
       return { value: n };
     }
     case 'grid': {
-      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { error: 'Answer each row.' };
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { error: msg.answerRows };
       const cols = optionCodes(q.columns);
       const rows = new Set(q.rows.map((r) => r.id));
       const out: Record<string, number> = {};
       for (const [rowId, v] of Object.entries(raw as Record<string, unknown>)) {
-        if (!rows.has(rowId)) return { error: 'Unknown row.' };
+        if (!rows.has(rowId)) return { error: msg.answerRows };
         if (v === null || v === undefined || v === '') continue;
         const n = typeof v === 'string' ? Number(v) : v;
-        if (typeof n !== 'number' || !cols.has(n)) return { error: 'Choose one of the listed options in each row.' };
+        if (typeof n !== 'number' || !cols.has(n)) return { error: msg.gridListed };
         out[rowId] = n;
       }
-      if (q.required && q.rows.some((r) => out[r.id] === undefined)) return { error: 'Answer every row.' };
+      if (q.required && q.rows.some((r) => out[r.id] === undefined)) return { error: msg.answerRows };
       return { value: Object.keys(out).length ? out : null };
     }
   }
@@ -217,6 +260,7 @@ export function validatePage(
   page: Page,
   priorAnswers: Answers,
   submitted: Record<string, unknown>,
+  msg: SystemMessages = SYSTEM_MESSAGES,
 ): PageValidationResult {
   // Visibility is decided in page order: a question may depend on earlier questions on the same
   // page (e.g. "Other, please specify"), so each condition sees the answers accepted so far.
@@ -231,7 +275,7 @@ export function validatePage(
       pageAnswers[q.id] = null;
       continue;
     }
-    const r = normalizeAnswer(q, submitted[q.id]);
+    const r = normalizeAnswer(q, submitted[q.id], msg);
     if ('error' in r) {
       errors.push({ questionId: q.id, message: r.error });
       pageAnswers[q.id] = null;
