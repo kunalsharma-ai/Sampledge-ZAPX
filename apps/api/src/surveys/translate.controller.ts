@@ -11,6 +11,7 @@ import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { AiError, AiProvider } from '../ai/ai-provider';
 import { notConfigured } from '../ai/claude.provider';
+import { AiGateway } from '../ai/ai-gateway';
 import { SurveysService } from './surveys.service';
 
 const translateSchema = z.object({
@@ -30,6 +31,7 @@ const BATCH = 120;
 export class TranslateController {
   constructor(
     private readonly ai: AiProvider,
+    private readonly gateway: AiGateway,
     private readonly surveys: SurveysService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -40,7 +42,7 @@ export class TranslateController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async translate(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     const input = parseBody(translateSchema, body);
-    if (!this.ai.configured) throw toHttp(notConfigured());
+    if (!this.gateway.configured) throw toHttp(notConfigured());
     const draft = await this.surveys.draft(user, id);
     const def = parseSurveyDefinition(draft.definition);
     const pres = parsePresentation(draft.presentation);
@@ -56,16 +58,27 @@ export class TranslateController {
           return !e || !e.text.trim() || e.source !== k.source;
         });
     const results: Record<string, { text: string; source: string }> = {};
-    let model = this.ai.model;
+    let model = this.gateway.modelFor('translate');
+    const actor = { tenantId: user.tenantId, userId: user.id };
     for (let i = 0; i < wanted.length; i += BATCH) {
       const batch = wanted.slice(i, i + BATCH);
-      const r = await this.ai
-        .translate({
-          from: { tag: def.definition.language, name: pres.presentation.sourceLanguageName ?? def.definition.language },
-          to: { tag: lang.tag, name: lang.name },
-          surveyTitle: def.definition.title,
-          items: batch.map((k) => ({ key: k.key, text: k.source, context: k.context })),
-        })
+      // Survey texts are the product being translated, so they are not redacted.
+      const r = await this.gateway
+        .run(
+          'translate',
+          actor,
+          (m) =>
+            this.ai.translate(
+              {
+                from: { tag: def.definition.language, name: pres.presentation.sourceLanguageName ?? def.definition.language },
+                to: { tag: lang.tag, name: lang.name },
+                surveyTitle: def.definition.title,
+                items: batch.map((k) => ({ key: k.key, text: k.source, context: k.context })),
+              },
+              m,
+            ),
+          { surveyId: id },
+        )
         .catch((e: unknown) => {
           throw toHttp(e);
         });

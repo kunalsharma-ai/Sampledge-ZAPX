@@ -9,7 +9,7 @@ export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
   async record(
-    actor: AuthUser | { tenantId: string; id?: undefined },
+    actor: AuthUser | { tenantId: string; id?: string | null },
     action: string,
     entityType: string,
     entityId: string,

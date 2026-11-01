@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { analyzeSurvey } from '@zapx/logic-engine';
 import { parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
 import { AiError, AiProvider, type AiDocument, type ArchitectResult } from './ai-provider';
+import { AiGateway, type AiActor } from './ai-gateway';
+import { redactPii } from './redact';
 
 export interface ArchitectOutcome {
   definition: SurveyDefinition;
@@ -11,6 +13,8 @@ export interface ArchitectOutcome {
   servedByFallback: boolean;
   /** 1, or 2 when the first answer needed a repair round. */
   attempts: number;
+  /** Personal data values removed from the brief and documents before sending. */
+  redactions: number;
   /** Logic errors still present after the repair round (the programmer sees them in review). */
   remainingProblems: string[];
 }
@@ -42,23 +46,45 @@ export function problemsIn(json: string): { definition: SurveyDefinition | null;
  */
 @Injectable()
 export class ArchitectService {
-  constructor(private readonly ai: AiProvider) {}
+  constructor(
+    private readonly ai: AiProvider,
+    private readonly gateway: AiGateway,
+  ) {}
 
-  get status() {
-    return { configured: this.ai.configured, model: this.ai.model };
+  get configured() {
+    return this.gateway.configured;
   }
 
-  async propose(instruction: string, current: SurveyDefinition | null, documents: AiDocument[]): Promise<ArchitectOutcome> {
-    let result: ArchitectResult = await this.ai.architect({ instruction, current, documents });
+  async propose(
+    actor: AiActor,
+    input: { instruction: string; current: SurveyDefinition | null; documents: AiDocument[]; surveyId?: string },
+  ): Promise<ArchitectOutcome> {
+    const admitted = await this.gateway.admit('architect', actor, input.surveyId);
+    let { instruction, documents } = input;
+    let redactions = 0;
+    if (admitted.policy.redactPii) {
+      const r = redactPii(instruction);
+      instruction = r.text;
+      redactions += r.count;
+      documents = documents.map((d) => {
+        if (d.kind !== 'text') return d;
+        const rd = redactPii(d.text);
+        redactions += rd.count;
+        return { ...d, text: rd.text };
+      });
+    }
+    const current = input.current;
+    const call = (feedback?: { previousJson: string; problems: string[] }) => (model: string) =>
+      this.ai.architect({ instruction, current, documents, feedback }, model);
+
+    let result: ArchitectResult = await this.gateway.run('architect', actor, call(), { surveyId: input.surveyId, redactions, admitted });
     let check = problemsIn(result.definitionJson);
     let attempts = 1;
     if (check.problems.length) {
       attempts = 2;
-      result = await this.ai.architect({
-        instruction,
-        current,
-        documents,
-        feedback: { previousJson: result.definitionJson, problems: check.problems },
+      result = await this.gateway.run('architect', actor, call({ previousJson: result.definitionJson, problems: check.problems }), {
+        surveyId: input.surveyId,
+        redactions,
       });
       check = problemsIn(result.definitionJson);
     }
@@ -72,6 +98,7 @@ export class ArchitectService {
       model: result.model,
       servedByFallback: result.servedByFallback,
       attempts,
+      redactions,
       remainingProblems: check.problems,
     };
   }

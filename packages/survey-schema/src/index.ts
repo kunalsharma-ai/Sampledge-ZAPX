@@ -137,7 +137,17 @@ export const pageSchema = z.object({
 export type Page = z.infer<typeof pageSchema>;
 
 /** Final statuses a respondent can reach. Each maps to a vendor redirect. */
-export const OUTCOME_STATUSES = ['complete', 'terminate', 'quota_full', 'quality_fail', 'security_reject', 'duplicate'] as const;
+/** The same eight statuses as PROJEXA. `partial` = abandoned; `technical_error` = ZAPX could not continue. */
+export const OUTCOME_STATUSES = [
+  'complete',
+  'terminate',
+  'quota_full',
+  'quality_fail',
+  'security_reject',
+  'duplicate',
+  'partial',
+  'technical_error',
+] as const;
 export type OutcomeStatus = (typeof OUTCOME_STATUSES)[number];
 
 export const terminationSchema = z.object({

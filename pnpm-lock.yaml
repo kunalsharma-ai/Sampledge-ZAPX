@@ -62,6 +62,9 @@ importers:
       '@zapx/logic-engine':
         specifier: workspace:*
         version: link:../../packages/logic-engine
+      '@zapx/redirect-core':
+        specifier: workspace:*
+        version: link:../../packages/redirect-core
       '@zapx/survey-schema':
         specifier: workspace:*
         version: link:../../packages/survey-schema
@@ -231,6 +234,21 @@ importers:
       '@zapx/survey-schema':
         specifier: workspace:*
         version: link:../survey-schema
+    devDependencies:
+      '@types/node':
+        specifier: 22.15.30
+        version: 22.15.30
+      tsup:
+        specifier: 8.5.0
+        version: 8.5.0(@swc/core@1.12.1)(jiti@2.4.2)(postcss@8.5.32)(typescript@5.8.3)
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/node@22.15.30)(jiti@2.4.2)
+
+  packages/redirect-core:
     devDependencies:
       '@types/node':
         specifier: 22.15.30

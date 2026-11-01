@@ -220,7 +220,11 @@ describe('Template import and change sets', () => {
 
 describe('AI Survey Architect', () => {
   it('reports AI status', async () => {
-    expect((await http.get('/api/ai/status').set(auth).expect(200)).body).toEqual({ configured: true, model: 'fake-model' });
+    expect((await http.get('/api/ai/status').set(auth).expect(200)).body).toMatchObject({
+      configured: true,
+      model: 'fake-model',
+      tasks: { architect: { model: 'fake-model', permitted: true }, translate: { model: 'fake-model', permitted: true } },
+    });
   });
 
   it('repairs an invalid first answer and returns a change set for review', async () => {

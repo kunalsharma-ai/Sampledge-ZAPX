@@ -1,4 +1,4 @@
-import { Body, Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post } from '@nestjs/common';
 import { z } from 'zod';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -18,9 +18,9 @@ export class ProjectsController {
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.prisma.project.findMany({
-      where: { tenantId: user.tenantId },
+      where: { tenantId: user.tenantId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { surveys: true, vendors: true } } },
+      include: { _count: { select: { surveys: { where: { deletedAt: null } }, vendors: { where: { deletedAt: null } } } } },
     });
   }
 
@@ -36,14 +36,42 @@ export class ProjectsController {
   @Get(':id')
   async get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const project = await this.prisma.project.findFirst({
-      where: { id, tenantId: user.tenantId },
+      where: { id, tenantId: user.tenantId, deletedAt: null },
       include: {
-        surveys: { orderBy: { createdAt: 'desc' } },
-        vendors: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, code: true, redirectMode: true } },
+        surveys: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
+        vendors: {
+          where: { deletedAt: null },
+          orderBy: { createdAt: 'asc' },
+          select: { id: true, name: true, code: true, redirectMode: true, integration: true },
+        },
       },
     });
     if (!project) throw new NotFoundException('Project not found');
     return project;
+  }
+
+  /**
+   * Soft delete: the project, its surveys and vendors disappear from the studio and their links
+   * stop working; responses, audit trail and logs are kept. Live surveys must be closed first.
+   */
+  @Delete(':id')
+  @Roles('ADMIN')
+  @HttpCode(204)
+  async remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id, tenantId: user.tenantId, deletedAt: null },
+      include: { surveys: { where: { deletedAt: null } } },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    if (project.surveys.some((s) => s.status === 'LIVE'))
+      throw new ConflictException('Close or pause the live surveys in this project first');
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.survey.updateMany({ where: { projectId: id, deletedAt: null }, data: { deletedAt: now } }),
+      this.prisma.vendor.updateMany({ where: { projectId: id, deletedAt: null }, data: { deletedAt: now } }),
+      this.prisma.project.update({ where: { id }, data: { deletedAt: now } }),
+    ]);
+    await this.audit.record(user, 'project.delete', 'project', id, { surveys: project.surveys.length });
   }
 
   @Get(':id/audit')

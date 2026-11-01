@@ -1,4 +1,18 @@
-import { Body, Controller, Get, NotFoundException, Param, ParseIntPipe, Post, Put, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response as ExpressResponse } from 'express';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
@@ -10,7 +24,7 @@ import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { SurveysService } from './surveys.service';
 import { ExportService } from '../exports/export.service';
-import { signParams } from '../vendors/redirects';
+import { signParams } from '@zapx/redirect-core';
 import { testSignature } from '../interview/interview.service';
 
 const createSchema = z.object({ name: z.string().min(1).max(200) });
@@ -44,7 +58,7 @@ export class SurveysController {
 
   @Get('projects/:projectId/surveys')
   list(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string) {
-    return this.prisma.survey.findMany({ where: { projectId, tenantId: user.tenantId }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.survey.findMany({ where: { projectId, tenantId: user.tenantId, deletedAt: null }, orderBy: { createdAt: 'desc' } });
   }
 
   @Post('projects/:projectId/surveys')
@@ -101,6 +115,17 @@ export class SurveysController {
   @Roles(...CAN_EDIT)
   status(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     return this.surveys.setStatus(user, id, parseBody(statusSchema, body).status);
+  }
+
+  /** Soft delete. A live survey must be paused or closed first. Responses are kept. */
+  @Delete('surveys/:id')
+  @Roles(...CAN_EDIT)
+  @HttpCode(204)
+  async remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    const survey = await this.surveys.getSurvey(user, id);
+    if (survey.status === 'LIVE') throw new ConflictException('Pause or close the survey before deleting it');
+    await this.prisma.survey.update({ where: { id }, data: { deletedAt: new Date() } });
+    await this.audit.record(user, 'survey.delete', 'survey', id);
   }
 
   @Get('surveys/:id/versions/:version')

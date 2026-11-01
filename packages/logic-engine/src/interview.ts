@@ -143,6 +143,8 @@ export const SYSTEM_MESSAGES = {
   outcomeQualityFail: 'Thank you for your time.',
   outcomeSecurityReject: 'This survey link is not valid.',
   outcomeDuplicate: 'You have already taken part in this survey. Thank you.',
+  outcomePartial: 'This survey session has expired. Thank you for your time.',
+  outcomeTechnicalError: 'Sorry, something went wrong on our side and the survey cannot continue. Thank you for your time.',
   deviceNotAllowed: 'This survey cannot be taken on this device. Please open the link on a {device}.',
   deviceDesktop: 'computer',
   deviceTablet: 'tablet',

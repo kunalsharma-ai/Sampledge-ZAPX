@@ -11,7 +11,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
-import { signParams } from '../src/vendors/redirects';
+import { signParams } from '@zapx/redirect-core';
 
 process.env.ALLOW_SIGNUP = 'true';
 const demo = JSON.parse(readFileSync(join(__dirname, '../../../docs/examples/demo-screener.json'), 'utf8'));
@@ -192,7 +192,10 @@ describe('Milestone 1 flow: create, check, publish, respond, redirect, quota, ex
 
   it('exports CSV with codes, one column per option/row, and formula protection', async () => {
     const res = await http.get(`/api/surveys/${surveyId}/export?format=csv`).set(auth).expect(200);
-    const [header, ...rows] = res.text.replace(/^\uFEFF/, '').trim().split('\r\n');
+    const [header, ...rows] = res.text
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split('\r\n');
     const cols = header!.split(',');
     expect(cols).toEqual(expect.arrayContaining(['uid', 'status', 'AGE', 'GENDER', 'AWARE_1', 'AWARE_99', 'RATE_a', 'COMMENTS']));
     expect(rows).toHaveLength(4); // test response excluded

@@ -23,6 +23,8 @@ import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { SurveysService } from '../surveys/surveys.service';
 import { ChangeSetsService } from './changesets.service';
 import { ArchitectService } from '../ai/architect.service';
+import { AiGateway } from '../ai/ai-gateway';
+import { notConfigured } from '../ai/claude.provider';
 import { AiError } from '../ai/ai-provider';
 import { classifyFile, toAiDocument, type UploadedFile } from '../imports/documents';
 import { buildTemplateWorkbook, importTemplateRows, parseCsv, readXlsxTable } from '../imports/template-import';
@@ -43,11 +45,12 @@ export class ChangeSetsController {
     private readonly changeSets: ChangeSetsService,
     private readonly surveys: SurveysService,
     private readonly architect: ArchitectService,
+    private readonly gateway: AiGateway,
   ) {}
 
   @Get('ai/status')
-  aiStatus() {
-    return this.architect.status;
+  aiStatus(@CurrentUser() user: AuthUser) {
+    return this.gateway.status(user.tenantId);
   }
 
   @Get('imports/template.xlsx')
@@ -68,10 +71,7 @@ export class ChangeSetsController {
   async propose(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown, @UploadedFileParam() file?: UploadedFile) {
     const { instruction } = parseBody(proposeSchema, body ?? {});
     if (!instruction.trim() && !file) throw new BadRequestException('Describe what to build or change, or attach a questionnaire.');
-    if (!this.architect.status.configured)
-      aiHttpError(
-        new AiError('AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED'),
-      );
+    if (!this.architect.configured) aiHttpError(notConfigured());
     const draft = await this.surveys.draft(user, id);
     const current = parseSurveyDefinition(draft.definition);
     const documents = [];
@@ -80,7 +80,12 @@ export class ChangeSetsController {
       if (kind === 'xlsx') throw new BadRequestException('Excel files are imported with the template importer. Use Import file instead.');
       documents.push(await toAiDocument(file, kind));
     }
-    const outcome = await this.architect.propose(instruction, current.ok ? current.definition : null, documents).catch(aiHttpError);
+    const outcome = await this.architect
+      .propose(
+        { tenantId: user.tenantId, userId: user.id },
+        { instruction, current: current.ok ? current.definition : null, documents, surveyId: id },
+      )
+      .catch(aiHttpError);
     const assumptions = [...outcome.assumptions];
     if (outcome.servedByFallback) assumptions.unshift(`The primary model declined; this proposal was written by ${outcome.model}.`);
     if (outcome.remainingProblems.length) assumptions.push(`Logic problems the AI did not fix: ${outcome.remainingProblems.join('; ')}`);
@@ -91,7 +96,7 @@ export class ChangeSetsController {
       sourceFileName: file?.originalname,
       proposed: outcome.definition,
       assumptions,
-      confidence: { summary: outcome.summary, attempts: outcome.attempts },
+      confidence: { summary: outcome.summary, attempts: outcome.attempts, redactions: outcome.redactions },
       producer: outcome.model,
     });
   }

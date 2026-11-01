@@ -30,13 +30,13 @@ export class SurveysService {
   ) {}
 
   async getSurvey(user: AuthUser, id: string): Promise<Survey> {
-    const survey = await this.prisma.survey.findFirst({ where: { id, tenantId: user.tenantId } });
+    const survey = await this.prisma.survey.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
     if (!survey) throw new NotFoundException('Survey not found');
     return survey;
   }
 
   async create(user: AuthUser, projectId: string, name: string) {
-    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId } });
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId, deletedAt: null } });
     if (!project) throw new NotFoundException('Project not found');
     const survey = await this.prisma.$transaction(async (tx) => {
       const s = await tx.survey.create({ data: { tenantId: user.tenantId, projectId, name } });
