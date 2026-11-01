@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+**/dist
+**/.next
+**/.turbo
+**/node_modules
+packages/db/prisma/migrations
+e2e/test-results
+e2e/playwright-report

@@ -2,7 +2,13 @@
 import Link from 'next/link';
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
 import { analyzeSurvey, translationStatus, type AnalysisReport } from '@zapx/logic-engine';
-import { defaultPresentation, parsePresentation, parseSurveyDefinition, type Presentation, type SurveyDefinition } from '@zapx/survey-schema';
+import {
+  defaultPresentation,
+  parsePresentation,
+  parseSurveyDefinition,
+  type Presentation,
+  type SurveyDefinition,
+} from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { CopyField, ErrorNote, Shell } from '@/components/Shell';
@@ -66,7 +72,10 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   }, [id]);
   useEffect(() => {
     void load();
-    void api<{ configured: boolean }>('/ai/status').then((s) => setAiConfigured(s.configured), () => undefined);
+    void api<{ configured: boolean }>('/ai/status').then(
+      (s) => setAiConfigured(s.configured),
+      () => undefined,
+    );
   }, [load]);
 
   useEffect(() => {
@@ -113,12 +122,22 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     try {
       let current = draft;
       if (dirty) {
-        current = (await api<{ version: DraftVersion }>(`/surveys/${id}/draft`, { method: 'PUT', body: { definition: def, expectedUpdatedAt: current.updatedAt } })).version;
+        current = (
+          await api<{ version: DraftVersion }>(`/surveys/${id}/draft`, {
+            method: 'PUT',
+            body: { definition: def, expectedUpdatedAt: current.updatedAt },
+          })
+        ).version;
         setDraft(current);
         setDirty(false);
       }
       if (presDirty) {
-        current = (await api<{ version: DraftVersion }>(`/surveys/${id}/draft/presentation`, { method: 'PUT', body: { presentation: pres, expectedUpdatedAt: current.updatedAt } })).version;
+        current = (
+          await api<{ version: DraftVersion }>(`/surveys/${id}/draft/presentation`, {
+            method: 'PUT',
+            body: { presentation: pres, expectedUpdatedAt: current.updatedAt },
+          })
+        ).version;
         setDraft(current);
         setPresDirty(false);
       }
@@ -219,7 +238,11 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       {tab === 'build' || tab === 'json' ? (
         <div className="editor" style={{ gridTemplateColumns: 'minmax(0,1fr) 320px' }}>
           <div>
-            {tab === 'build' ? <VisualEditor def={def} onChange={edit} readOnly={readOnly} /> : <JsonEditor def={def} onApply={edit} readOnly={readOnly} />}
+            {tab === 'build' ? (
+              <VisualEditor def={def} onChange={edit} readOnly={readOnly} />
+            ) : (
+              <JsonEditor def={def} onApply={edit} readOnly={readOnly} />
+            )}
           </div>
           <LogicReport schemaIssues={report.schemaIssues} analysis={report.analysis} languageBlockers={languageBlockers} />
         </div>
@@ -271,8 +294,19 @@ function JsonEditor({ def, onApply, readOnly }: { def: SurveyDefinition; onApply
   return (
     <div className="panel stack">
       <p className="muted small">The canonical survey definition. Paste a full definition here, then apply it.</p>
-      <textarea aria-label="Survey definition JSON" rows={30} value={text} onChange={(e) => setText(e.target.value)} readOnly={readOnly} spellCheck={false} />
-      {err ? <pre className="error-text small" style={{ whiteSpace: 'pre-wrap' }}>{err}</pre> : null}
+      <textarea
+        aria-label="Survey definition JSON"
+        rows={30}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        readOnly={readOnly}
+        spellCheck={false}
+      />
+      {err ? (
+        <pre className="error-text small" style={{ whiteSpace: 'pre-wrap' }}>
+          {err}
+        </pre>
+      ) : null}
       {!readOnly ? (
         <div>
           <button className="primary" onClick={apply}>
@@ -309,7 +343,8 @@ function LogicReport({
       ) : analysis ? (
         <>
           <p className={analysis.ok ? 'ok-text' : 'error-text'}>
-            {analysis.ok ? 'Ready to publish.' : 'Fix these errors before publishing.'} {analysis.errors} error(s), {analysis.warnings} warning(s).
+            {analysis.ok ? 'Ready to publish.' : 'Fix these errors before publishing.'} {analysis.errors} error(s), {analysis.warnings}{' '}
+            warning(s).
           </p>
           {languageBlockers.map((b) => (
             <div key={b} className="issue error">
@@ -449,7 +484,9 @@ function Distribute({ survey, readOnly, onChanged }: { survey: SurveyDetail; rea
         <p>
           Currently <span className={`badge ${survey.status.toLowerCase()}`}>{survey.status.toLowerCase()}</span>
         </p>
-        <p className="muted small">Paused and closed surveys send new respondents to the quota-full redirect. Respondents already in progress can finish.</p>
+        <p className="muted small">
+          Paused and closed surveys send new respondents to the quota-full redirect. Respondents already in progress can finish.
+        </p>
         {!readOnly ? (
           <div className="row">
             <button onClick={() => setStatus('LIVE')} disabled={survey.status === 'LIVE'}>
@@ -472,7 +509,11 @@ function Distribute({ survey, readOnly, onChanged }: { survey: SurveyDetail; rea
                 <td>
                   <span className="badge">{v.status.toLowerCase()}</span>
                 </td>
-                <td className="muted small">{v.publishedAt ? `published ${new Date(v.publishedAt).toLocaleString()}` : `edited ${new Date(v.updatedAt).toLocaleString()}`}</td>
+                <td className="muted small">
+                  {v.publishedAt
+                    ? `published ${new Date(v.publishedAt).toLocaleString()}`
+                    : `edited ${new Date(v.updatedAt).toLocaleString()}`}
+                </td>
               </tr>
             ))}
           </tbody>

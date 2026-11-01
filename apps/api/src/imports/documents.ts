@@ -58,5 +58,5 @@ export async function toAiDocument(file: UploadedFile, kind: FileKind): Promise<
       throw new BadRequestException('The Word document could not be read, or it has no text.');
     }
   }
-  return { name, kind: 'text', text: file.buffer.toString('utf8').replace(/^﻿/, '') };
+  return { name, kind: 'text', text: file.buffer.toString('utf8').replace(/^\uFEFF/, '') };
 }

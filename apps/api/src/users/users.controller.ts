@@ -38,7 +38,13 @@ export class UsersController {
     if (await this.prisma.user.findUnique({ where: { email: input.email } }))
       throw new ForbiddenException('An account with this email already exists');
     const created = await this.prisma.user.create({
-      data: { tenantId: user.tenantId, email: input.email, name: input.name, role: input.role, passwordHash: await hash(input.password, 10) },
+      data: {
+        tenantId: user.tenantId,
+        email: input.email,
+        name: input.name,
+        role: input.role,
+        passwordHash: await hash(input.password, 10),
+      },
       select: { id: true, email: true, name: true, role: true },
     });
     await this.audit.record(user, 'user.create', 'user', created.id, { email: created.email, role: created.role });

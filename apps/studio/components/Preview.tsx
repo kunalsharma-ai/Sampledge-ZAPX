@@ -44,7 +44,10 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
   };
 
   const page = pageIndex >= 0 ? def.pages[pageIndex] : undefined;
-  const questions = useMemo(() => (page ? page.questions.map((q) => renderQuestion(q, def, answers, seed)) : []), [page, def, answers, seed]);
+  const questions = useMemo(
+    () => (page ? page.questions.map((q) => renderQuestion(q, def, answers, seed)) : []),
+    [page, def, answers, seed],
+  );
   const blocked = !presentation.devices.allowed.includes(device);
 
   const next = () => {
@@ -66,7 +69,10 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
     setPageIndex(n);
   };
 
-  const languages = [{ tag: sourceDef.language, name: presentation.sourceLanguageName ?? sourceDef.language }, ...presentation.languages.map((l) => ({ tag: l.tag, name: `${l.name}${l.enabled ? '' : ' (not offered)'}` }))];
+  const languages = [
+    { tag: sourceDef.language, name: presentation.sourceLanguageName ?? sourceDef.language },
+    ...presentation.languages.map((l) => ({ tag: l.tag, name: `${l.name}${l.enabled ? '' : ' (not offered)'}` })),
+  ];
 
   return (
     <div className="grid2" style={{ gridTemplateColumns: 'minmax(0,1fr) 300px' }}>
@@ -89,7 +95,11 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
           <button onClick={restart}>Restart</button>
           <span className="muted small">Preview runs your current, unsaved edits. Nothing is recorded.</span>
         </div>
-        <div className="preview-frame" style={{ maxWidth: WIDTHS[device], margin: device === 'desktop' ? undefined : '0 auto' }} data-testid="preview-frame">
+        <div
+          className="preview-frame"
+          style={{ maxWidth: WIDTHS[device], margin: device === 'desktop' ? undefined : '0 auto' }}
+          data-testid="preview-frame"
+        >
           <div className="zx-root" style={{ minHeight: 400 }} lang={language}>
             <style>{defaultThemeCss}</style>
             <style>{themeCss(presentation.theme, presentation.devices)}</style>
@@ -117,7 +127,11 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
                   }}
                   noValidate
                 >
-                  <SurveyHeader theme={presentation.theme} progress={def.settings.showProgress ? progressPercent(def, pageIndex) : undefined} progressLabel="Progress" />
+                  <SurveyHeader
+                    theme={presentation.theme}
+                    progress={def.settings.showProgress ? progressPercent(def, pageIndex) : undefined}
+                    progressLabel="Progress"
+                  />
                   {page.title ? <h1 className="zx-title">{page.title}</h1> : null}
                   <SurveyPage
                     questions={questions}

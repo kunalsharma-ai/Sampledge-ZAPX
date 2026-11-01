@@ -30,8 +30,7 @@ import { buildTemplateWorkbook, importTemplateRows, parseCsv, readXlsxTable } fr
 const proposeSchema = z.object({ instruction: z.string().max(20000).default('') });
 const manualSchema = z.object({ title: z.string().min(1).max(200).default('Pasted definition'), definition: z.unknown() });
 
-const upload = () =>
-  FileInterceptor('file', { limits: { fileSize: config().UPLOAD_MAX_MB * 1024 * 1024, files: 1, fields: 10 } });
+const upload = () => FileInterceptor('file', { limits: { fileSize: config().UPLOAD_MAX_MB * 1024 * 1024, files: 1, fields: 10 } });
 
 function aiHttpError(err: unknown): never {
   if (err instanceof AiError) throw new HttpException({ message: err.message, code: err.code }, err.status);
@@ -69,7 +68,10 @@ export class ChangeSetsController {
   async propose(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown, @UploadedFileParam() file?: UploadedFile) {
     const { instruction } = parseBody(proposeSchema, body ?? {});
     if (!instruction.trim() && !file) throw new BadRequestException('Describe what to build or change, or attach a questionnaire.');
-    if (!this.architect.status.configured) aiHttpError(new AiError('AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED'));
+    if (!this.architect.status.configured)
+      aiHttpError(
+        new AiError('AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED'),
+      );
     const draft = await this.surveys.draft(user, id);
     const current = parseSurveyDefinition(draft.definition);
     const documents = [];
@@ -107,7 +109,12 @@ export class ChangeSetsController {
     const kind = classifyFile(file);
     if (kind === 'xlsx' || kind === 'csv') {
       const survey = await this.surveys.getSurvey(user, id);
-      const table = kind === 'xlsx' ? await readXlsxTable(file.buffer).catch(() => { throw new BadRequestException('The Excel file could not be read.'); }) : parseCsv(file.buffer.toString('utf8'));
+      const table =
+        kind === 'xlsx'
+          ? await readXlsxTable(file.buffer).catch(() => {
+              throw new BadRequestException('The Excel file could not be read.');
+            })
+          : parseCsv(file.buffer.toString('utf8'));
       const result = importTemplateRows(table, survey.name);
       if (!result.definition) {
         throw new UnprocessableEntityException({ message: 'The file could not be imported', errors: result.errors, rows: result.rows });
@@ -122,7 +129,15 @@ export class ChangeSetsController {
         producer: 'zapx-template-v1',
       });
     }
-    return this.propose(user, id, { instruction: parseBody(proposeSchema, body ?? {}).instruction || 'Program this questionnaire as a new survey, replacing the current draft.' }, file);
+    return this.propose(
+      user,
+      id,
+      {
+        instruction:
+          parseBody(proposeSchema, body ?? {}).instruction || 'Program this questionnaire as a new survey, replacing the current draft.',
+      },
+      file,
+    );
   }
 
   /** Propose a pasted definition (e.g. from another tool) for review like any other change. */

@@ -31,7 +31,8 @@ export function textKeys(def: SurveyDefinition, presentation?: Pick<Presentation
       if (q.type === 'info') continue;
       add(`q.${q.id}.help`, q.help, `${q.id} help text`);
       q.validations.forEach((v, i) => add(`q.${q.id}.val.${i}`, v.message, `${q.id} validation message`));
-      if (q.type === 'single' || q.type === 'multi') q.options.forEach((o) => add(`q.${q.id}.opt.${o.code}`, o.label, `${q.id} answer ${o.code}`));
+      if (q.type === 'single' || q.type === 'multi')
+        q.options.forEach((o) => add(`q.${q.id}.opt.${o.code}`, o.label, `${q.id} answer ${o.code}`));
       if (q.type === 'grid') {
         q.rows.forEach((r) => add(`q.${q.id}.row.${r.id}`, r.label, `${q.id} row ${r.id}`));
         q.columns.forEach((c) => add(`q.${q.id}.col.${c.code}`, c.label, `${q.id} column ${c.code}`));
@@ -128,11 +129,17 @@ export interface TranslationStatus {
 }
 
 function placeholders(text: string): string {
-  return [...text.matchAll(new RegExp(PIPE_PATTERN.source, 'g'))].map((m) => m[0]).sort().join('|');
+  return [...text.matchAll(new RegExp(PIPE_PATTERN.source, 'g'))]
+    .map((m) => m[0])
+    .sort()
+    .join('|');
 }
 
 function messagePlaceholders(text: string): string {
-  return [...text.matchAll(/\{(n|label|device)\}/g)].map((m) => m[0]).sort().join('|');
+  return [...text.matchAll(/\{(n|label|device)\}/g)]
+    .map((m) => m[0])
+    .sort()
+    .join('|');
 }
 
 export function translationStatus(def: SurveyDefinition, presentation: Presentation): TranslationStatus[] {
@@ -157,7 +164,8 @@ export function translationStatus(def: SurveyDefinition, presentation: Presentat
       translated++;
       if (e.status === 'reviewed') reviewed++;
       else unreviewed.push(k.key);
-      if (placeholders(e.text) !== placeholders(k.source) || messagePlaceholders(e.text) !== messagePlaceholders(k.source)) placeholderMismatch.push(k.key);
+      if (placeholders(e.text) !== placeholders(k.source) || messagePlaceholders(e.text) !== messagePlaceholders(k.source))
+        placeholderMismatch.push(k.key);
     }
     return {
       tag: lang.tag,

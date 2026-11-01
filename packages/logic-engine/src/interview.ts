@@ -5,17 +5,7 @@
  * offline CAPI app, so a survey behaves identically in every mode. The server never trusts the
  * client's idea of routing: it recomputes visibility and validation from the stored answers.
  */
-import type {
-  AnswerValue,
-  Answers,
-  GridQuestion,
-  Option,
-  Page,
-  Question,
-  SurveyDefinition,
-  Termination,
-  Quota,
-} from '@zapx/survey-schema';
+import type { AnswerValue, Answers, GridQuestion, Option, Page, Question, SurveyDefinition, Termination, Quota } from '@zapx/survey-schema';
 import { evaluate, parseCached, references, truthy, type EvalContext, type Value } from './expression.js';
 
 /** Build an evaluation context over a set of answers. Grid rows are addressable as Q.row. */
@@ -191,7 +181,11 @@ function isEmpty(v: unknown): boolean {
 }
 
 /** Coerce and check one submitted answer. Returns the normalized value or an error message. */
-export function normalizeAnswer(q: Question, raw: unknown, msg: SystemMessages = SYSTEM_MESSAGES): { value: AnswerValue } | { error: string } {
+export function normalizeAnswer(
+  q: Question,
+  raw: unknown,
+  msg: SystemMessages = SYSTEM_MESSAGES,
+): { value: AnswerValue } | { error: string } {
   if (q.type === 'info') return { value: null };
   if (isEmpty(raw)) {
     return q.required ? { error: msg.required } : { value: null };
@@ -206,17 +200,14 @@ export function normalizeAnswer(q: Question, raw: unknown, msg: SystemMessages =
       if (!Array.isArray(raw)) return { error: msg.chooseOneOrMore };
       const codes = optionCodes(q.options);
       const vals = [...new Set(raw.map((x) => (typeof x === 'string' ? Number(x) : x)))];
-      if (!vals.every((v): v is number => typeof v === 'number' && codes.has(v)))
-        return { error: msg.chooseOnlyListed };
+      if (!vals.every((v): v is number => typeof v === 'number' && codes.has(v))) return { error: msg.chooseOnlyListed };
       const exclusive = q.options.filter((o) => o.exclusive).map((o) => o.code);
       if (vals.length > 1 && vals.some((v) => exclusive.includes(v))) {
         const label = q.options.find((o) => o.exclusive && vals.includes(o.code))?.label ?? '';
         return { error: fillMessage(msg.exclusive, { label }) };
       }
-      if (q.minSelected !== undefined && vals.length < q.minSelected)
-        return { error: fillMessage(msg.minSelected, { n: q.minSelected }) };
-      if (q.maxSelected !== undefined && vals.length > q.maxSelected)
-        return { error: fillMessage(msg.maxSelected, { n: q.maxSelected }) };
+      if (q.minSelected !== undefined && vals.length < q.minSelected) return { error: fillMessage(msg.minSelected, { n: q.minSelected }) };
+      if (q.maxSelected !== undefined && vals.length > q.maxSelected) return { error: fillMessage(msg.maxSelected, { n: q.maxSelected }) };
       return { value: vals.sort((a, b) => a - b) };
     }
     case 'open': {
@@ -306,8 +297,7 @@ export function answerText(def: SurveyDefinition, id: string, answers: Answers):
   const v = answers[id];
   if (!q || v === null || v === undefined) return '';
   if (q.type === 'single') return q.options.find((o) => o.code === v)?.label ?? String(v);
-  if (q.type === 'multi' && Array.isArray(v))
-    return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
+  if (q.type === 'multi' && Array.isArray(v)) return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
   if (typeof v === 'object') return '';
   return String(v);
 }

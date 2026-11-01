@@ -36,15 +36,17 @@ describe('static redirects (Sampledge preset)', () => {
   });
 
   it('fills every placeholder and signs when asked', () => {
-    const v = vendor({ staticUrls: { complete: 'https://x.test/c?u=[uid]&v=[VID]&c=[CC]&r=[RID]&p=[param:pid]&s=[STATUS]' }, signRedirects: true });
+    const v = vendor({
+      staticUrls: { complete: 'https://x.test/c?u=[uid]&v=[VID]&c=[CC]&r=[RID]&p=[param:pid]&s=[STATUS]' },
+      signRedirects: true,
+    });
     const r = resolveRedirect(v, resp(), 'complete');
     expect(r.url).toMatch(/^https:\/\/x\.test\/c\?u=abc%20123&v=SE&c=US&r=R1&p=P9&s=complete&zsig=[0-9a-f]{64}$/);
   });
 });
 
 describe('dynamic and hybrid redirects', () => {
-  const dyn = (mode: VendorRedirectConfig['redirectMode']) =>
-    vendor({ redirectMode: mode, dynamicAllowedHosts: ['panel.example.com'] });
+  const dyn = (mode: VendorRedirectConfig['redirectMode']) => vendor({ redirectMode: mode, dynamicAllowedHosts: ['panel.example.com'] });
 
   it('uses the return URL supplied at entry when its host is allowed', () => {
     const r = resolveRedirect(dyn('DYNAMIC'), resp({ returnUrl: 'https://panel.example.com/back?id=[UID]' }), 'quota_full');

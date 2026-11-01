@@ -5,10 +5,24 @@
  */
 import { useState } from 'react';
 import { THEME_PRESETS, themeWarnings } from '@zapx/survey-renderer';
-import { DEVICE_TYPES, LOGO_MAX_BYTES, THEME_FONTS, THEME_MOTION, type DeviceType, type Presentation, type SurveyDefinition, type Theme } from '@zapx/survey-schema';
+import {
+  DEVICE_TYPES,
+  LOGO_MAX_BYTES,
+  THEME_FONTS,
+  THEME_MOTION,
+  type DeviceType,
+  type Presentation,
+  type SurveyDefinition,
+  type Theme,
+} from '@zapx/survey-schema';
 import { Preview } from './Preview';
 
-const FONT_NAMES: Record<Theme['font'], string> = { system: 'System (default)', humanist: 'Humanist sans', rounded: 'Rounded', serif: 'Serif' };
+const FONT_NAMES: Record<Theme['font'], string> = {
+  system: 'System (default)',
+  humanist: 'Humanist sans',
+  rounded: 'Rounded',
+  serif: 'Serif',
+};
 const MOTION_NAMES: Record<Theme['motion'], string> = { none: 'None', subtle: 'Subtle fade', lively: 'Lively slide and pop' };
 const DEVICE_NAMES: Record<DeviceType, string> = { desktop: 'Desktop and laptop', tablet: 'Tablet', mobile: 'Phone' };
 
@@ -42,8 +56,22 @@ export function DesignStudio({
     <label className="field" style={{ flex: '1 1 120px' }}>
       {label}
       <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
-        <input type="color" value={theme[key]} onChange={(e) => setTheme({ [key]: e.target.value, preset: 'custom' })} disabled={readOnly} aria-label={`${label} colour`} style={{ width: 40, padding: 2 }} />
-        <input value={theme[key]} onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && setTheme({ [key]: e.target.value, preset: 'custom' })} disabled={readOnly} aria-label={`${label} hex`} className="mono" style={{ width: 90 }} />
+        <input
+          type="color"
+          value={theme[key]}
+          onChange={(e) => setTheme({ [key]: e.target.value, preset: 'custom' })}
+          disabled={readOnly}
+          aria-label={`${label} colour`}
+          style={{ width: 40, padding: 2 }}
+        />
+        <input
+          value={theme[key]}
+          onChange={(e) => /^#[0-9a-fA-F]{6}$/.test(e.target.value) && setTheme({ [key]: e.target.value, preset: 'custom' })}
+          disabled={readOnly}
+          aria-label={`${label} hex`}
+          className="mono"
+          style={{ width: 90 }}
+        />
       </span>
     </label>
   );
@@ -61,7 +89,10 @@ export function DesignStudio({
                 onClick={() => setTheme({ ...p.theme, preset: key })}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               >
-                <span aria-hidden="true" style={{ width: 14, height: 14, borderRadius: 4, background: p.theme.accent, border: `3px solid ${p.theme.background}` }} />
+                <span
+                  aria-hidden="true"
+                  style={{ width: 14, height: 14, borderRadius: 4, background: p.theme.accent, border: `3px solid ${p.theme.background}` }}
+                />
                 {p.name}
               </button>
             ))}
@@ -136,27 +167,50 @@ export function DesignStudio({
           <h3 style={{ marginTop: 8 }}>Logo</h3>
           {theme.logo ? (
             <div className="row">
-              <img src={theme.logo} alt="" style={{ maxHeight: 40, maxWidth: 160, background: theme.surface, padding: 4, borderRadius: 6 }} />
+              <img
+                src={theme.logo}
+                alt=""
+                style={{ maxHeight: 40, maxWidth: 160, background: theme.surface, padding: 4, borderRadius: 6 }}
+              />
               <button className="danger" onClick={() => setTheme({ logo: undefined })}>
                 Remove
               </button>
             </div>
           ) : null}
-          <input type="file" accept="image/png,image/jpeg,image/webp" aria-label="Upload logo" onChange={(e) => onLogo(e.target.files?.[0])} />
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            aria-label="Upload logo"
+            onChange={(e) => onLogo(e.target.files?.[0])}
+          />
           {logoError ? <p className="error-text small">{logoError}</p> : null}
           <label className="field">
             Logo description (for screen readers)
-            <input value={theme.logoAlt ?? ''} onChange={(e) => setTheme({ logoAlt: e.target.value || undefined })} placeholder="e.g. Acme Research" />
+            <input
+              value={theme.logoAlt ?? ''}
+              onChange={(e) => setTheme({ logoAlt: e.target.value || undefined })}
+              placeholder="e.g. Acme Research"
+            />
           </label>
           <h3 style={{ marginTop: 8 }}>Buttons</h3>
           <div className="row">
             <label className="field">
               Next button
-              <input value={theme.nextLabel ?? ''} placeholder="Next" onChange={(e) => setTheme({ nextLabel: e.target.value || undefined })} style={{ width: 140 }} />
+              <input
+                value={theme.nextLabel ?? ''}
+                placeholder="Next"
+                onChange={(e) => setTheme({ nextLabel: e.target.value || undefined })}
+                style={{ width: 140 }}
+              />
             </label>
             <label className="field">
               Back button
-              <input value={theme.backLabel ?? ''} placeholder="Back" onChange={(e) => setTheme({ backLabel: e.target.value || undefined })} style={{ width: 140 }} />
+              <input
+                value={theme.backLabel ?? ''}
+                placeholder="Back"
+                onChange={(e) => setTheme({ backLabel: e.target.value || undefined })}
+                style={{ width: 140 }}
+              />
             </label>
           </div>
         </fieldset>
@@ -164,7 +218,8 @@ export function DesignStudio({
         <fieldset className="panel stack" disabled={readOnly} style={{ margin: 0 }} data-testid="device-settings">
           <h2>Devices</h2>
           <p className="muted small" style={{ margin: 0 }}>
-            Respondents on a device that is not allowed are screened out before the survey starts and sent back to the vendor as a terminate.
+            Respondents on a device that is not allowed are screened out before the survey starts and sent back to the vendor as a
+            terminate.
           </p>
           {DEVICE_TYPES.map((d) => (
             <label key={d} className="check">
@@ -172,8 +227,14 @@ export function DesignStudio({
                 type="checkbox"
                 checked={presentation.devices.allowed.includes(d)}
                 onChange={(e) => {
-                  const allowed = e.target.checked ? [...presentation.devices.allowed, d] : presentation.devices.allowed.filter((x) => x !== d);
-                  if (allowed.length) onChange({ ...presentation, devices: { ...presentation.devices, allowed: DEVICE_TYPES.filter((x) => allowed.includes(x)) } });
+                  const allowed = e.target.checked
+                    ? [...presentation.devices.allowed, d]
+                    : presentation.devices.allowed.filter((x) => x !== d);
+                  if (allowed.length)
+                    onChange({
+                      ...presentation,
+                      devices: { ...presentation.devices, allowed: DEVICE_TYPES.filter((x) => allowed.includes(x)) },
+                    });
                 }}
               />
               {DEVICE_NAMES[d]}
@@ -183,7 +244,9 @@ export function DesignStudio({
             Grids on narrow screens
             <select
               value={presentation.devices.gridOnMobile}
-              onChange={(e) => onChange({ ...presentation, devices: { ...presentation.devices, gridOnMobile: e.target.value as 'cards' | 'scroll' } })}
+              onChange={(e) =>
+                onChange({ ...presentation, devices: { ...presentation.devices, gridOnMobile: e.target.value as 'cards' | 'scroll' } })
+              }
             >
               <option value="cards">One card per row (recommended)</option>
               <option value="scroll">Full table, scroll sideways</option>

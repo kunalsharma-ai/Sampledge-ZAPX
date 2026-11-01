@@ -25,8 +25,14 @@ const vendorSchema = z.object({
   redirectMode: z.enum(['STATIC', 'DYNAMIC', 'HYBRID']).default('STATIC'),
   staticUrls: statusMap(urlTemplate).default({}),
   statusWords: statusMap(z.string().min(1).max(60)).default({}),
-  dynamicAllowedHosts: z.array(z.string().regex(/^[A-Za-z0-9.-]{1,253}$/, 'Host names only, e.g. example.com')).max(20).default([]),
-  dynamicParam: z.string().regex(/^[A-Za-z0-9_]{1,40}$/).default('rurl'),
+  dynamicAllowedHosts: z
+    .array(z.string().regex(/^[A-Za-z0-9.-]{1,253}$/, 'Host names only, e.g. example.com'))
+    .max(20)
+    .default([]),
+  dynamicParam: z
+    .string()
+    .regex(/^[A-Za-z0-9_]{1,40}$/)
+    .default('rurl'),
   requireSignedEntry: z.boolean().default(false),
   signRedirects: z.boolean().default(false),
   presetId: z.string().optional(),

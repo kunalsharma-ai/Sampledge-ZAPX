@@ -28,7 +28,10 @@ export function problemsIn(json: string): { definition: SurveyDefinition | null;
     return { definition: null, problems: parsed.issues.slice(0, 40).map((i) => `${i.path || '(root)'}: ${i.message}`), blocking: true };
   }
   const analysis = analyzeSurvey(parsed.definition);
-  const problems = analysis.issues.filter((i) => i.severity === 'error').slice(0, 40).map((i) => `${i.location}: ${i.message}`);
+  const problems = analysis.issues
+    .filter((i) => i.severity === 'error')
+    .slice(0, 40)
+    .map((i) => `${i.location}: ${i.message}`);
   return { definition: parsed.definition, problems, blocking: false };
 }
 

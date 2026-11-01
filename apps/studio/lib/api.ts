@@ -41,7 +41,8 @@ export interface Me {
 /** Multipart upload (files) with the same session and CSRF handling as `api`. */
 export async function upload<T = unknown>(path: string, form: FormData): Promise<T> {
   const res = await fetch(`/api${path}`, { method: 'POST', credentials: 'same-origin', headers: { 'x-zapx-csrf': '1' }, body: form });
-  if (res.status === 401 && typeof window !== 'undefined') window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+  if (res.status === 401 && typeof window !== 'undefined')
+    window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, data);
   return data as T;

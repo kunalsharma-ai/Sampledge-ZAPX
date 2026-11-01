@@ -71,7 +71,10 @@ describe('Milestone 1 flow: create, check, publish, respond, redirect, quota, ex
   });
 
   it('rejects structurally invalid definitions and blocks publishing on logic errors', async () => {
-    const bad = await http.put(`/api/surveys/${surveyId}/draft`).set(auth).send({ definition: { schemaVersion: 1, title: 'x', pages: [] } });
+    const bad = await http
+      .put(`/api/surveys/${surveyId}/draft`)
+      .set(auth)
+      .send({ definition: { schemaVersion: 1, title: 'x', pages: [] } });
     expect(bad.status).toBe(400);
     expect(bad.body.issues[0].path).toBe('pages');
 
@@ -95,15 +98,23 @@ describe('Milestone 1 flow: create, check, publish, respond, redirect, quota, ex
 
   it('adds a vendor from the Sampledge preset and previews its redirects', async () => {
     const v = (
-      await http.post(`/api/projects/${projectId}/vendors`).set(auth).send({ name: 'Sampledge', code: 'SE', presetId: 'sampledge-platform' }).expect(201)
+      await http
+        .post(`/api/projects/${projectId}/vendors`)
+        .set(auth)
+        .send({ name: 'Sampledge', code: 'SE', presetId: 'sampledge-platform' })
+        .expect(201)
     ).body;
     vendorId = v.id;
-    const preview = (await http.post(`/api/vendors/${vendorId}/redirect-preview`).set(auth).send({ status: 'quota_full', uid: 'U1' }).expect(201)).body;
+    const preview = (
+      await http.post(`/api/vendors/${vendorId}/redirect-preview`).set(auth).send({ status: 'quota_full', uid: 'U1' }).expect(201)
+    ).body;
     expect(preview.url).toBe('https://platform.sampledge.com/response/status?status=overquota&uid=U1');
   });
 
   it('a respondent completes the survey and is sent to the complete redirect', async () => {
-    const { url } = (await http.post(`/api/surveys/${surveyId}/links`).set(auth).send({ vendorId, uid: 'RESP-1', country: 'US' }).expect(201)).body;
+    const { url } = (
+      await http.post(`/api/surveys/${surveyId}/links`).set(auth).send({ vendorId, uid: 'RESP-1', country: 'US' }).expect(201)
+    ).body;
     const s = await startFromLink(url);
     expect(s.state).toBe('in_progress');
     expect(s.survey.welcome).toMatch(/Thank you for taking part/);
@@ -181,7 +192,7 @@ describe('Milestone 1 flow: create, check, publish, respond, redirect, quota, ex
 
   it('exports CSV with codes, one column per option/row, and formula protection', async () => {
     const res = await http.get(`/api/surveys/${surveyId}/export?format=csv`).set(auth).expect(200);
-    const [header, ...rows] = res.text.replace(/^﻿/, '').trim().split('\r\n');
+    const [header, ...rows] = res.text.replace(/^\uFEFF/, '').trim().split('\r\n');
     const cols = header!.split(',');
     expect(cols).toEqual(expect.arrayContaining(['uid', 'status', 'AGE', 'GENDER', 'AWARE_1', 'AWARE_99', 'RATE_a', 'COMMENTS']));
     expect(rows).toHaveLength(4); // test response excluded
@@ -198,7 +209,9 @@ describe('Milestone 1 flow: create, check, publish, respond, redirect, quota, ex
   it('records an audit trail', async () => {
     const events = (await http.get(`/api/projects/${projectId}/audit`).set(auth).expect(200)).body;
     const actions = events.map((e: { action: string }) => e.action);
-    expect(actions).toEqual(expect.arrayContaining(['project.create', 'survey.create', 'survey.publish', 'vendor.create', 'survey.export']));
+    expect(actions).toEqual(
+      expect.arrayContaining(['project.create', 'survey.create', 'survey.publish', 'vendor.create', 'survey.export']),
+    );
   });
 
   describe('signed entry and dynamic redirects', () => {
@@ -215,12 +228,22 @@ describe('Milestone 1 flow: create, check, publish, respond, redirect, quota, ex
             redirectMode: 'HYBRID',
             requireSignedEntry: true,
             dynamicAllowedHosts: ['panel.example.com'],
-            staticUrls: { complete: 'https://static.example.com/done?u=[UID]&s=[STATUS]', security_reject: 'https://static.example.com/sec?u=[UID]' },
+            staticUrls: {
+              complete: 'https://static.example.com/done?u=[UID]&s=[STATUS]',
+              security_reject: 'https://static.example.com/sec?u=[UID]',
+            },
           })
           .expect(201)
       ).body;
-      const unsigned = await http.post(`/api/public/s/${surveyId}/start`).send({ query: { vid: 'PX', uid: 'S1' } }).expect(200);
-      expect(unsigned.body).toMatchObject({ state: 'finished', status: 'security_reject', redirectUrl: 'https://static.example.com/sec?u=S1' });
+      const unsigned = await http
+        .post(`/api/public/s/${surveyId}/start`)
+        .send({ query: { vid: 'PX', uid: 'S1' } })
+        .expect(200);
+      expect(unsigned.body).toMatchObject({
+        state: 'finished',
+        status: 'security_reject',
+        redirectUrl: 'https://static.example.com/sec?u=S1',
+      });
     });
 
     it('accepts a signed link and honours an allowed dynamic return URL', async () => {
@@ -268,19 +291,29 @@ describe('Milestone 1 flow: create, check, publish, respond, redirect, quota, ex
       const viewer = { Authorization: `Bearer ${login.body.token}` };
       await http.get(`/api/surveys/${surveyId}`).set(viewer).expect(200);
       await http.post(`/api/surveys/${surveyId}/publish`).set(viewer).expect(403);
-      await http.post('/api/users').set(viewer).send({ name: 'X', email: `x-${run}@t.zapx`, password: 'whatever-12345', role: 'ADMIN' }).expect(403);
+      await http
+        .post('/api/users')
+        .set(viewer)
+        .send({ name: 'X', email: `x-${run}@t.zapx`, password: 'whatever-12345', role: 'ADMIN' })
+        .expect(403);
     });
 
     it('requires the CSRF header for cookie-authenticated changes', async () => {
       const agent = request.agent(app.getHttpServer());
-      await agent.post('/api/auth/login').send({ email: `programmer-${run}@test.zapx`, password: 'correct-horse-battery' }).expect(200);
+      await agent
+        .post('/api/auth/login')
+        .send({ email: `programmer-${run}@test.zapx`, password: 'correct-horse-battery' })
+        .expect(200);
       await agent.get('/api/projects').expect(200);
       await agent.post('/api/projects').send({ name: 'nope' }).expect(403);
       await agent.post('/api/projects').set('x-zapx-csrf', '1').send({ name: 'yes' }).expect(201);
     });
 
     it('rejects bad credentials and anonymous access', async () => {
-      await http.post('/api/auth/login').send({ email: `programmer-${run}@test.zapx`, password: 'wrong' }).expect(401);
+      await http
+        .post('/api/auth/login')
+        .send({ email: `programmer-${run}@test.zapx`, password: 'wrong' })
+        .expect(401);
       await http.get('/api/projects').expect(401);
     });
   });

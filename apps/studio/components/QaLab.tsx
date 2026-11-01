@@ -77,15 +77,22 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
         <div className="panel stack">
           <h2>QA Laboratory</h2>
           <p className="muted small">
-            Sends synthetic respondents through the survey with the same logic engine live interviews use. They try every option,
-            boundary values around your conditions, and skip optional questions, then report what was never reached. Nothing is
-            saved as a response and quotas are not touched.
+            Sends synthetic respondents through the survey with the same logic engine live interviews use. They try every option, boundary
+            values around your conditions, and skip optional questions, then report what was never reached. Nothing is saved as a response
+            and quotas are not touched.
           </p>
           {!readOnly ? (
             <div className="row">
               <label className="field">
                 Respondents
-                <input type="number" min={1} max={2000} value={respondents} onChange={(e) => setRespondents(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))} style={{ width: 110 }} />
+                <input
+                  type="number"
+                  min={1}
+                  max={2000}
+                  value={respondents}
+                  onChange={(e) => setRespondents(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                  style={{ width: 110 }}
+                />
               </label>
               <label className="field">
                 Seed (optional)
@@ -105,7 +112,11 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
               </button>
             </div>
           ) : null}
-          {dirty && target === 'draft' ? <p className="small" style={{ color: 'var(--warn)' }}>You have unsaved edits. QA runs on the saved draft, so save first to test them.</p> : null}
+          {dirty && target === 'draft' ? (
+            <p className="small" style={{ color: 'var(--warn)' }}>
+              You have unsaved edits. QA runs on the saved draft, so save first to test them.
+            </p>
+          ) : null}
           <ErrorNote error={error} />
         </div>
         {current ? <QaResult version={current.version} report={current.report} /> : <p className="muted">Run QA to see a report.</p>}
@@ -116,8 +127,8 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
         <div className="stack" style={{ gap: 6 }}>
           {runs.map((r) => (
             <button key={r.id} className="item" style={{ textAlign: 'left', fontWeight: 400 }} onClick={() => open(r.id)}>
-              <span className={`badge ${r.passed ? 'good' : 'bad'}`}>{r.passed ? 'passed' : 'failed'}</span> v{r.version} · {r.respondents} resp ·{' '}
-              {Math.round(r.coverage)}% covered
+              <span className={`badge ${r.passed ? 'good' : 'bad'}`}>{r.passed ? 'passed' : 'failed'}</span> v{r.version} · {r.respondents}{' '}
+              resp · {Math.round(r.coverage)}% covered
               <div className="muted small">
                 {new Date(r.createdAt).toLocaleString()} · seed {r.seed}
               </div>
@@ -165,7 +176,8 @@ function QaResult({ version, report }: { version: number; report: QaReport }) {
           <tr>
             {OUTCOME_LABELS.map(([k]) => (
               <td key={k}>
-                {report.outcomes[k]} <span className="muted small">({Math.round((report.outcomes[k] / Math.max(1, report.respondents)) * 100)}%)</span>
+                {report.outcomes[k]}{' '}
+                <span className="muted small">({Math.round((report.outcomes[k] / Math.max(1, report.respondents)) * 100)}%)</span>
               </td>
             ))}
           </tr>

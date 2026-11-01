@@ -48,7 +48,10 @@ export class ProjectsController {
 
   @Get(':id/audit')
   async audit_(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    const project = await this.prisma.project.findFirst({ where: { id, tenantId: user.tenantId }, include: { surveys: true, vendors: true } });
+    const project = await this.prisma.project.findFirst({
+      where: { id, tenantId: user.tenantId },
+      include: { surveys: true, vendors: true },
+    });
     if (!project) throw new NotFoundException('Project not found');
     const ids = [project.id, ...project.surveys.map((s) => s.id), ...project.vendors.map((v) => v.id)];
     return this.prisma.auditEvent.findMany({

@@ -137,14 +137,7 @@ export const pageSchema = z.object({
 export type Page = z.infer<typeof pageSchema>;
 
 /** Final statuses a respondent can reach. Each maps to a vendor redirect. */
-export const OUTCOME_STATUSES = [
-  'complete',
-  'terminate',
-  'quota_full',
-  'quality_fail',
-  'security_reject',
-  'duplicate',
-] as const;
+export const OUTCOME_STATUSES = ['complete', 'terminate', 'quota_full', 'quality_fail', 'security_reject', 'duplicate'] as const;
 export type OutcomeStatus = (typeof OUTCOME_STATUSES)[number];
 
 export const terminationSchema = z.object({
@@ -192,9 +185,7 @@ export interface SchemaIssue {
 }
 
 /** Validate and normalize (apply defaults to) an untrusted survey definition. */
-export function parseSurveyDefinition(
-  input: unknown,
-): { ok: true; definition: SurveyDefinition } | { ok: false; issues: SchemaIssue[] } {
+export function parseSurveyDefinition(input: unknown): { ok: true; definition: SurveyDefinition } | { ok: false; issues: SchemaIssue[] } {
   const result = surveyDefinitionSchema.safeParse(input);
   if (result.success) return { ok: true, definition: result.data };
   return {

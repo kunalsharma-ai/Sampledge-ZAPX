@@ -52,7 +52,13 @@ function LoginForm() {
       </label>
       <label className="field">
         Password
-        <input type="password" required autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={form.password} onChange={set('password')} />
+        <input
+          type="password"
+          required
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          value={form.password}
+          onChange={set('password')}
+        />
       </label>
       <ErrorNote error={error} />
       <button className="primary" disabled={busy}>

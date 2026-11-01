@@ -113,7 +113,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <div className="row">
                 <h2 style={{ margin: 0 }}>Sample vendors</h2>
                 <div style={{ flex: 1 }} />
-                <button onClick={() => setEditing({ ...emptyVendor(), name: 'Sampledge', code: 'SE', ...presetSampledge() })}>+ Sampledge preset</button>
+                <button onClick={() => setEditing({ ...emptyVendor(), name: 'Sampledge', code: 'SE', ...presetSampledge() })}>
+                  + Sampledge preset
+                </button>
                 <button onClick={() => setEditing(emptyVendor())}>+ Custom vendor</button>
               </div>
               {vendors.length === 0 ? <p className="muted">Add a vendor to send live traffic. Each vendor has its own redirects.</p> : null}
@@ -162,7 +164,14 @@ function presetSampledge(): Partial<Vendor> {
   return {
     redirectMode: 'STATIC',
     staticUrls: { complete: url, terminate: url, quota_full: url, security_reject: url },
-    statusWords: { complete: 'complete', terminate: 'terminate', quota_full: 'overquota', security_reject: 'security', quality_fail: 'terminate', duplicate: 'security' },
+    statusWords: {
+      complete: 'complete',
+      terminate: 'terminate',
+      quota_full: 'overquota',
+      security_reject: 'security',
+      quality_fail: 'terminate',
+      duplicate: 'security',
+    },
   };
 }
 
@@ -184,7 +193,8 @@ function VendorEditor({
   const [previewReturn, setPreviewReturn] = useState('');
 
   const payload = () => {
-    const clean = <T extends Record<string, string | undefined>>(m: T) => Object.fromEntries(Object.entries(m).filter(([, x]) => x && x.trim() !== ''));
+    const clean = <T extends Record<string, string | undefined>>(m: T) =>
+      Object.fromEntries(Object.entries(m).filter(([, x]) => x && x.trim() !== ''));
     return {
       name: v.name,
       code: v.code,
@@ -247,7 +257,8 @@ function VendorEditor({
         </label>
       </div>
       <p className="muted small">
-        Placeholders: <span className="mono">[UID] [VID] [CC] [STATUS] [RID] [param:name]</span>. [STATUS] is replaced with the status word below.
+        Placeholders: <span className="mono">[UID] [VID] [CC] [STATUS] [RID] [param:name]</span>. [STATUS] is replaced with the status word
+        below.
       </p>
       {v.redirectMode !== 'DYNAMIC' ? (
         <table className="data list-editor">
@@ -266,7 +277,13 @@ function VendorEditor({
                   <input
                     aria-label={`${label} URL`}
                     style={{ width: '100%' }}
-                    placeholder={s === 'duplicate' ? 'uses Security reject URL if empty' : s === 'quality_fail' ? 'uses Terminate URL if empty' : 'https://…'}
+                    placeholder={
+                      s === 'duplicate'
+                        ? 'uses Security reject URL if empty'
+                        : s === 'quality_fail'
+                          ? 'uses Terminate URL if empty'
+                          : 'https://…'
+                    }
                     value={v.staticUrls[s] ?? ''}
                     onChange={(e) => setV({ ...v, staticUrls: { ...v.staticUrls, [s]: e.target.value } })}
                   />
@@ -322,7 +339,12 @@ function VendorEditor({
           <h3>Redirect QA</h3>
           <div className="row">
             {v.redirectMode !== 'STATIC' ? (
-              <input style={{ flex: 1 }} placeholder="Sample dynamic return URL to test" value={previewReturn} onChange={(e) => setPreviewReturn(e.target.value)} />
+              <input
+                style={{ flex: 1 }}
+                placeholder="Sample dynamic return URL to test"
+                value={previewReturn}
+                onChange={(e) => setPreviewReturn(e.target.value)}
+              />
             ) : null}
             <button onClick={runPreview}>Preview every status for UID TEST123</button>
           </div>
@@ -332,7 +354,9 @@ function VendorEditor({
                 {STATUSES.map(([s, label]) => (
                   <tr key={s}>
                     <td>{label}</td>
-                    <td className="mono small">{preview[s] ?? <span className="error-text">No redirect: respondent sees a message</span>}</td>
+                    <td className="mono small">
+                      {preview[s] ?? <span className="error-text">No redirect: respondent sees a message</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>

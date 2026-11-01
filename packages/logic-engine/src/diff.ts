@@ -63,10 +63,19 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
     { title: before.title, language: before.language, welcome: before.welcome, thankYou: before.thankYou },
     { title: after.title, language: after.language, welcome: after.welcome, thankYou: after.thankYou },
   );
-  if (meta.length) items.push({ change: 'changed', entity: 'survey', id: 'survey', fields: meta, summary: `Survey ${meta.join(', ')} changed` });
+  if (meta.length)
+    items.push({ change: 'changed', entity: 'survey', id: 'survey', fields: meta, summary: `Survey ${meta.join(', ')} changed` });
   const settings = changedFields(before.settings, after.settings);
   if (settings.length) {
-    items.push({ change: 'changed', entity: 'settings', id: 'settings', fields: settings, before: before.settings, after: after.settings, summary: `Settings changed: ${settings.join(', ')}` });
+    items.push({
+      change: 'changed',
+      entity: 'settings',
+      id: 'settings',
+      fields: settings,
+      before: before.settings,
+      after: after.settings,
+      summary: `Settings changed: ${settings.join(', ')}`,
+    });
   }
 
   // Pages
@@ -75,12 +84,28 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
   for (const [id, { item, index }] of pa) {
     const old = pb.get(id);
     if (!old) {
-      items.push({ change: 'added', entity: 'page', id, after: { title: item.title, condition: item.condition }, summary: `Page ${id} added${item.title ? ` (“${shortText(item.title)}”)` : ''}` });
+      items.push({
+        change: 'added',
+        entity: 'page',
+        id,
+        after: { title: item.title, condition: item.condition },
+        summary: `Page ${id} added${item.title ? ` (“${shortText(item.title)}”)` : ''}`,
+      });
       continue;
     }
     const f = changedFields(old.item, item, ['questions']);
-    if (f.length) items.push({ change: 'changed', entity: 'page', id, fields: f, before: { title: old.item.title, condition: old.item.condition }, after: { title: item.title, condition: item.condition }, summary: `Page ${id}: ${f.join(', ')} changed` });
-    else if (old.index !== index) items.push({ change: 'moved', entity: 'page', id, summary: `Page ${id} moved from position ${old.index + 1} to ${index + 1}` });
+    if (f.length)
+      items.push({
+        change: 'changed',
+        entity: 'page',
+        id,
+        fields: f,
+        before: { title: old.item.title, condition: old.item.condition },
+        after: { title: item.title, condition: item.condition },
+        summary: `Page ${id}: ${f.join(', ')} changed`,
+      });
+    else if (old.index !== index)
+      items.push({ change: 'moved', entity: 'page', id, summary: `Page ${id} moved from position ${old.index + 1} to ${index + 1}` });
   }
   for (const [id] of pb) if (!pa.has(id)) items.push({ change: 'removed', entity: 'page', id, summary: `Page ${id} removed` });
 
@@ -96,7 +121,14 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
   for (const [id, cur] of qa) {
     const old = qb.get(id);
     if (!old) {
-      items.push({ change: 'added', entity: 'question', id, pageId: cur.pageId, after: cur.q, summary: `${id} added (${cur.q.type}): “${shortText(cur.q.text)}”` });
+      items.push({
+        change: 'added',
+        entity: 'question',
+        id,
+        pageId: cur.pageId,
+        after: cur.q,
+        summary: `${id} added (${cur.q.type}): “${shortText(cur.q.text)}”`,
+      });
       continue;
     }
     const f = changedFields(old.q as unknown as Record<string, unknown>, cur.q as unknown as Record<string, unknown>);
@@ -105,15 +137,37 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
       const removedCodes = codesOf(old.q).filter((c) => !codesOf(cur.q).includes(c));
       if (removedCodes.length) affectsData = true;
       const extra = removedCodes.length ? `; answer codes removed: ${removedCodes.join(', ')}` : '';
-      items.push({ change: 'changed', entity: 'question', id, pageId: cur.pageId, fields: f, before: old.q, after: cur.q, summary: `${id}: ${f.join(', ')} changed${extra}` });
+      items.push({
+        change: 'changed',
+        entity: 'question',
+        id,
+        pageId: cur.pageId,
+        fields: f,
+        before: old.q,
+        after: cur.q,
+        summary: `${id}: ${f.join(', ')} changed${extra}`,
+      });
     } else if (old.pageId !== cur.pageId) {
-      items.push({ change: 'moved', entity: 'question', id, pageId: cur.pageId, summary: `${id} moved from page ${old.pageId} to ${cur.pageId}` });
+      items.push({
+        change: 'moved',
+        entity: 'question',
+        id,
+        pageId: cur.pageId,
+        summary: `${id} moved from page ${old.pageId} to ${cur.pageId}`,
+      });
     }
   }
   for (const [id, old] of qb) {
     if (!qa.has(id)) {
       affectsData = true;
-      items.push({ change: 'removed', entity: 'question', id, pageId: old.pageId, before: old.q, summary: `${id} removed: “${shortText(old.q.text)}”` });
+      items.push({
+        change: 'removed',
+        entity: 'question',
+        id,
+        pageId: old.pageId,
+        before: old.q,
+        summary: `${id} removed: “${shortText(old.q.text)}”`,
+      });
     }
   }
 
@@ -130,14 +184,37 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
         const r = x as { condition: string; target?: number };
         return r.target === undefined ? r.condition : `${r.condition} (target ${r.target})`;
       };
-      if (!old) items.push({ change: 'added', entity, id, after: item, summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id} added: ${desc(item)}` });
+      if (!old)
+        items.push({
+          change: 'added',
+          entity,
+          id,
+          after: item,
+          summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id} added: ${desc(item)}`,
+        });
       else {
         const f = changedFields(old.item, item);
-        if (f.length) items.push({ change: 'changed', entity, id, fields: f, before: old.item, after: item, summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id}: ${f.join(', ')} changed` });
+        if (f.length)
+          items.push({
+            change: 'changed',
+            entity,
+            id,
+            fields: f,
+            before: old.item,
+            after: item,
+            summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id}: ${f.join(', ')} changed`,
+          });
       }
     }
     for (const [id, { item }] of mb) {
-      if (!ma.has(id)) items.push({ change: 'removed', entity, id, before: item, summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id} removed` });
+      if (!ma.has(id))
+        items.push({
+          change: 'removed',
+          entity,
+          id,
+          before: item,
+          summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id} removed`,
+        });
     }
   }
 

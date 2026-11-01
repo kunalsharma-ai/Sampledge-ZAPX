@@ -25,21 +25,7 @@ export type Node =
   | { kind: 'unary'; op: 'not' | '-'; arg: Node }
   | { kind: 'binary'; op: BinaryOp; left: Node; right: Node };
 
-export type BinaryOp =
-  | 'or'
-  | 'and'
-  | '=='
-  | '!='
-  | '<'
-  | '<='
-  | '>'
-  | '>='
-  | 'in'
-  | '+'
-  | '-'
-  | '*'
-  | '/'
-  | '%';
+export type BinaryOp = 'or' | 'and' | '==' | '!=' | '<' | '<=' | '>' | '>=' | 'in' | '+' | '-' | '*' | '/' | '%';
 
 export class ExpressionError extends Error {
   constructor(
@@ -75,8 +61,7 @@ function tokenize(src: string): Token[] {
       while (i < src.length && /[0-9.]/.test(src[i]!)) i++;
       const text = src.slice(start, i);
       const v = Number(text);
-      if (!Number.isFinite(v) || (text.match(/\./g)?.length ?? 0) > 1)
-        throw new ExpressionError(`Invalid number "${text}"`, start);
+      if (!Number.isFinite(v) || (text.match(/\./g)?.length ?? 0) > 1) throw new ExpressionError(`Invalid number "${text}"`, start);
       out.push({ t: 'num', v, p: start });
       continue;
     }
@@ -235,11 +220,8 @@ export function parse(src: string): Node {
           return { kind: 'call', name: lower, args: parseList(')', depth) };
         }
         const parts = t.v.split('.');
-        if (parts.length > 2 || parts.some((p) => p === ''))
-          throw new ExpressionError(`Invalid variable "${t.v}"`, t.p);
-        return parts.length === 2
-          ? { kind: 'var', name: parts[0]!, member: parts[1]! }
-          : { kind: 'var', name: parts[0]! };
+        if (parts.length > 2 || parts.some((p) => p === '')) throw new ExpressionError(`Invalid variable "${t.v}"`, t.p);
+        return parts.length === 2 ? { kind: 'var', name: parts[0]!, member: parts[1]! } : { kind: 'var', name: parts[0]! };
       }
       case 'eof':
         throw new ExpressionError('Unexpected end of expression', t.p);
@@ -283,8 +265,7 @@ function looseEquals(a: Value, b: Value): boolean {
   // A multiple-choice answer equals a code when it contains that code.
   if (Array.isArray(a) && !Array.isArray(b)) return a.some((x) => looseEquals(x, b));
   if (Array.isArray(b) && !Array.isArray(a)) return looseEquals(b, a);
-  if (Array.isArray(a) && Array.isArray(b))
-    return a.length === b.length && a.every((x, i) => looseEquals(x, b[i]!));
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => looseEquals(x, b[i]!));
   if (typeof a === 'number' && typeof b === 'string') return String(a) === b;
   if (typeof a === 'string' && typeof b === 'number') return a === String(b);
   return a === b;
@@ -368,7 +349,10 @@ function callFunction(node: Extract<Node, { kind: 'call' }>, ctx: EvalContext): 
   if (!fn || node.args.length < fn.min || node.args.length > fn.max) return null;
   const args = node.args.map((a) => evaluate(a, ctx));
   const nums = () =>
-    args.flatMap((a) => (Array.isArray(a) ? a : [a])).map(toNumber).filter((n): n is number => n !== null);
+    args
+      .flatMap((a) => (Array.isArray(a) ? a : [a]))
+      .map(toNumber)
+      .filter((n): n is number => n !== null);
   switch (node.name) {
     case 'answered': {
       const v = args[0]!;

@@ -78,9 +78,7 @@
       ]
     }
   ],
-  "terminations": [
-    { "id": "T_UNDERAGE", "condition": "AGE < 18", "label": "Under 18" }
-  ],
+  "terminations": [{ "id": "T_UNDERAGE", "condition": "AGE < 18", "label": "Under 18" }],
   "quotas": [
     { "id": "QT_MEN", "label": "Men", "condition": "GENDER == 1", "target": 1 },
     { "id": "QT_WOMEN", "label": "Women", "condition": "GENDER == 2", "target": 50 }

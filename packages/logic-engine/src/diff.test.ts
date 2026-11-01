@@ -12,7 +12,20 @@ const base = def({
   schemaVersion: 1,
   title: 'T',
   pages: [
-    { id: 'P1', questions: [{ id: 'Q1', type: 'single', text: 'Gender', options: [{ code: 1, label: 'M' }, { code: 2, label: 'F' }] }] },
+    {
+      id: 'P1',
+      questions: [
+        {
+          id: 'Q1',
+          type: 'single',
+          text: 'Gender',
+          options: [
+            { code: 1, label: 'M' },
+            { code: 2, label: 'F' },
+          ],
+        },
+      ],
+    },
     { id: 'P2', questions: [{ id: 'Q2', type: 'open', text: 'Why?' }] },
   ],
 });

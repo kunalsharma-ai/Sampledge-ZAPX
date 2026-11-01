@@ -51,7 +51,8 @@ export function Languages({
   const add = () => {
     const tag = newTag.trim();
     if (!LANGUAGE_TAG.test(tag)) return setError(new Error('Use a language tag such as fr, es-MX or zh-Hans.'));
-    if (tag === def.language || presentation.languages.some((l) => l.tag === tag)) return setError(new Error('That language is already in the survey.'));
+    if (tag === def.language || presentation.languages.some((l) => l.tag === tag))
+      return setError(new Error('That language is already in the survey.'));
     setError(null);
     onChange({ ...presentation, languages: [...presentation.languages, { tag, name: newName.trim() || tag, enabled: false, texts: {} }] });
     setSelected(tag);
@@ -65,12 +66,19 @@ export function Languages({
     setError(null);
     setNotice(null);
     try {
-      const r = await api<{ translated: number; requested: number; model: string; version: { updatedAt: string; presentation: unknown } }>(`/surveys/${surveyId}/translate`, {
-        method: 'POST',
-        body: { language: lang.tag },
-      });
+      const r = await api<{ translated: number; requested: number; model: string; version: { updatedAt: string; presentation: unknown } }>(
+        `/surveys/${surveyId}/translate`,
+        {
+          method: 'POST',
+          body: { language: lang.tag },
+        },
+      );
       onServerUpdate(r.version);
-      setNotice(r.requested === 0 ? 'Nothing to translate: every text already has a current translation.' : `${r.translated} of ${r.requested} texts translated by ${r.model}. Review them below before offering this language.`);
+      setNotice(
+        r.requested === 0
+          ? 'Nothing to translate: every text already has a current translation.'
+          : `${r.translated} of ${r.requested} texts translated by ${r.model}. Review them below before offering this language.`,
+      );
     } catch (e) {
       setError(e);
     } finally {
@@ -86,7 +94,9 @@ export function Languages({
   };
 
   const status = statuses.find((s) => s.tag === selected);
-  const rows = lang ? keys.filter((k) => filter === 'all' || rowState(lang, k.key, k.source) !== 'reviewed' || status?.placeholderMismatch.includes(k.key)) : [];
+  const rows = lang
+    ? keys.filter((k) => filter === 'all' || rowState(lang, k.key, k.source) !== 'reviewed' || status?.placeholderMismatch.includes(k.key))
+    : [];
 
   return (
     <div className="editor" style={{ gridTemplateColumns: '280px minmax(0,1fr)' }}>
@@ -94,11 +104,21 @@ export function Languages({
         <h2>Languages</h2>
         <label className="field">
           Source language ({def.language})
-          <input value={presentation.sourceLanguageName ?? ''} placeholder="e.g. English" disabled={readOnly} onChange={(e) => onChange({ ...presentation, sourceLanguageName: e.target.value || undefined })} />
+          <input
+            value={presentation.sourceLanguageName ?? ''}
+            placeholder="e.g. English"
+            disabled={readOnly}
+            onChange={(e) => onChange({ ...presentation, sourceLanguageName: e.target.value || undefined })}
+          />
         </label>
         <div className="stack" style={{ gap: 6 }}>
           {statuses.map((s) => (
-            <button key={s.tag} onClick={() => setSelected(s.tag)} aria-current={selected === s.tag} style={{ textAlign: 'left', fontWeight: 400 }}>
+            <button
+              key={s.tag}
+              onClick={() => setSelected(s.tag)}
+              aria-current={selected === s.tag}
+              style={{ textAlign: 'left', fontWeight: 400 }}
+            >
               <strong>{s.name}</strong> <span className="mono small">{s.tag}</span>{' '}
               <span className={`badge ${s.complete ? 'good' : 'warn'}`}>{s.complete ? 'ready' : `${s.reviewed}/${s.total} reviewed`}</span>
               <div className="muted small">{s.enabled ? 'Offered to respondents' : 'Not offered yet'}</div>
@@ -109,8 +129,20 @@ export function Languages({
           <div className="stack" style={{ gap: 6 }}>
             <h3 style={{ margin: '8px 0 0' }}>Add a language</h3>
             <div className="row" style={{ gap: 6 }}>
-              <input aria-label="Language tag" placeholder="fr" value={newTag} onChange={(e) => setNewTag(e.target.value)} style={{ width: 70 }} />
-              <input aria-label="Language name" placeholder="Français" value={newName} onChange={(e) => setNewName(e.target.value)} style={{ flex: 1 }} />
+              <input
+                aria-label="Language tag"
+                placeholder="fr"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                style={{ width: 70 }}
+              />
+              <input
+                aria-label="Language name"
+                placeholder="Français"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                style={{ flex: 1 }}
+              />
             </div>
             <button onClick={add} disabled={!newTag.trim()}>
               Add language
@@ -133,8 +165,15 @@ export function Languages({
               <div style={{ flex: 1 }} />
               {!readOnly ? (
                 <>
-                  <label className="check" title={status.complete ? '' : 'Publishing is blocked until this language is complete and reviewed'}>
-                    <input type="checkbox" checked={lang.enabled} onChange={(e) => updateLang(lang.tag, (l) => ({ ...l, enabled: e.target.checked }))} />
+                  <label
+                    className="check"
+                    title={status.complete ? '' : 'Publishing is blocked until this language is complete and reviewed'}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={lang.enabled}
+                      onChange={(e) => updateLang(lang.tag, (l) => ({ ...l, enabled: e.target.checked }))}
+                    />
                     Offer to respondents
                   </label>
                   <button
@@ -158,31 +197,48 @@ export function Languages({
               {status.placeholderMismatch.length ? ` · ${status.placeholderMismatch.length} with broken {{piping}}` : ''}
             </p>
             {lang.enabled && !status.complete ? (
-              <p className="error-text small">This language is offered to respondents, so publishing is blocked until every text is translated and reviewed.</p>
+              <p className="error-text small">
+                This language is offered to respondents, so publishing is blocked until every text is translated and reviewed.
+              </p>
             ) : null}
             {!readOnly ? (
               <div className="row">
-                <button className="primary" onClick={translate} disabled={busy || dirty || !aiConfigured} title={aiConfigured ? '' : 'AI is not configured on this server'}>
+                <button
+                  className="primary"
+                  onClick={translate}
+                  disabled={busy || dirty || !aiConfigured}
+                  title={aiConfigured ? '' : 'AI is not configured on this server'}
+                >
                   {busy ? 'Translating…' : 'Translate missing with AI'}
                 </button>
                 <button
                   onClick={() =>
                     updateLang(lang.tag, (l) => ({
                       ...l,
-                      texts: Object.fromEntries(Object.entries(l.texts).map(([k, e]) => [k, e.source === keys.find((x) => x.key === k)?.source && e.text.trim() ? { ...e, status: 'reviewed' as const } : e])),
+                      texts: Object.fromEntries(
+                        Object.entries(l.texts).map(([k, e]) => [
+                          k,
+                          e.source === keys.find((x) => x.key === k)?.source && e.text.trim() ? { ...e, status: 'reviewed' as const } : e,
+                        ]),
+                      ),
                     }))
                   }
                   disabled={!status.unreviewed.length}
                 >
                   Mark all current translations reviewed
                 </button>
-                {dirty ? <span className="small" style={{ color: 'var(--warn)' }}>Save first: AI translates the saved draft.</span> : null}
+                {dirty ? (
+                  <span className="small" style={{ color: 'var(--warn)' }}>
+                    Save first: AI translates the saved draft.
+                  </span>
+                ) : null}
                 {!aiConfigured ? <span className="muted small">AI is not configured; translate by hand below.</span> : null}
               </div>
             ) : null}
             <div className="row">
               <label className="check">
-                <input type="radio" name="lang-filter" checked={filter === 'attention'} onChange={() => setFilter('attention')} /> Needs attention
+                <input type="radio" name="lang-filter" checked={filter === 'attention'} onChange={() => setFilter('attention')} /> Needs
+                attention
               </label>
               <label className="check">
                 <input type="radio" name="lang-filter" checked={filter === 'all'} onChange={() => setFilter('all')} /> All texts
@@ -215,18 +271,35 @@ export function Languages({
                           rows={Math.min(4, Math.max(1, Math.ceil(k.source.length / 60)))}
                           value={entry?.text ?? ''}
                           readOnly={readOnly}
-                          onChange={(e) => updateLang(lang.tag, (l) => ({ ...l, texts: { ...l.texts, [k.key]: { text: e.target.value, source: k.source, status: 'reviewed' } } }))}
+                          onChange={(e) =>
+                            updateLang(lang.tag, (l) => ({
+                              ...l,
+                              texts: { ...l.texts, [k.key]: { text: e.target.value, source: k.source, status: 'reviewed' } },
+                            }))
+                          }
                           style={{ fontFamily: 'inherit', fontSize: 13 }}
                         />
                         {st === 'outdated' && entry ? <div className="muted small">Translated from: “{entry.source}”</div> : null}
-                        {broken ? <div className="error-text small">Keep the placeholders from the source, such as {'{{Q1}}'} or {'{n}'}.</div> : null}
+                        {broken ? (
+                          <div className="error-text small">
+                            Keep the placeholders from the source, such as {'{{Q1}}'} or {'{n}'}.
+                          </div>
+                        ) : null}
                       </td>
                       <td>
                         <span className={`badge ${st === 'reviewed' && !broken ? 'good' : st === 'missing' || broken ? 'bad' : 'warn'}`}>
                           {st === 'machine' ? 'AI, to review' : st}
                         </span>
                         {st === 'machine' && !readOnly ? (
-                          <button className="link small" onClick={() => updateLang(lang.tag, (l) => ({ ...l, texts: { ...l.texts, [k.key]: { ...l.texts[k.key]!, status: 'reviewed' } } }))}>
+                          <button
+                            className="link small"
+                            onClick={() =>
+                              updateLang(lang.tag, (l) => ({
+                                ...l,
+                                texts: { ...l.texts, [k.key]: { ...l.texts[k.key]!, status: 'reviewed' } },
+                              }))
+                            }
+                          >
                             Approve
                           </button>
                         ) : null}

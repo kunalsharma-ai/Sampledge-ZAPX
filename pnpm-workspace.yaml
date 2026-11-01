@@ -1,11 +1,11 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "e2e"
+  - 'apps/*'
+  - 'packages/*'
+  - 'e2e'
 onlyBuiltDependencies:
-  - "@prisma/client"
-  - "@prisma/engines"
+  - '@prisma/client'
+  - '@prisma/engines'
   - prisma
   - esbuild
-  - "@nestjs/core"
+  - '@nestjs/core'
   - bcrypt

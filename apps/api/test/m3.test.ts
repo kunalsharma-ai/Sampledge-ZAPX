@@ -47,7 +47,11 @@ async function draft() {
 }
 
 async function savePresentation(presentation: unknown, expect = 200) {
-  const res = await http.put(`/api/surveys/${surveyId}/draft/presentation`).set(auth).send({ presentation, expectedUpdatedAt: updatedAt }).expect(expect);
+  const res = await http
+    .put(`/api/surveys/${surveyId}/draft/presentation`)
+    .set(auth)
+    .send({ presentation, expectedUpdatedAt: updatedAt })
+    .expect(expect);
   if (expect === 200) updatedAt = res.body.version.updatedAt;
   return res.body;
 }
@@ -59,11 +63,20 @@ async function testLink() {
 async function start(url: string, headers: Record<string, string> = {}, extra: Record<string, string> = {}, client?: unknown) {
   const u = new URL(url);
   const query = { ...Object.fromEntries(u.searchParams), ...extra };
-  return (await http.post(`/api/public/s/${surveyId}/start`).set({ 'User-Agent': DESKTOP, ...headers }).send({ query, client }).expect(200)).body;
+  return (
+    await http
+      .post(`/api/public/s/${surveyId}/start`)
+      .set({ 'User-Agent': DESKTOP, ...headers })
+      .send({ query, client })
+      .expect(200)
+  ).body;
 }
 
 beforeAll(async () => {
-  const mod = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(AiProvider).useValue(fake).compile();
+  const mod = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(AiProvider)
+    .useValue(fake)
+    .compile();
   app = configureApp(mod.createNestApplication());
   await app.init();
   http = request(app.getHttpServer());
@@ -84,12 +97,25 @@ afterAll(async () => {
 
 describe('Experience: themes', () => {
   it('saves a theme and rejects unsafe or invalid values', async () => {
-    const saved = await savePresentation({ theme: { preset: 'warm', accent: '#c2410c', font: 'rounded', radius: 18, motion: 'lively', logo: 'data:image/png;base64,iVBORw0KGgo=' } });
+    const saved = await savePresentation({
+      theme: {
+        preset: 'warm',
+        accent: '#c2410c',
+        font: 'rounded',
+        radius: 18,
+        motion: 'lively',
+        logo: 'data:image/png;base64,iVBORw0KGgo=',
+      },
+    });
     expect(saved.version.presentation.theme.accent).toBe('#c2410c');
     expect(saved.version.presentation.devices.allowed).toEqual(['desktop', 'tablet', 'mobile']);
     const bad = await savePresentation({ theme: { logo: 'data:image/svg+xml;base64,PHN2Zz48c2NyaXB0Lz48L3N2Zz4=' } }, 400);
     expect(bad.issues[0].path).toBe('theme.logo');
-    await http.put(`/api/surveys/${surveyId}/draft/presentation`).set(auth).send({ presentation: {}, expectedUpdatedAt: '2000-01-01T00:00:00.000Z' }).expect(409);
+    await http
+      .put(`/api/surveys/${surveyId}/draft/presentation`)
+      .set(auth)
+      .send({ presentation: {}, expectedUpdatedAt: '2000-01-01T00:00:00.000Z' })
+      .expect(409);
   });
 });
 
@@ -142,7 +168,9 @@ describe('Languages', () => {
     expect(fr.page.questions[0].renderedText.startsWith('FR ')).toBe(true);
     // Answer codes are unchanged.
     const gender = fr.page.questions.find((q: { id: string }) => q.id === 'GENDER');
-    expect(gender.options.map((o: { code: number }) => o.code)).toEqual(demo.pages[0].questions[1].options.map((o: { code: number }) => o.code));
+    expect(gender.options.map((o: { code: number }) => o.code)).toEqual(
+      demo.pages[0].questions[1].options.map((o: { code: number }) => o.code),
+    );
     const invalid = await http.post(`/api/public/r/${fr.token}/answers`).send({ pageId: fr.page.id, answers: {} }).expect(422);
     expect(invalid.body.errors[0].message).toBe('Réponse obligatoire.');
 
@@ -170,7 +198,12 @@ describe('Devices', () => {
     expect(phone.state).toBe('finished');
     expect(phone.status).toBe('terminate');
     expect(phone.message).toBe('This survey cannot be taken on this device. Please open the link on a computer.');
-    const ipad = await start(await testLink(), { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15' }, {}, { touch: true });
+    const ipad = await start(
+      await testLink(),
+      { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15' },
+      {},
+      { touch: true },
+    );
     expect(ipad.state).toBe('finished');
 
     const desk = await start(await testLink(), { 'Accept-Language': 'en' });

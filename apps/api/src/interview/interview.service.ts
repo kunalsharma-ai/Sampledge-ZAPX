@@ -26,7 +26,17 @@ import {
   type FieldError,
   type SystemMessages,
 } from '@zapx/logic-engine';
-import { defaultPresentation, parsePresentation, type Answers, type DeviceType, type OutcomeStatus, type Presentation, type Question, type SurveyDefinition, type Theme } from '@zapx/survey-schema';
+import {
+  defaultPresentation,
+  parsePresentation,
+  type Answers,
+  type DeviceType,
+  type OutcomeStatus,
+  type Presentation,
+  type Question,
+  type SurveyDefinition,
+  type Theme,
+} from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -115,7 +125,10 @@ export function interviewContext(version: { definition: unknown; presentation: u
       gridOnMobile: presentation.devices.gridOnMobile,
       language: lang?.tag ?? source.language,
       languages: offered.length
-        ? [{ tag: source.language, name: presentation.sourceLanguageName ?? source.language }, ...offered.map((l) => ({ tag: l.tag, name: l.name }))]
+        ? [
+            { tag: source.language, name: presentation.sourceLanguageName ?? source.language },
+            ...offered.map((l) => ({ tag: l.tag, name: l.name })),
+          ]
         : [],
       ui: { next: msg.next, back: msg.back, saving: msg.saving, language: msg.language, fixErrors: msg.fixErrors },
     },
@@ -218,7 +231,16 @@ export class InterviewService {
     if (!ctx.presentation.devices.allowed.includes(device)) {
       const preferred = ctx.presentation.devices.allowed[0]!;
       const deviceWord = { desktop: ctx.msg.deviceDesktop, tablet: ctx.msg.deviceTablet, mobile: ctx.msg.deviceMobile }[preferred];
-      return this.rejectWithoutRecord(survey, vendor, uid, params, 'terminate', `device_not_allowed:${device}`, ctx, fillMessage(ctx.msg.deviceNotAllowed, { device: deviceWord }));
+      return this.rejectWithoutRecord(
+        survey,
+        vendor,
+        uid,
+        params,
+        'terminate',
+        `device_not_allowed:${device}`,
+        ctx,
+        fillMessage(ctx.msg.deviceNotAllowed, { device: deviceWord }),
+      );
     }
 
     const def = sourceDef;
@@ -314,7 +336,13 @@ export class InterviewService {
     return this.stateOf(updated, await this.ctxOf(updated), await this.vendorOf(updated));
   }
 
-  private async outcomeState(vendor: Vendor | null, r: Response, status: OutcomeStatus, ctx: Ctx, message?: string): Promise<InterviewState> {
+  private async outcomeState(
+    vendor: Vendor | null,
+    r: Response,
+    status: OutcomeStatus,
+    ctx: Ctx,
+    message?: string,
+  ): Promise<InterviewState> {
     const redirect = vendor
       ? await this.redirects.resolve(
           vendor,
@@ -479,7 +507,13 @@ export class InterviewService {
   ): Promise<InterviewState> {
     await this.prisma.response.updateMany({
       where: { id: r.id, status: 'IN_PROGRESS' },
-      data: { status: toEnum(status), outcomeReason: reason, answers: answers as Prisma.InputJsonValue, currentPage: -1, completedAt: new Date() },
+      data: {
+        status: toEnum(status),
+        outcomeReason: reason,
+        answers: answers as Prisma.InputJsonValue,
+        currentPage: -1,
+        completedAt: new Date(),
+      },
     });
     const fresh = await this.prisma.response.findUniqueOrThrow({ where: { id: r.id } });
     return this.stateOf(fresh, ctx, vendor);

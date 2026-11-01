@@ -1,9 +1,7 @@
 import type { SurveyDefinition } from '@zapx/survey-schema';
 
 /** Material the architect reads. PDFs go to the model as documents; other files are text. */
-export type AiDocument =
-  | { name: string; kind: 'text'; text: string }
-  | { name: string; kind: 'pdf'; base64: string };
+export type AiDocument = { name: string; kind: 'text'; text: string } | { name: string; kind: 'pdf'; base64: string };
 
 export interface ArchitectRequest {
   /** What the programmer asked for, typed or dictated. */

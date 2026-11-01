@@ -87,7 +87,12 @@ export class TranslateController {
       for (const [key, v] of Object.entries(results)) target.texts[key] = { ...v, status: 'machine' };
       return tx.surveyVersion.update({ where: { id: draft.id }, data: { presentation: next as unknown as Prisma.InputJsonValue } });
     });
-    await this.audit.record(user, 'survey.translate.ai', 'survey', id, { language: lang.tag, requested: wanted.length, translated: Object.keys(results).length, model });
+    await this.audit.record(user, 'survey.translate.ai', 'survey', id, {
+      language: lang.tag,
+      requested: wanted.length,
+      translated: Object.keys(results).length,
+      model,
+    });
     return {
       requested: wanted.length,
       translated: Object.keys(results).length,
