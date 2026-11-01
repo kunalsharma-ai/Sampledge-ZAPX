@@ -24,7 +24,7 @@ export function contextFor(def: SurveyDefinition, answers: Answers): EvalContext
   return {
     lookup(name, member) {
       if (!known.has(name)) return undefined;
-      const v = answers[name];
+      const v = Object.hasOwn(answers, name) ? answers[name] : undefined;
       if (v === undefined) return null;
       if (member !== undefined) {
         if (v && typeof v === 'object' && !Array.isArray(v)) return (v as Record<string, number>)[member] ?? null;
@@ -33,6 +33,30 @@ export function contextFor(def: SurveyDefinition, answers: Answers): EvalContext
       return v as Value;
     },
   };
+}
+
+/**
+ * Evaluate a condition against a plain answer map, without the full definition. Used by renderers
+ * to show or hide same-page questions as the respondent answers. Unknown variables are null.
+ */
+export function conditionHoldsFor(expr: string | undefined, answers: Answers): boolean {
+  if (!expr) return true;
+  try {
+    return truthy(
+      evaluate(parseCached(expr), {
+        lookup(name, member) {
+          if (!Object.hasOwn(answers, name)) return null;
+          const v = answers[name];
+          if (v === undefined || v === null) return null;
+          if (member !== undefined)
+            return typeof v === 'object' && !Array.isArray(v) ? ((v as Record<string, number>)[member] ?? null) : null;
+          return v as Value;
+        },
+      }),
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Evaluate a condition; a condition that fails to parse is treated as false (publish blocks it). */
