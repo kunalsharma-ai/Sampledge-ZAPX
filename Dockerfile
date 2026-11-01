@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1.7
+# One build, three images: api (and its migrate job), studio and runtime.
+#   docker build --target api -t zapx-api .
+#   docker build --target studio -t zapx-studio .
+#   docker build --target runtime -t zapx-runtime .
+# The same images run locally under docker compose and on AWS ECS/Fargate.
+
+FROM node:22-bookworm-slim AS base
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable
+WORKDIR /app
+
+FROM base AS build
+COPY . .
+RUN pnpm install --frozen-lockfile
+# The studio proxies /api to this address; it is fixed at build time by Next.js rewrites.
+ARG ZAPX_API_URL=http://api:4000
+ENV ZAPX_API_URL=$ZAPX_API_URL
+RUN pnpm build
+
+# ---- API -------------------------------------------------------------------------------------
+FROM base AS api
+ENV NODE_ENV=production
+COPY --from=build --chown=node:node /app /app
+USER node
+EXPOSE 4000
+HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD node -e "fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "apps/api/dist/main.js"]
+
+# One-off job: apply database migrations, then exit (an ECS task before each deployment).
+FROM api AS migrate
+HEALTHCHECK NONE
+CMD ["packages/db/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "packages/db/prisma/schema.prisma"]
+
+# ---- Studio ----------------------------------------------------------------------------------
+FROM base AS studio
+ENV NODE_ENV=production
+COPY --from=build --chown=node:node /app /app
+USER node
+WORKDIR /app/apps/studio
+EXPOSE 3000
+CMD ["node_modules/.bin/next", "start", "-p", "3000"]
+
+# ---- Respondent runtime: static files plus an /api proxy (CloudFront + S3 + ALB on AWS) -------
+FROM nginx:1.27-alpine AS runtime
+COPY infra/nginx/runtime.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/runtime/dist /usr/share/nginx/html
+EXPOSE 80

@@ -81,9 +81,6 @@ const schema = z
       .min(5)
       .max(60 * 24 * 30)
       .default(24 * 60),
-    /** OpenTelemetry: tracing starts only when an OTLP endpoint is configured. */
-    OTEL_EXPORTER_OTLP_ENDPOINT: optionalString,
-    OTEL_SERVICE_NAME: z.string().default('zapx-api'),
     /** Max upload size for questionnaire files, in megabytes. */
     UPLOAD_MAX_MB: z.coerce.number().min(1).max(50).default(15),
     COOKIE_SECURE: z

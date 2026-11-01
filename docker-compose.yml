@@ -1,0 +1,62 @@
+# Full ZAPX stack on one machine, no cloud services needed:
+#   docker compose up --build
+# Studio http://localhost:3000 · respondent runtime http://localhost:5173 · API http://localhost:4000/api
+# For development with hot reload, run only the database: docker compose up postgres
+name: zapx
+
+x-api-env: &api-env
+  DATABASE_URL: postgresql://zapx:zapx@postgres:5432/zapx?connection_limit=10&pool_timeout=20
+  JWT_SECRET: ${JWT_SECRET:-local-compose-secret-change-me-0123456789}
+  SECRETS_KEY: ${SECRETS_KEY:-local-compose-secrets-key-change-me-012345}
+  RUNTIME_BASE_URL: ${RUNTIME_BASE_URL:-http://localhost:5173}
+  ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+  COOKIE_SECURE: 'false'
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  AI_MODEL: ${AI_MODEL:-}
+  AI_PRICING: ${AI_PRICING:-}
+  NODE_ENV: production
+  CALLBACK_WORKER: 'on'
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: zapx
+      POSTGRES_PASSWORD: zapx
+      POSTGRES_DB: zapx
+    ports: ['5432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U zapx']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    build: { context: ., target: migrate }
+    environment: *api-env
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: 'no'
+
+  api:
+    build: { context: ., target: api }
+    environment: *api-env
+    ports: ['4000:4000']
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  studio:
+    build: { context: ., target: studio }
+    ports: ['3000:3000']
+    depends_on:
+      api: { condition: service_healthy }
+
+  runtime:
+    build: { context: ., target: runtime }
+    ports: ['5173:80']
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  pgdata:
