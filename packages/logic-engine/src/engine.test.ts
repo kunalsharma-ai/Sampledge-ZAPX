@@ -258,3 +258,22 @@ describe('static analysis', () => {
     expect(conditionHolds('Q1 = 1', demo(), {})).toBe(false);
   });
 });
+
+describe('same-page conditions', () => {
+  it('rejects a condition on a later question of the same page', () => {
+    const def = make({
+      schemaVersion: 1,
+      title: 't',
+      pages: [
+        {
+          id: 'P1',
+          questions: [
+            { id: 'A', type: 'open', text: 'a', condition: 'B == 1' },
+            { id: 'B', type: 'single', text: 'b', options: [{ code: 1, label: 'x' }] },
+          ],
+        },
+      ],
+    });
+    expect(analyzeSurvey(def).issues.map((i) => i.code)).toContain('FORWARD_REFERENCE');
+  });
+});

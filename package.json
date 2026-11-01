@@ -2,16 +2,18 @@
   "name": "zapx",
   "private": true,
   "packageManager": "pnpm@10.28.0",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
-    "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:migrate": "pnpm --filter @zapx/db migrate:deploy",
     "db:seed": "pnpm --filter @zapx/db seed",
-    "e2e": "pnpm --filter @zapx/e2e test"
+    "e2e": "pnpm --filter @zapx/e2e e2e",
+    "format": "prettier --write ."
   },
   "devDependencies": {
     "turbo": "2.5.4",
