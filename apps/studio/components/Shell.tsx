@@ -14,6 +14,11 @@ export function Shell({ children, crumbs }: { children: ReactNode; crumbs?: Reac
         </Link>
         <nav className="muted">{crumbs}</nav>
         <div className="spacer" />
+        {me?.role === 'ADMIN' ? (
+          <Link href="/settings" className="small">
+            Settings
+          </Link>
+        ) : null}
         {me ? (
           <span className="muted small">
             {me.name} · {me.role.toLowerCase()} · {me.tenant.name}
