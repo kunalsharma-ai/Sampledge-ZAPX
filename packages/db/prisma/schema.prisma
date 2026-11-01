@@ -36,6 +36,18 @@ enum RedirectMode {
   HYBRID
 }
 
+enum ChangeSource {
+  AI
+  IMPORT
+  MANUAL
+}
+
+enum ChangeStatus {
+  PROPOSED
+  APPLIED
+  REJECTED
+}
+
 enum ResponseStatus {
   IN_PROGRESS
   COMPLETE
@@ -94,6 +106,8 @@ model Survey {
   versions      SurveyVersion[]
   responses     Response[]
   quotaCounts   QuotaCount[]
+  qaRuns        QaRun[]
+  changeSets    ChangeSet[]
 
   @@index([tenantId, projectId])
 }
@@ -202,4 +216,61 @@ model AuditEvent {
 
   @@index([tenantId, entityType, entityId])
   @@index([tenantId, createdAt])
+}
+
+/// A QA Laboratory run: synthetic respondents simulated against one survey version.
+model QaRun {
+  id          String   @id @default(cuid())
+  tenantId    String
+  surveyId    String
+  survey      Survey   @relation(fields: [surveyId], references: [id])
+  versionId   String
+  version     Int
+  respondents Int
+  seed        String
+  passed      Boolean
+  /// Coverage percent (0-100) of pages, questions, options, branches and outcomes.
+  coverage    Float
+  /// Full QaReport from @zapx/logic-engine simulateSurvey.
+  report      Json
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, surveyId, createdAt])
+}
+
+/// A proposed edit to a survey draft (from AI, a file import or a manual paste). Nothing reaches
+/// the draft until a programmer reviews and applies it.
+model ChangeSet {
+  id                 String       @id @default(cuid())
+  tenantId           String
+  surveyId           String
+  survey             Survey       @relation(fields: [surveyId], references: [id])
+  /// Draft version the proposal was made against, and its updatedAt at that moment.
+  baseVersionId      String
+  baseUpdatedAt      DateTime
+  source             ChangeSource
+  title              String
+  /// The instruction or brief given (for AI), or the import file name.
+  prompt             String?
+  sourceFileName     String?
+  /// Full proposed survey definition (validated by @zapx/survey-schema).
+  proposedDefinition Json
+  /// Structured diff against the base draft.
+  diff               Json
+  /// Assumptions and questions the author (AI or importer) wants a human to confirm.
+  assumptions        Json         @default("[]")
+  /// Import confidence and per-item issues, if any.
+  confidence         Json?
+  /// Schema and logic check of the proposed definition.
+  check              Json
+  status             ChangeStatus @default(PROPOSED)
+  /// Model or importer that produced the proposal, e.g. "claude-opus-5-5" or "xlsx-template-v1".
+  producer           String
+  createdById        String?
+  decidedById        String?
+  decidedAt          DateTime?
+  createdAt          DateTime     @default(now())
+
+  @@index([tenantId, surveyId, createdAt])
 }
