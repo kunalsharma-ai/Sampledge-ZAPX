@@ -99,6 +99,15 @@ const schema = z
       .regex(/^[a-z0-9-]*$/i)
       .default('')
       .transform((v) => v.toLowerCase()),
+    /**
+     * Milestone 16: network reputation (VPN, proxy, Tor, data centre) for online interviews. "ipinfo"
+     * sends each respondent's address to IPinfo's privacy detection API (a paid IPinfo plan) when an
+     * interview starts and keeps only the answer's words; "off" sends nothing anywhere.
+     */
+    NETWORK_REPUTATION: z.enum(['off', 'ipinfo']).default('off'),
+    IPINFO_TOKEN: z.string().default(''),
+    IPINFO_API_BASE: z.string().url().default('https://ipinfo.io'),
+    NETWORK_REPUTATION_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(2_000),
     /** Largest interview recording (CAPI audio), in megabytes. Photos are capped at 15. */
     CAPTURE_MAX_MB: z.coerce.number().min(1).max(500).default(100),
     /** Delete photos and recordings this many days after they were uploaded. 0 keeps them until erased. */
@@ -187,6 +196,8 @@ const schema = z
       .transform((v) => v === 'true'),
   })
   .superRefine((c, ctx) => {
+    if (c.NETWORK_REPUTATION === 'ipinfo' && !c.IPINFO_TOKEN)
+      ctx.addIssue({ code: 'custom', path: ['IPINFO_TOKEN'], message: 'IPINFO_TOKEN is required when NETWORK_REPUTATION=ipinfo' });
     if (c.NODE_ENV === 'production' && !c.SECRETS_KEY)
       ctx.addIssue({ code: 'custom', path: ['SECRETS_KEY'], message: 'SECRETS_KEY is required in production' });
     if (c.NODE_ENV === 'production' && c.CALLBACK_ALLOW_PRIVATE_HOSTS) {

@@ -44,6 +44,7 @@ import { FraudBlocksController, QualityController } from './quality/quality.cont
 import { CaptureController } from './captures/capture.controller';
 import { CaptureService } from './captures/capture.service';
 import { QualityService } from './quality/quality.service';
+import { NetworkReputationService } from './quality/network-reputation.service';
 import { CapiAppController, CapiAssignmentsController } from './capi/capi.controller';
 import { CapiService } from './capi/capi.service';
 import { ProjectMembersController } from './projects/members.controller';
@@ -114,6 +115,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     AiGateway,
     AiUsageRepository,
     QualityService,
+    NetworkReputationService,
     CaptureService,
     CapiService,
     QaService,

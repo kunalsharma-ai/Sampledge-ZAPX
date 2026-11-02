@@ -36,7 +36,7 @@ import { CaptureService } from '../captures/capture.service';
 type Db = Prisma.TransactionClient | PrismaService;
 
 export type ScoredFor = Pick<Response, 'id' | 'surveyId' | 'isTest' | 'ipHash'> &
-  Partial<Pick<Response, 'tenantId' | 'deviceHash' | 'signals' | 'geoCountry' | 'country'>>;
+  Partial<Pick<Response, 'tenantId' | 'deviceHash' | 'signals' | 'geoCountry' | 'country' | 'networkFlags'>>;
 
 /** Browser traits the runtime reports for the device check. Only their keyed hash is kept. */
 export type DeviceTraits = Record<string, string | number | boolean>;
@@ -108,6 +108,7 @@ export class QualityService {
     let duplicateOpenEnds = new Set<string>();
     let sameNetworkCompletes = 0;
     const fraud: FraudInput = { browser: (r.signals ?? {}) as BrowserSignals, ...(capi ? { capi } : {}) };
+    if (r.networkFlags?.length) fraud.network = r.networkFlags;
     if (r.geoCountry) {
       const declared = r.country && /^[A-Za-z]{2}$/.test(r.country) ? [r.country.toUpperCase()] : [];
       fraud.geo = { country: r.geoCountry, expected: settings.countries.length ? settings.countries : declared };

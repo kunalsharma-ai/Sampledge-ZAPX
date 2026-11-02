@@ -93,6 +93,12 @@ in `pnpm-workspace.yaml`.
   password); Terraform creates the secret but never holds its values (except `edge_shared_secret`,
   which CloudFront needs, so treat the Terraform state as secret).
 
+## Third-party lookups (Milestone 16 onwards)
+
+- **Network reputation** (`NETWORK_REPUTATION=ipinfo`, off by default) sends each online
+  respondent's public address to IPinfo over HTTPS with a bearer token. Private, loopback and
+  link-local addresses are never sent. ZAPX stores only the words in the answer, never the address.
+
 ## Reporting
 
 Report vulnerabilities privately to the maintainer; do not open a public issue.

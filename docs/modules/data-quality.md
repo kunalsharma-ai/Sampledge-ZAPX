@@ -45,6 +45,8 @@ Fraud signals (Milestone 12, [ADR 0018](../adr/0018-fraud-detection-and-capi-cap
 | `geo_mismatch`        | The edge network's country is not one of the expected countries                          | 30      |
 | `blocked_device`      | The device is on the organization's block list                                           | 60      |
 | `blocked_network`     | The network is on the organization's block list                                          | 40      |
+| `anonymous_network`   | A network reputation service says the address is a VPN, proxy, Tor exit or privacy relay | 30      |
+| `datacenter_network`  | A network reputation service says the address is a data centre or cloud host             | 20      |
 | `gps_missing`         | CAPI: the survey requires a location and none was recorded                               | 30      |
 | `gps_moved`           | CAPI: the interview ended more than 1 km from where it started                           | 15      |
 | `interviewer_overlap` | CAPI: the interviewer recorded another interview at the same time (over 1 minute)        | 40      |
@@ -101,6 +103,23 @@ Set `GEO_COUNTRY_HEADER` to the header your edge network adds (`cloudfront-viewe
 otherwise anyone could send the header. Without it there is no country check. The country (two
 letters) is stored with the response as `geoCountry`.
 
+## VPN, proxy and data-centre check (Milestone 16)
+
+Off by default. With `NETWORK_REPUTATION=ipinfo` and an `IPINFO_TOKEN` whose IPinfo plan includes
+privacy detection, ZAPX asks IPinfo about each online respondent's address when the interview
+starts (only when the survey has quality and fraud checks on, never for test links or private
+addresses). Only the answer's words (`vpn`, `proxy`, `tor`, `relay`, `hosting`) are stored, as
+`networkFlags`; the address and IPinfo's full answer are not.
+
+- At completion ZAPX waits for a lookup that is still running (up to
+  `NETWORK_REPUTATION_TIMEOUT_MS`, 2 seconds), so fast bots are scored with it. A lookup that
+  fails or times out gives no flag; the interview is never delayed beyond that or refused.
+- An address is looked up once an hour per API process (in-memory cache keyed by its hash).
+- VPNs are also used by honest people (company networks, privacy-minded users), so this is review
+  evidence like every other fraud signal, not a block.
+- **Status: tested against a local stand-in of IPinfo's API, not against IPinfo itself.** Try one
+  interview from a VPN on staging and check its review card before relying on it.
+
 ## Privacy
 
 - Network: `HMAC(key, tenantId + ":" + address)`, key derived from `JWT_SECRET`. The address is not
@@ -109,5 +128,8 @@ letters) is stored with the response as `geoCountry`.
 - Device: `HMAC(key, tenantId + user agent + traits)` of coarse browser traits (screen, time zone,
   languages, platform, cores, memory, touch points). The traits are not stored. No canvas, audio or
   font fingerprinting.
+- Network reputation (when turned on): the respondent's address is sent to IPinfo, a processor
+  under your data processing agreement with them; mention it in the survey's privacy notice. Only
+  the resulting words are stored.
 - Browser signals: only counts and question ids (pages without input, honeypot hits, which open
   answers were pasted). No keystrokes or text.

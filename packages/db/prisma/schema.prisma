@@ -419,6 +419,9 @@ model Response {
   signals    Json      @default("{}")
   /// Two-letter country reported by the edge network (GEO_COUNTRY_HEADER), when configured.
   geoCountry String?
+  /// Milestone 16: what a network reputation service said about the respondent's address (vpn, proxy,
+  /// tor, relay, hosting). Only these words are kept: not the address, not the provider's answer.
+  networkFlags String[] @default([])
   /// CAPI: {start?, end?: {lat, lon, accuracy, at}} and {audioConsent?}. Rounded to about a metre.
   location   Json?
   captures   Capture[]

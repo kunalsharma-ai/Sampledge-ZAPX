@@ -63,7 +63,8 @@ aws secretsmanager put-secret-value --secret-id "$(terraform output -raw app_sec
   "EDGE_SHARED_SECRET": "<the same value as edge_shared_secret>",
   "ANTHROPIC_API_KEY": "",
   "STRIPE_SECRET_KEY": "",
-  "STRIPE_WEBHOOK_SECRET": ""
+  "STRIPE_WEBHOOK_SECRET": "",
+  "IPINFO_TOKEN": ""
 }'
 ```
 
