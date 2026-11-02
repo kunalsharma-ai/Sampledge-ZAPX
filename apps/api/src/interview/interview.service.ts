@@ -29,6 +29,7 @@ import {
 import {
   defaultPresentation,
   parsePresentation,
+  qualitySettingsOf,
   type Answers,
   type DeviceType,
   type OutcomeStatus,
@@ -44,6 +45,7 @@ import { AuditService } from '../common/audit.service';
 import { isAllowedReturnUrl, verifySignedParams } from '@zapx/redirect-core';
 import { RedirectService } from '../integrations/redirect.service';
 import { MAX_PAGE_MS, QualityService, type DeviceTraits } from '../quality/quality.service';
+import { NetworkReputationService } from '../quality/network-reputation.service';
 import { CaptureService } from '../captures/capture.service';
 import type { BrowserSignals } from '@zapx/quality-core';
 import { PlanService } from '../plans/plan.service';
@@ -110,6 +112,12 @@ export class InterviewValidationError extends UnprocessableEntityException {
   constructor(public readonly errors: FieldError[]) {
     super({ message: 'Some answers need attention', errors });
   }
+}
+
+/** Quality on with fraud checks (the default): the only case where a network lookup is worth making. */
+function wantsFraudChecks(def: SurveyDefinition) {
+  const q = qualitySettingsOf(def);
+  return q.enabled && q.fraud;
 }
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -247,6 +255,7 @@ export class InterviewService {
     private readonly quality: QualityService,
     private readonly plans: PlanService,
     private readonly captures: CaptureService,
+    private readonly reputation: NetworkReputationService,
   ) {}
 
   // ---- Entry --------------------------------------------------------------------------------
@@ -361,6 +370,8 @@ export class InterviewService {
           device,
         },
       });
+      // Network reputation runs in the background; it never delays or fails the start.
+      if (!isTest && wantsFraudChecks(def)) void this.reputation.check(response.id, meta.ip);
       return { ...(await this.stateOf(response, ctx, vendor)), token };
     } catch (e) {
       // Two simultaneous entries with the same UID: the second one is a re-entry.
@@ -697,6 +708,10 @@ export class InterviewService {
   /** Complete the interview, counting it toward every matching quota atomically (no overfill). */
   private async complete(r: Response, ctx: Ctx, vendor: Vendor | null, answers: Answers, timing: Timing): Promise<InterviewState> {
     const def = ctx.def;
+    // A fast finisher may beat the network lookup started with the interview: wait for it (it is
+    // bounded by its own timeout), so the score includes what it found.
+    const networkFlags = await this.reputation.settle(r.id);
+    if (networkFlags) r = { ...r, networkFlags };
     // Quality is decided before the quota place is taken: an in-survey quality reject never counts.
     const assessment = await this.quality.assess(r, def, answers, timing.durationMs);
     const scored = { ...timing, ...this.quality.fields(def, assessment, r.isTest) };

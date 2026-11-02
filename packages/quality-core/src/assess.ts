@@ -26,6 +26,9 @@ export const QUALITY_FLAG_CODES = [
   'geo_mismatch',
   'blocked_device',
   'blocked_network',
+  // Milestone 16: network reputation (needs a provider)
+  'anonymous_network',
+  'datacenter_network',
   // Milestone 12: face-to-face (CAPI) checks
   'gps_missing',
   'gps_moved',
@@ -66,6 +69,8 @@ export const PENALTY = {
   geo_mismatch: 30,
   blocked_device: 60,
   blocked_network: 40,
+  anonymous_network: 30,
+  datacenter_network: 20,
   gps_missing: 30,
   gps_moved: 15,
   interviewer_overlap: 40,
@@ -102,6 +107,8 @@ export interface FraudInput {
   sameDeviceCompletes?: number;
   /** Country reported by the edge network, and the countries expected for this respondent. */
   geo?: { country: string; expected: string[] };
+  /** What the network reputation service said about the address: vpn, proxy, tor, relay, hosting. */
+  network?: string[];
   /** The device or network is on the organization's block list. */
   blocked?: { device?: boolean; network?: boolean };
   /** CAPI only. */
@@ -251,6 +258,22 @@ function fraudFlags(q: QualitySettings, f: FraudInput): QualityFlag[] {
       out.push({ code: 'blocked_device', penalty: PENALTY.blocked_device, detail: 'This device is on your organization’s block list.' });
     if (f.blocked?.network)
       out.push({ code: 'blocked_network', penalty: PENALTY.blocked_network, detail: 'This network is on your organization’s block list.' });
+  }
+  if (q.fraud && f.network?.length) {
+    const hidden = f.network.filter((k) => k === 'vpn' || k === 'proxy' || k === 'tor' || k === 'relay');
+    const words: Record<string, string> = { vpn: 'a VPN', proxy: 'a proxy', tor: 'Tor', relay: 'a privacy relay' };
+    if (hidden.length)
+      out.push({
+        code: 'anonymous_network',
+        penalty: PENALTY.anonymous_network,
+        detail: `Answered through ${hidden.map((k) => words[k]).join(' and ')}, which hides where the respondent is.`,
+      });
+    else if (f.network.includes('hosting'))
+      out.push({
+        code: 'datacenter_network',
+        penalty: PENALTY.datacenter_network,
+        detail: 'Answered from a data-centre or cloud address, where people rarely browse from.',
+      });
   }
   if (f.geo && f.geo.expected.length && !f.geo.expected.includes(f.geo.country))
     out.push({
