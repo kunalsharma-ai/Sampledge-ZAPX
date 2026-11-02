@@ -89,7 +89,7 @@ export function Webhooks() {
         </div>
       ) : null}
       {hooks.map((h) => (
-        <div key={h.id} className="review-item stack" style={{ gap: 6 }} data-testid="webhook">
+        <div key={h.id} className="webhook-card stack" data-testid="webhook">
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <span className="mono small">{h.url}</span>
             <span className={`badge ${h.active ? 'good' : 'warn'}`}>{h.active ? 'active' : 'paused'}</span>

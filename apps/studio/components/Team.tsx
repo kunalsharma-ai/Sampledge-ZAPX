@@ -61,7 +61,7 @@ export function Team() {
   };
 
   return (
-    <section className="panel stack" data-testid="team">
+    <section className="panel stack wide" data-testid="team">
       <h2>Team</h2>
       <table className="data">
         <thead>

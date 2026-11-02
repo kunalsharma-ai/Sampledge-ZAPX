@@ -164,7 +164,7 @@ export default function AuditPage() {
               <td>
                 {e.entityType} <span className="mono muted">{e.entityId.slice(0, 10)}</span>
               </td>
-              <td className="audit-details">{Object.keys(e.data).length ? JSON.stringify(e.data, null, 1).slice(0, 600) : ''}</td>
+              <td className="audit-details">{Object.keys(e.data).length ? JSON.stringify(e.data).slice(0, 400) : ''}</td>
             </tr>
           ))}
         </tbody>
