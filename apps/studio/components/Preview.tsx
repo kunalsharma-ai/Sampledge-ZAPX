@@ -23,6 +23,7 @@ import {
   pendingMedia,
   themeCss,
   type FieldErrors,
+  type PhotoHandler,
 } from '@zapx/survey-renderer';
 import { defaultPresentation, type AnswerValue, type Answers, type Presentation, type SurveyDefinition } from '@zapx/survey-schema';
 
@@ -42,6 +43,16 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
   const [outcome, setOutcome] = useState<string | null>(null);
   const [device, setDevice] = useState<Device>('desktop');
   const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
+  // Preview photos stay in this browser tab; nothing is uploaded.
+  const [shots] = useState(() => new Map<string, string>());
+  const photos: PhotoHandler = {
+    take: async (_q, photo) => {
+      const ref = `preview-${Math.random().toString(36).slice(2, 12)}`;
+      shots.set(ref, URL.createObjectURL(photo));
+      return ref;
+    },
+    preview: (ref) => shots.get(ref),
+  };
 
   const restart = () => {
     setSeed(Math.random().toString(36).slice(2));
@@ -153,7 +164,11 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
                     readAloud={presentation.readAloud}
                     language={def.language}
                     messages={msg}
+                    photos={photos}
                   />
+                  {questions.some((q) => q.type === 'photo') ? (
+                    <p className="zx-media-wait">Preview: photos stay in this browser and are not uploaded.</p>
+                  ) : null}
                   {pendingMedia(questions, pageAnswers, answers, played).length ? (
                     <p className="zx-media-wait">{msg.playToEnd} (Preview: you can continue without playing it.)</p>
                   ) : null}

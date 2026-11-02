@@ -50,6 +50,12 @@ quality review, and saved reports that anyone on the team can rerun or download 
 and sliders; images, video and audio on questions and pictures as answers (uploaded, served by
 ZAPX, cached offline in the interviewer app); play-to-the-end for ads; and read aloud.
 
+**Milestone 12 (fraud detection and face-to-face capture)** adds fraud signals to the quality score
+(automated browsers, a honeypot field, pages answered without input, pasted answers, the same device
+as another complete, the wrong country, and an organization-wide block list), photo questions, and
+for CAPI the interview location, consented recordings and a check for overlapping interviews. All
+evidence appears in the review queue; photos and recordings are private and audited.
+
 ## What works today
 
 | Area                     | What you can do                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -98,10 +104,11 @@ ZAPX, cached offline in the interviewer app); play-to-the-end for ads; and read 
 | Phone interviews (CATI)  | Upload a call list (CSV); interviewers take the next case from Calls, dial the shown number, run the interview in the runtime and record the outcome. Callbacks, retries, max attempts, reopen, erase numbers. No dialer or recording yet ([guide](docs/modules/cati.md))                                                                                                                                                                  |
 | Analysis and reports     | Analysis tab: frequencies (counts, shares, numeric statistics, open-answer samples) and crosstabs with significance letters; filters; saved reports rerun on the latest data, Excel download. Unweighted ([guide](docs/modules/analytics.md))                                                                                                                                                                                              |
 | Rich media and new types | Rating scale / NPS, ranking (tap to rank), constant sum and sliders; images, video and audio on questions and pictures as answers; play to the end; read aloud with the device voices ([guide](docs/modules/rich-media.md))                                                                                                                                                                                                                |
+| Fraud and capture        | Fraud signals in the quality score; block a rejected complete's device and network for the organization; photo questions (shrunk, metadata removed, private); CAPI location at start and end, recording after the respondent agrees, overlapping-interview check; evidence in the review queue ([guide](docs/modules/data-quality.md), [CAPI](docs/modules/capi.md))                                                                       |
 | Row-level security       | PostgreSQL policy on respondent data: the studio's reads of responses, exports, review queue and fieldwork run scoped to the organization in the database too. Applies when the API's database role is not a superuser ([details](docs/adr/0012-row-level-security.md))                                                                                                                                                                    |
 | Deletion                 | Projects, surveys and vendors are soft-deleted: they disappear and their links stop working, history is kept                                                                                                                                                                                                                                                                                                                               |
 
-Not yet built (later milestones): recorded voice-over and transcription, MaxDiff and conjoint, a CATI dialer and call recording, audio/photo/GPS capture in CAPI, advanced fraud detection (device fingerprinting, AI open-end review), weighting and charts in analysis, SAML and billing. See
+Not yet built (later milestones): recorded voice-over and transcription, MaxDiff and conjoint, a CATI dialer and call recording, network reputation (VPN and proxy lists) and AI open-end review, weighting and charts in analysis, SAML and billing. See
 [docs/architecture.md](docs/architecture.md).
 
 ## Repository layout

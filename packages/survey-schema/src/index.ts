@@ -172,6 +172,19 @@ export const gridQuestionSchema = z.object({
   randomizeRows: z.boolean().default(false),
 });
 
+/**
+ * Photo (Milestone 12): the respondent or interviewer takes or chooses a picture (a receipt, a shelf,
+ * a product at home). The answer is a capture reference; the file itself is private to the
+ * organization and never shown to other respondents.
+ */
+export const photoQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('photo'),
+});
+
+/** Reference to a captured photo or recording, unique within one interview. */
+export const CAPTURE_REF = /^[A-Za-z0-9_-]{8,64}$/;
+
 export const infoElementSchema = z.object({
   id: variableName,
   type: z.literal('info'),
@@ -189,6 +202,7 @@ export const questionSchema = z.discriminatedUnion('type', [
   scaleQuestionSchema,
   rankingQuestionSchema,
   sumQuestionSchema,
+  photoQuestionSchema,
   infoElementSchema,
 ]);
 export type Question = z.infer<typeof questionSchema>;
@@ -203,6 +217,7 @@ export type InfoElement = z.infer<typeof infoElementSchema>;
 export type ScaleQuestion = z.infer<typeof scaleQuestionSchema>;
 export type RankingQuestion = z.infer<typeof rankingQuestionSchema>;
 export type SumQuestion = z.infer<typeof sumQuestionSchema>;
+export type PhotoQuestion = z.infer<typeof photoQuestionSchema>;
 
 /** Codes a scale question can store: every point of the scale, plus "don't know" when offered. */
 export function scaleCodes(q: Pick<ScaleQuestion, 'min' | 'max' | 'dontKnow'>): number[] {
@@ -292,6 +307,20 @@ export const qualitySettingsSchema = z.object({
   openEnds: z.boolean().default(true),
   /** Flag several completes from the same network (a keyed hash of the IP address, never the address). */
   sameNetwork: z.boolean().default(true),
+  /**
+   * Fraud signals (Milestone 12): automated browsers, the hidden honeypot field, pages answered with
+   * no keyboard, pointer or touch input, pasted open answers, the same device as another complete,
+   * and devices or networks the organization blocked.
+   */
+  fraud: z.boolean().default(true),
+  /**
+   * Countries respondents are expected to answer from (ISO 3166 two-letter codes). Checked against
+   * the country the edge network reports (GEO_COUNTRY_HEADER); empty uses the vendor's cc parameter.
+   */
+  countries: z
+    .array(z.string().regex(/^[A-Z]{2}$/, 'Use two-letter country codes such as GB'))
+    .max(250)
+    .default([]),
   /** Survey-specific checks, such as attention or consistency checks. */
   checks: z.array(qualityCheckSchema).max(50).default([]),
   /** Completes scoring below this go to the review queue. */
@@ -313,6 +342,26 @@ export function qualitySettingsOf(def: { settings?: { quality?: unknown } }): Qu
   return parsed.success ? parsed.data : qualitySettingsSchema.parse({});
 }
 
+// ---- Face-to-face capture (Milestone 12) -----------------------------------------------------------
+
+export const capiSettingsSchema = z.object({
+  /** Record where CAPI interviews happen (start and end). required: an interview cannot start without a location. */
+  gps: z.enum(['off', 'optional', 'required']).default('off'),
+  /** consent: the interviewer asks the respondent before recording the interview's audio. Never recorded silently. */
+  audio: z.enum(['off', 'consent']).default('off'),
+  /** What the interviewer reads out to ask for consent to record. */
+  consentText: z.string().max(1000).optional(),
+});
+export type CapiSettings = z.infer<typeof capiSettingsSchema>;
+
+export const DEFAULT_RECORDING_CONSENT =
+  'May I record the sound of this interview? It is only used to check the quality of my work, is kept securely and is not shared.';
+
+export function capiSettingsOf(def: { settings?: { capi?: unknown } }): CapiSettings {
+  const parsed = capiSettingsSchema.safeParse(def.settings?.capi ?? {});
+  return parsed.success ? parsed.data : capiSettingsSchema.parse({});
+}
+
 export const surveyDefinitionSchema = z.object({
   schemaVersion: z.literal(1),
   title: z.string().min(1),
@@ -328,6 +377,7 @@ export const surveyDefinitionSchema = z.object({
       allowBack: z.boolean().default(false),
       showProgress: z.boolean().default(true),
       quality: qualitySettingsSchema.default({}),
+      capi: capiSettingsSchema.default({}),
     })
     .default({}),
 });
@@ -353,7 +403,7 @@ export function parseSurveyDefinition(input: unknown): { ok: true; definition: S
 export type AnswerValue =
   | number // single, numeric
   | number[] // multi; ranking (codes in rank order)
-  | string // open
+  | string // open; photo (capture reference)
   | Record<string, number> // grid: rowId -> column code; sum: option code -> amount
   | null;
 

@@ -173,3 +173,16 @@ h2 {
     display: none;
   }
 }
+.capi-pill.capi-recording {
+  color: var(--bad);
+  border-color: var(--bad);
+  font-weight: 600;
+}
+.capi-consent blockquote {
+  margin: 12px 0 20px;
+  padding: 12px 16px;
+  border-left: 4px solid var(--zx-accent, #2f5bea);
+  background: var(--zx-accent-soft, rgba(47, 91, 234, 0.08));
+  border-radius: 6px;
+  font-size: 1.05rem;
+}

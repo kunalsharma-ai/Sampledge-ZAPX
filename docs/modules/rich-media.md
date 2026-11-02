@@ -10,6 +10,10 @@
 | Numeric as a slider | `numeric` with `display: "slider"`      | the number                                   | `TEMP > 70`                                      |
 | Image choice        | `single` or `multi` with option `image` | the code                                     | as usual                                         |
 
+- **Photo** (`photo`, Milestone 12): the answer is a reference to a private photo. Respondents
+  take one with the camera or choose one; the device shrinks it to 1600 px and removes its
+  metadata before upload. In logic, `SHELF != null`. Reviewers see photos in the review queue. See
+  [ADR 0018](../adr/0018-fraud-detection-and-capi-capture.md).
 - **Scale**: from/to (any whole numbers up to 20 points), end labels, and an optional answer
   outside the scale such as "Don't know". Tick **Net Promoter Score** for a 0-10 NPS question.
 - **Ranking**: respondents tap items in order of preference and can move them up or down. Set

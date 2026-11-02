@@ -377,9 +377,22 @@ model Response {
   reviewedById  String?
   reviewNote    String?
 
+  // ---- Milestone 12: fraud signals and face-to-face capture ----
+  /// Keyed HMAC of browser traits (screen, time zone, languages, platform, user agent). The traits are not stored.
+  deviceHash String?
+  /// Browser signals while answering: {automation?, honeypot?, quietPages?, pasted?: [questionId]}.
+  signals    Json      @default("{}")
+  /// Two-letter country reported by the edge network (GEO_COUNTRY_HEADER), when configured.
+  geoCountry String?
+  /// CAPI: {start?, end?: {lat, lon, accuracy, at}} and {audioConsent?}. Rounded to about a metre.
+  location   Json?
+  captures   Capture[]
+
   @@unique([surveyId, vendorId, uid])
   @@index([surveyId, reviewState])
   @@index([surveyId, ipHash])
+  @@index([surveyId, deviceHash])
+  @@index([interviewerId, startedAt])
   @@index([tenantId, surveyId, status])
   @@index([vendorId, completedAt])
   /// Plan usage: completes per organization per month.
@@ -815,4 +828,48 @@ model MediaAsset {
   deletedAt   DateTime?
 
   @@index([tenantId, surveyId])
+}
+
+/// A photo answer or an interview recording (Milestone 12). Private: only people who can see the
+/// survey can open it, and every view is audited. Files live in the file store.
+model Capture {
+  /// 22-character random id.
+  id           String    @id
+  tenantId     String
+  surveyId     String
+  responseId   String?
+  response     Response? @relation(fields: [responseId], references: [id])
+  /// CAPI: the interview's device-generated id. Captures are uploaded before the interview syncs.
+  clientId     String?
+  /// The value stored in the photo answer, or "audio" for the interview recording.
+  ref          String
+  /// photo | audio
+  kind         String
+  contentType  String
+  size         Int
+  sha256       String
+  storageKey   String    @unique
+  uploadedById String?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+
+  @@unique([clientId, ref])
+  @@unique([responseId, ref])
+  @@index([tenantId, surveyId])
+}
+
+/// A device or network an organization blocked after rejecting fraud (Milestone 12). Only keyed hashes.
+model FraudBlock {
+  id          String   @id @default(cuid())
+  tenantId    String
+  /// device | network
+  kind        String
+  hash        String
+  /// The rejected response it came from, and why.
+  responseId  String?
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, kind, hash])
 }

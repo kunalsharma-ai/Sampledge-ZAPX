@@ -180,3 +180,24 @@ describe('translation', () => {
     expect(all.find((x) => x.id === 'AD')!.media!.alt).toBe('Une publicité de 30 secondes');
   });
 });
+
+describe('photo', () => {
+  const photo = make({
+    schemaVersion: 1,
+    title: 'Photo',
+    pages: [{ id: 'P1', questions: [{ id: 'SHELF', type: 'photo', text: 'Take a photo of the shelf' }] }],
+    settings: { capi: { gps: 'required', audio: 'consent' } },
+  });
+  const pq = photo.pages[0]!.questions[0]!;
+  it('stores a capture reference', () => {
+    expect(normalizeAnswer(pq, 'c3f1a9b2-4e5d')).toEqual({ value: 'c3f1a9b2-4e5d' });
+    expect(normalizeAnswer(pq, '../etc/passwd')).toEqual({ error: 'Take or choose a photo.' });
+    expect(normalizeAnswer(pq, 42)).toEqual({ error: 'Take or choose a photo.' });
+    expect(normalizeAnswer(pq, '')).toEqual({ error: 'This question requires an answer.' });
+  });
+  it('keeps the capture settings and simulates', () => {
+    expect(photo.settings.capi).toEqual({ gps: 'required', audio: 'consent' });
+    expect(simulateSurvey(photo, { respondents: 20, seed: 'p' }).outcomes.complete).toBe(20);
+    expect(conditionHolds('SHELF != null', photo, { SHELF: 'abcdefgh' })).toBe(true);
+  });
+});

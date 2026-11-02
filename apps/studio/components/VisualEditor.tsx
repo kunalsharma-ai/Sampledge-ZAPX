@@ -18,6 +18,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   scale: 'Rating scale / NPS',
   ranking: 'Ranking',
   sum: 'Constant sum',
+  photo: 'Photo',
   info: 'Information',
 };
 
@@ -56,6 +57,8 @@ function newQuestion(def: SurveyDefinition, type: QuestionType): Question {
         integer: true,
         unit: 'points',
       };
+    case 'photo':
+      return { ...base, type, text: 'Please take a photo' };
     case 'grid':
       return { ...base, type, rows: [{ id: 'r1', label: 'Item 1' }], columns: opts, randomizeRows: false };
     case 'info':
@@ -753,6 +756,13 @@ function QuestionForm({
             <Check label="Randomize order" value={q.randomize} onChange={(v) => onChange({ ...q, randomize: v })} />
           </div>
         </>
+      ) : null}
+      {q.type === 'photo' ? (
+        <p className="muted small">
+          Respondents take a photo with their camera or choose one; interviewers take it with the device. Photos are shrunk and their
+          location metadata removed on the device, and they are private: only your team can open them, from the review queue. In logic, use{' '}
+          {q.id} != null to check one was given.
+        </p>
       ) : null}
       {q.type === 'open' ? (
         <div className="row">

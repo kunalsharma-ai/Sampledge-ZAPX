@@ -5,7 +5,7 @@
  * All survey text is rendered as plain text (never as HTML), so questionnaire content and piped
  * answers cannot inject markup or scripts.
  */
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { conditionHoldsFor } from '@zapx/logic-engine';
 import type { AnswerValue, Answers, DeviceSettings, Option, Question, QuestionMedia, Theme } from '@zapx/survey-schema';
 
@@ -36,8 +36,18 @@ export interface RendererMessages {
   playToEnd: string;
   readAloud: string;
   stopReading: string;
+  takePhoto: string;
+  retakePhoto: string;
+  photoUploading: string;
+  photoFailed: string;
+  photoSaved: string;
 }
 export const DEFAULT_RENDERER_MESSAGES: RendererMessages = {
+  takePhoto: 'Take or choose a photo',
+  retakePhoto: 'Use a different photo',
+  photoUploading: 'Uploading the photo…',
+  photoFailed: 'The photo could not be uploaded. Try again.',
+  photoSaved: 'Photo saved.',
   rankUp: 'Move up',
   rankDown: 'Move down',
   sumRemaining: 'Remaining: {n}',
@@ -59,6 +69,84 @@ export function pendingMedia(questions: DisplayQuestion[], answers: Answers, con
     .map((q) => q.id);
 }
 
+/**
+ * Where photo answers go. The host stores the file (the runtime uploads it, the CAPI app keeps it on
+ * the device until sync, the studio preview keeps it in memory) and returns the reference to submit.
+ */
+export interface PhotoHandler {
+  take: (questionId: string, photo: Blob) => Promise<string>;
+  /** A URL to show the photo behind a reference, if the host still has it. */
+  preview?: (ref: string) => string | undefined;
+}
+
+/** Longest side of a photo after shrinking, in pixels. */
+export const PHOTO_MAX_SIDE = 1600;
+
+/**
+ * Shrink a photo and re-encode it as JPEG before it leaves the device. Re-encoding also drops the
+ * camera's metadata (EXIF), which can hold the exact place and time the photo was taken. A photo
+ * the browser cannot decode is refused rather than sent with its metadata.
+ */
+export async function shrinkPhoto(file: Blob, maxSide = PHOTO_MAX_SIDE): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  if (!out) throw new Error('The photo could not be read');
+  return out;
+}
+
+/**
+ * Fraud signals of one page (Milestone 12): keyboard, pointer and touch input, pasted open answers and
+ * the honeypot. Nothing typed is recorded, only counts and question ids. Attach `handlers` to the
+ * page's form, put <Honeypot> inside it, and send `read()` with the answers.
+ */
+export function usePageSignals() {
+  const honeypot = useRef<HTMLInputElement>(null);
+  // One stable object: hosts can depend on `reset` without re-running effects on every render.
+  return useMemo(() => {
+    let interactions = 0;
+    let pasted = new Set<string>();
+    const count = () => {
+      interactions++;
+    };
+    return {
+      handlers: {
+        onKeyDownCapture: count,
+        onPointerDownCapture: count,
+        onTouchStartCapture: count,
+        onPasteCapture: (e: { target: EventTarget }) => {
+          const q = (e.target as HTMLElement).closest?.('[data-question]')?.getAttribute('data-question');
+          if (q) pasted.add(q);
+        },
+      },
+      honeypot,
+      read: () => ({ interactions, pasted: [...pasted], ...(honeypot.current?.value ? { hp: true } : {}) }),
+      reset: () => {
+        interactions = 0;
+        pasted = new Set();
+        if (honeypot.current) honeypot.current.value = '';
+      },
+    };
+  }, []);
+}
+
+/** A field people never see or reach (hidden from view, screen readers and the tab order); bots fill it in. */
+export function Honeypot({ inputRef }: { inputRef: React.RefObject<HTMLInputElement | null> }) {
+  return (
+    <div className="zx-hp" aria-hidden="true">
+      <label>
+        Website
+        <input ref={inputRef} type="text" name="website" tabIndex={-1} autoComplete="off" defaultValue="" />
+      </label>
+    </div>
+  );
+}
+
 export interface SurveyPageProps {
   questions: DisplayQuestion[];
   answers: Answers;
@@ -75,6 +163,8 @@ export interface SurveyPageProps {
   /** Language of the text, for read aloud voices. */
   language?: string;
   messages?: Partial<RendererMessages>;
+  /** Stores photo answers. Without it, photo questions say they cannot be answered here. */
+  photos?: PhotoHandler;
 }
 
 export function SurveyPage({
@@ -89,6 +179,7 @@ export function SurveyPage({
   readAloud,
   language,
   messages,
+  photos,
 }: SurveyPageProps) {
   const visible = visibleOnPage(questions, answers, context);
   const msg = { ...DEFAULT_RENDERER_MESSAGES, ...messages };
@@ -107,6 +198,7 @@ export function SurveyPage({
           readAloud={readAloud}
           language={language}
           messages={msg}
+          photos={photos}
         />
       ))}
     </div>
@@ -124,6 +216,7 @@ interface QuestionViewProps {
   readAloud?: boolean;
   language?: string;
   messages?: RendererMessages;
+  photos?: PhotoHandler;
 }
 
 /** What read aloud says for a question: its text, help and answer labels. */
@@ -201,6 +294,7 @@ export function QuestionView({
   readAloud,
   language,
   messages = DEFAULT_RENDERER_MESSAGES,
+  photos,
 }: QuestionViewProps) {
   const id = useId();
   const text = q.renderedText ?? q.text;
@@ -252,6 +346,9 @@ export function QuestionView({
       {q.type === 'scale' ? <Scale question={q} name={id} value={value} onChange={onChange} /> : null}
       {q.type === 'ranking' ? <Ranking question={q} value={value} onChange={onChange} messages={messages} mediaUrl={mediaUrl} /> : null}
       {q.type === 'sum' ? <ConstantSum question={q} value={value} onChange={onChange} messages={messages} /> : null}
+      {q.type === 'photo' ? (
+        <PhotoInput questionId={q.id} label={text} value={value} onChange={onChange} handler={photos} messages={messages} />
+      ) : null}
       {q.type === 'open' ? (
         q.multiline ? (
           <textarea
@@ -537,6 +634,68 @@ function Ranking({
   );
 }
 
+function PhotoInput({
+  questionId,
+  label,
+  value,
+  onChange,
+  handler,
+  messages,
+}: {
+  questionId: string;
+  label: string;
+  value: AnswerValue;
+  onChange: (v: AnswerValue) => void;
+  handler?: PhotoHandler;
+  messages: RendererMessages;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [local, setLocal] = useState<{ ref: string; url: string } | null>(null);
+  useEffect(() => () => (local ? URL.revokeObjectURL(local.url) : undefined), [local]);
+  if (!handler) return <p className="zx-help">Photos cannot be taken here.</p>;
+  const ref = typeof value === 'string' ? value : null;
+  const shown = ref ? (local?.ref === ref ? local.url : handler.preview?.(ref)) : undefined;
+  return (
+    <div className="zx-photo">
+      {ref ? shown ? <img className="zx-photo-preview" src={shown} alt="" /> : <p className="zx-help">{messages.photoSaved}</p> : null}
+      <label className={`zx-button zx-secondary zx-photo-pick${busy ? ' zx-busy' : ''}`}>
+        {busy ? messages.photoUploading : ref ? messages.retakePhoto : messages.takePhoto}
+        <input
+          className="zx-sr-only"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          capture="environment"
+          aria-label={`${label}: ${ref ? messages.retakePhoto : messages.takePhoto}`}
+          disabled={busy}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (!file) return;
+            setBusy(true);
+            setFailed(false);
+            try {
+              const photo = await shrinkPhoto(file);
+              const newRef = await handler.take(questionId, photo);
+              setLocal({ ref: newRef, url: URL.createObjectURL(photo) });
+              onChange(newRef);
+            } catch {
+              setFailed(true);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      </label>
+      {failed ? (
+        <p className="zx-error" role="alert">
+          {messages.photoFailed}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function ConstantSum({
   question: q,
   value,
@@ -717,6 +876,12 @@ export const defaultThemeCss = `
 .zx-sum-total.zx-done{color:var(--zx-accent);}
 .zx-sum-total.zx-over{color:var(--zx-error);}
 .zx-media-wait{color:var(--zx-muted);font-size:.9rem;margin:12px 0 0;}
+.zx-photo{display:flex;flex-direction:column;align-items:flex-start;gap:10px;}
+.zx-photo-preview{max-width:100%;max-height:320px;border-radius:var(--zx-radius,12px);border:1px solid var(--zx-border);object-fit:contain;background:var(--zx-card);}
+.zx-photo-pick{position:relative;cursor:pointer;display:inline-flex;align-items:center;box-sizing:border-box;}
+.zx-photo-pick:focus-within{outline:3px solid var(--zx-accent);outline-offset:2px;}
+.zx-photo-pick.zx-busy{opacity:.7;cursor:progress;}
+.zx-hp{position:absolute!important;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;}
 @container zx (max-width:560px){
   .zx-card{padding:18px;}
   .zx-grid thead{display:none;}

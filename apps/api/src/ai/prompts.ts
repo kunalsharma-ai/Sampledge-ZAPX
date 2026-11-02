@@ -43,6 +43,8 @@ Types:
   "randomize": boolean. In expressions SPEND.1 is the amount given to code 1.
 - "grid": "rows": [{ "id": "r1", "label": string }], "columns": Option[] (single choice per row),
   "randomizeRows": boolean. Each row is stored as <questionId>_<rowId>.
+- "photo": the respondent or interviewer takes a photo (a receipt, a shelf). No extra fields. Only use it
+  when the questionnaire asks for a photo; it is stored privately.
 - "info": text only, no answer: { "id", "type": "info", "text", "condition"? }
 
 Option: { "code": integer, "label": string, "anchor"?: true (stays in place when randomized),

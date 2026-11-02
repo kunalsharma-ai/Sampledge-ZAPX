@@ -37,7 +37,9 @@ import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
 import { AiGateway } from './ai/ai-gateway';
 import { AiUsageRepository } from './ai/ai-usage.repository';
 import { AiSettingsController } from './ai/ai-settings.controller';
-import { QualityController } from './quality/quality.controller';
+import { FraudBlocksController, QualityController } from './quality/quality.controller';
+import { CaptureController } from './captures/capture.controller';
+import { CaptureService } from './captures/capture.service';
 import { QualityService } from './quality/quality.service';
 import { CapiAppController, CapiAssignmentsController } from './capi/capi.controller';
 import { CapiService } from './capi/capi.service';
@@ -83,6 +85,8 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     TranslateController,
     AiSettingsController,
     QualityController,
+    FraudBlocksController,
+    CaptureController,
     CapiAssignmentsController,
     CapiAppController,
     ProjectMembersController,
@@ -104,6 +108,7 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     AiGateway,
     AiUsageRepository,
     QualityService,
+    CaptureService,
     CapiService,
     QaService,
     ExportRunner,

@@ -19,6 +19,7 @@ import { CAN_EDIT, CurrentUser, Public, Roles } from '../auth/decorators';
 import type { UploadedFile } from '../imports/documents';
 import { config } from '../config';
 import { MediaService } from './media.service';
+import { sendBytes } from '../common/send-bytes';
 
 /** Media library of a survey (Milestone 11). */
 @Controller()
@@ -61,27 +62,10 @@ export class MediaController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-    res.setHeader('Accept-Ranges', 'bytes');
     if (req.headers['if-none-match'] === `"${meta.sha256}"`) {
       res.status(304).end();
       return;
     }
-    const range = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
-    if (range && (range[1] || range[2])) {
-      let start = range[1] ? Number(range[1]) : data.length - Number(range[2]);
-      let end = range[1] && range[2] ? Number(range[2]) : data.length - 1;
-      start = Math.max(0, start);
-      end = Math.min(end, data.length - 1);
-      if (start > end) {
-        res.status(416).setHeader('Content-Range', `bytes */${data.length}`).end();
-        return;
-      }
-      res.status(206).setHeader('Content-Range', `bytes ${start}-${end}/${data.length}`);
-      res.setHeader('Content-Length', String(end - start + 1));
-      res.end(data.subarray(start, end + 1));
-      return;
-    }
-    res.setHeader('Content-Length', String(data.length));
-    res.end(data);
+    sendBytes(req, res, data);
   }
 }

@@ -3,7 +3,7 @@
  * uses. Answers are saved after every page. The outcome shown here is provisional: the server
  * replays the interview at sync and decides the outcome, the quotas and the quality score.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   firstMatchingTermination,
   localizeDefinition,
@@ -22,9 +22,19 @@ import {
   pendingMedia,
   themeCss,
   type FieldErrors,
+  type PhotoHandler,
 } from '@zapx/survey-renderer';
-import { defaultPresentation, parsePresentation, parseSurveyDefinition, type AnswerValue, type Answers } from '@zapx/survey-schema';
-import { interviews, type LocalInterview, type PackagedSurvey } from './store';
+import {
+  DEFAULT_RECORDING_CONSENT,
+  capiSettingsOf,
+  defaultPresentation,
+  parsePresentation,
+  parseSurveyDefinition,
+  type AnswerValue,
+  type Answers,
+} from '@zapx/survey-schema';
+import { InterviewRecorder, locate, savePhoto } from './capture';
+import { captures, interviews, type LocalInterview, type PackagedSurvey } from './store';
 
 /** A page left open longer than this counts as this long (the interviewer stepped away). */
 const MAX_PAGE_MS = 30 * 60 * 1000;
@@ -47,6 +57,38 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   /** Video and audio played to the end, as "pageIndex:questionId". */
   const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
   const shownAt = useRef(Date.now());
+  const capture = useMemo(() => (source ? capiSettingsOf(source) : null), [source]);
+  const recorder = useRef<InterviewRecorder | null>(null);
+  const [recording, setRecording] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
+  /** Photos taken in this interview, shown from the device. */
+  const [shots, setShots] = useState<ReadonlyMap<string, string>>(new Map());
+
+  useEffect(() => {
+    let urls: string[] = [];
+    void captures.of(record.clientId).then((list) => {
+      const m = new Map<string, string>();
+      for (const c of list)
+        if (c.kind === 'photo' && c.parts.length) m.set(c.ref, URL.createObjectURL(new Blob(c.parts, { type: c.type })));
+      urls = [...m.values()];
+      setShots(m);
+    });
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u));
+      // Leaving the interview stops the recording; what was recorded is kept on the device.
+      void recorder.current?.stop();
+    };
+  }, [record.clientId]);
+
+  const photos: PhotoHandler = {
+    take: async (_q, photo) => {
+      const ref = await savePhoto(current.clientId, current.surveyId, photo);
+      setShots((m) => new Map(m).set(ref, URL.createObjectURL(photo)));
+      return ref;
+    },
+    preview: (ref) => shots.get(ref),
+  };
 
   if (!def) return <p className="capi-card">This survey package could not be read. Update your surveys and try again.</p>;
 
@@ -73,8 +115,40 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
     return ms;
   };
 
-  const finish = (r: LocalInterview, outcome: string, endedEarly = false) =>
-    save({ ...r, state: 'finished', finishedAt: new Date().toISOString(), localOutcome: outcome, endedEarly, pageIndex: -1 });
+  const finish = async (r: LocalInterview, outcome: string, endedEarly = false) => {
+    setEnding(true);
+    try {
+      if (recorder.current) {
+        await recorder.current.stop();
+        recorder.current = null;
+        setRecording(false);
+      }
+      const location = capture && capture.gps !== 'off' ? { start: r.location?.start ?? null, end: await locate(10_000) } : r.location;
+      await save({
+        ...r,
+        location,
+        state: 'finished',
+        finishedAt: new Date().toISOString(),
+        localOutcome: outcome,
+        endedEarly,
+        pageIndex: -1,
+      });
+    } finally {
+      setEnding(false);
+    }
+  };
+
+  const consent = async (agreed: boolean) => {
+    if (!agreed) return save({ ...current, audio: 'declined' });
+    const r = new InterviewRecorder(current.clientId, current.surveyId);
+    const ok = await r.start();
+    if (ok) {
+      recorder.current = r;
+      setRecording(true);
+    } else setNotice('No microphone is available, so this interview is not recorded. Carry on with the questions.');
+    await save({ ...current, audio: ok ? 'recorded' : 'unavailable' });
+  };
+  const askConsent = capture?.audio === 'consent' && current.state === 'in_progress' && current.audio === undefined;
 
   const next = async () => {
     if (!page) return;
@@ -129,6 +203,11 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
         <span className="capi-muted">
           {survey.name} · <span className="capi-mono">{current.clientId.slice(0, 8)}</span>
         </span>
+        {recording ? (
+          <span className="capi-pill capi-recording" role="status">
+            ● Recording
+          </span>
+        ) : null}
         {languages.length > 1 && current.state === 'in_progress' ? (
           <select aria-label="Interview language" value={current.language} onChange={(e) => save({ ...current, language: e.target.value })}>
             {languages.map((l) => (
@@ -140,7 +219,30 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
         ) : null}
       </div>
       <div className="zx-shell">
-        {current.state !== 'in_progress' ? (
+        {notice ? (
+          <p className="capi-note" role="status">
+            {notice}
+          </p>
+        ) : null}
+        {ending ? (
+          <div className="zx-card" aria-busy="true">
+            Saving the interview{capture?.gps !== 'off' ? ' and its location' : ''}…
+          </div>
+        ) : askConsent ? (
+          <div className="zx-card capi-consent" data-testid="capi-consent">
+            <h1 className="zx-title">Ask before recording</h1>
+            <p>Read this to the respondent:</p>
+            <blockquote>{capture?.consentText ?? DEFAULT_RECORDING_CONSENT}</blockquote>
+            <div className="zx-actions">
+              <button type="button" className="zx-button zx-secondary" onClick={() => void consent(false)}>
+                Respondent declines
+              </button>
+              <button type="button" className="zx-button" onClick={() => void consent(true)}>
+                Respondent agrees: start recording
+              </button>
+            </div>
+          </div>
+        ) : current.state !== 'in_progress' ? (
           <div className="zx-card" data-testid="capi-finished">
             <h1 className="zx-title">Interview saved on this device</h1>
             <p>
@@ -180,6 +282,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
               readAloud={presentation.readAloud}
               language={def.language}
               messages={msg}
+              photos={photos}
             />
             {waiting ? <p className="zx-media-wait">{msg.playToEnd}</p> : null}
             <div className="zx-actions">

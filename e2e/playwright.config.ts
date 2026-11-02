@@ -18,7 +18,12 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'retain-on-failure',
-    launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
+    // navigator.webdriver stays false, so test respondents are not flagged as automation (Milestone 12;
+    // the automation check itself is covered by the API tests). A fake microphone lets the CAPI app record.
+    launchOptions: {
+      args: ['--disable-blink-features=AutomationControlled', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+      ...(process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {}),
+    },
   },
   webServer: [
     { command: 'node ../apps/api/dist/main.js', url: 'http://localhost:4000/api/health', reuseExistingServer: true, env, timeout: 60_000 },
