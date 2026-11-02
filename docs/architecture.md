@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 4)
+# ZAPX architecture (Milestones 1 to 5)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -10,7 +10,7 @@ the rules every later module must follow.
    API, runtime, QA, and later AI, translation and CAPI read and write this one format. Do not add a
    second questionnaire model.
 2. **One logic engine.** `packages/logic-engine` evaluates conditions, validations, terminations and
-   quotas. The server, the studio preview and (later) the offline app all call the same functions.
+   quotas. The server, the studio preview and the offline CAPI app all call the same functions.
    Expressions are parsed and interpreted, never `eval`-ed.
 3. **Presentation never changes logic.** Themes, translations and device layouts (later) are layers
    keyed by question id. They must not change ids, answer codes or routing.
@@ -104,10 +104,29 @@ limits and a monthly budget, a circuit breaker, PII redaction for briefs and doc
 and cost ledger with audit events. Details: [modules/ai-gateway.md](modules/ai-gateway.md),
 [ADR 0004](adr/0004-ai-gateway.md).
 
+## Data quality (Milestone 5)
+
+`packages/quality-core` scores every complete (speeding, straightlining, open-end quality, copied
+answers, same network, survey-specific checks) into a 0 to 100 score with reasons. Settings are part
+of the versioned definition. Low scores wait in a review queue where a person accepts or rejects;
+rejecting releases the quota place and tells the vendor `quality_fail`. Optionally, very low scores
+end as `quality_fail` inside the survey. Details: [modules/data-quality.md](modules/data-quality.md),
+[ADR 0007](adr/0007-data-quality.md).
+
+## CAPI: offline interviewing (Milestone 5)
+
+`apps/capi` is an installable web app for interviewers: it downloads assigned surveys, runs
+interviews offline with the shared engine and renderer, keeps everything in IndexedDB and syncs when
+online. The server replays every uploaded interview against its published version and decides the
+outcome, quotas and quality itself; uploads are idempotent by a device-generated id. Interviewers
+have their own role and cannot reach the studio API. Details: [modules/capi.md](modules/capi.md),
+[ADR 0008](adr/0008-capi-offline-app.md).
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
 - Vendor API contract: [api/openapi.yaml](api/openapi.yaml)
+- CAPI app API contract: [api/capi-openapi.yaml](api/capi-openapi.yaml)
 - Database operations (migrations, pooling, backups): [operations/database.md](operations/database.md)
 - Security checks and accepted exceptions: [security.md](security.md)
 
@@ -131,5 +150,9 @@ and cost ledger with audit events. Details: [modules/ai-gateway.md](modules/ai-g
 - Grid questions are single choice per row; MaxDiff, conjoint, ranking and media questions come later.
 - Back navigation is optional per survey and re-shows the previous visible page.
 - Exports are generated synchronously; background export jobs come with larger data volumes.
+- The fieldwork dashboard and review queue read response rows in the API process; very large
+  surveys need SQL aggregates or a reporting store.
+- CAPI quotas are only known at sync, so the field can exceed a quota (kept as quota full).
+- The CAPI app is a web app: no audio, photo or GPS capture, and no device management yet.
 - Re-entry with the same UID resumes an unfinished interview. With unsigned links, anyone who knows a
   UID can do this, so vendors handling sensitive studies should use signed entry links.

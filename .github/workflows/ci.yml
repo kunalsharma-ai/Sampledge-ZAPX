@@ -62,11 +62,12 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker compose build
       - run: docker compose up -d
-      - name: Wait for API, studio and runtime
+      - name: Wait for API, studio, runtime and interviewer app
         run: |
           for i in $(seq 1 60); do
             if curl -fsS http://localhost:4000/api/health && curl -fsS -o /dev/null http://localhost:3000/login \
-              && curl -fsS -o /dev/null http://localhost:5173/ && curl -fsS http://localhost:5173/api/health; then
+              && curl -fsS -o /dev/null http://localhost:5173/ && curl -fsS http://localhost:5173/api/health \
+              && curl -fsS -o /dev/null http://localhost:5174/sw.js && curl -fsS http://localhost:5174/api/health; then
               echo "stack is up"; exit 0
             fi
             sleep 5

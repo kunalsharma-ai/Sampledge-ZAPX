@@ -1,6 +1,6 @@
 # Full ZAPX stack on one machine, no cloud services needed:
 #   docker compose up --build
-# Studio http://localhost:3000 · respondent runtime http://localhost:5173 · API http://localhost:4000/api
+# Studio http://localhost:3000 · respondent runtime http://localhost:5173 · interviewer app http://localhost:5174 · API http://localhost:4000/api
 # For development with hot reload, run only the database: docker compose up postgres
 name: zapx
 
@@ -9,6 +9,7 @@ x-api-env: &api-env
   JWT_SECRET: ${JWT_SECRET:-local-compose-secret-change-me-0123456789}
   SECRETS_KEY: ${SECRETS_KEY:-local-compose-secrets-key-change-me-012345}
   RUNTIME_BASE_URL: ${RUNTIME_BASE_URL:-http://localhost:5173}
+  CAPI_APP_URL: ${CAPI_APP_URL:-http://localhost:5174}
   ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
   COOKIE_SECURE: 'false'
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
@@ -55,6 +56,12 @@ services:
   runtime:
     build: { context: ., target: runtime }
     ports: ['5173:80']
+    depends_on:
+      api: { condition: service_healthy }
+
+  capi:
+    build: { context: ., target: capi }
+    ports: ['5174:80']
     depends_on:
       api: { condition: service_healthy }
 

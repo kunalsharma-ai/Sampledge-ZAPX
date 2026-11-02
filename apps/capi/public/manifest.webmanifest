@@ -1,0 +1,11 @@
+{
+  "name": "ZAPX Interviewer",
+  "short_name": "ZAPX CAPI",
+  "description": "Conduct ZAPX surveys face to face, with or without a connection.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f7fb",
+  "theme_color": "#2f5bea",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

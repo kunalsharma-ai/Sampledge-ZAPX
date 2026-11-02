@@ -1,11 +1,12 @@
 'use client';
-/** Organization settings (administrators): AI permissions, limits and usage, and redirect defaults. */
+/** Organization settings (administrators): AI permissions, limits and usage, redirect defaults and the team. */
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote, Shell } from '@/components/Shell';
 import { LayerEditor, emptyLayer, type Layer } from '@/components/RedirectRules';
+import { Team } from '@/components/Team';
 
 type Task = 'architect' | 'translate';
 const TASK_NAMES: Record<Task, string> = { architect: 'AI Survey Architect (build and edit surveys)', translate: 'AI translation' };
@@ -240,6 +241,8 @@ export default function SettingsPage() {
             />
           ) : null}
         </section>
+
+        <Team />
       </div>
     </Shell>
   );

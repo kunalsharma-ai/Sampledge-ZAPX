@@ -1,0 +1,175 @@
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --text: #1b1f2a;
+  --muted: #5e6679;
+  --border: #dde1eb;
+  --accent: #2f5bea;
+  --good: #1f8a4c;
+  --bad: #c62828;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1118;
+    --card: #161a24;
+    --text: #e7eaf2;
+    --muted: #9aa2b4;
+    --border: #2a3142;
+    --accent: #7d9bff;
+    --good: #5fd08e;
+    --bad: #ff8a80;
+    color-scheme: dark;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font:
+    16px/1.45 system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+h1 {
+  font-size: 24px;
+}
+h2 {
+  font-size: 17px;
+  margin: 20px 0 8px;
+}
+.capi-top {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  position: sticky;
+  top: 0;
+}
+.capi-main {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.capi-narrow {
+  max-width: 420px;
+}
+.capi-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.capi-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.capi-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.capi-spacer {
+  flex: 1;
+}
+.capi-muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+.capi-mono {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+.capi-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.capi-field input {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.capi-button {
+  font: inherit;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+.capi-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.capi-link {
+  font: inherit;
+  background: none;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 6px 0;
+  min-height: 44px;
+}
+.capi-danger {
+  color: var(--bad);
+}
+.capi-pill {
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+.capi-pill.ok {
+  color: var(--good);
+}
+.capi-pill.off {
+  color: var(--bad);
+}
+.capi-note {
+  color: var(--good);
+}
+.capi-problem {
+  color: var(--bad);
+}
+.capi-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.capi-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.capi-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 16px;
+  flex-wrap: wrap;
+}
+@media (max-width: 520px) {
+  .capi-table td:nth-child(3) {
+    display: none;
+  }
+}

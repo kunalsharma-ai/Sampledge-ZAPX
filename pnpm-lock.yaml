@@ -139,6 +139,40 @@ importers:
         specifier: 3.2.4
         version: 3.2.4(@types/node@22.15.30)(jiti@2.4.2)
 
+  apps/capi:
+    dependencies:
+      '@zapx/logic-engine':
+        specifier: workspace:*
+        version: link:../../packages/logic-engine
+      '@zapx/survey-renderer':
+        specifier: workspace:*
+        version: link:../../packages/survey-renderer
+      '@zapx/survey-schema':
+        specifier: workspace:*
+        version: link:../../packages/survey-schema
+      react:
+        specifier: 19.1.0
+        version: 19.1.0
+      react-dom:
+        specifier: 19.1.0
+        version: 19.1.0(react@19.1.0)
+    devDependencies:
+      '@types/react':
+        specifier: 19.1.8
+        version: 19.1.8
+      '@types/react-dom':
+        specifier: 19.1.6
+        version: 19.1.6(@types/react@19.1.8)
+      '@vitejs/plugin-react':
+        specifier: 4.5.2
+        version: 4.5.2(vite@6.3.5(@types/node@22.15.30)(jiti@2.4.2))
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 6.3.5
+        version: 6.3.5(@types/node@22.15.30)(jiti@2.4.2)
+
   apps/runtime:
     dependencies:
       '@zapx/survey-renderer':

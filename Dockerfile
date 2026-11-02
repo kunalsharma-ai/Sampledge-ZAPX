@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1.7
-# One build, three images: api (and its migrate job), studio and runtime.
+# One build, four images: api (and its migrate job), studio, runtime and capi.
 #   docker build --target api -t zapx-api .
 #   docker build --target studio -t zapx-studio .
 #   docker build --target runtime -t zapx-runtime .
+#   docker build --target capi -t zapx-capi .
 # The same images run locally under docker compose and on AWS ECS/Fargate.
 
 FROM node:22-bookworm-slim AS base
@@ -46,4 +47,10 @@ CMD ["node_modules/.bin/next", "start", "-p", "3000"]
 FROM nginx:1.27-alpine AS runtime
 COPY infra/nginx/runtime.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/apps/runtime/dist /usr/share/nginx/html
+EXPOSE 80
+
+# ---- Offline interviewer app (CAPI): static files plus an /api proxy --------------------------
+FROM nginx:1.27-alpine AS capi
+COPY infra/nginx/capi.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/capi/dist /usr/share/nginx/html
 EXPOSE 80

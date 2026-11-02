@@ -362,3 +362,64 @@ table.data th {
   max-width: 380px;
   margin: 10vh auto;
 }
+
+/* ---- Milestone 5: fieldwork tiles and quality review ---- */
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.tile {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--panel-2);
+}
+.tile .value {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.tile .label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.badge.quality_fail,
+.badge.technical_error,
+.badge.rejected {
+  color: var(--bad);
+}
+.badge.partial,
+.badge.pending,
+.badge.duplicate {
+  color: var(--warn);
+}
+.badge.accepted {
+  color: var(--good);
+}
+.review-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+.review-item ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+.score {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 3ch;
+  text-align: right;
+}
+.score.low {
+  color: var(--bad);
+}
+.score.mid {
+  color: var(--warn);
+}

@@ -24,6 +24,19 @@ in `pnpm-workspace.yaml`.
   AES-256-GCM (`SecretBox`); the next step is KMS envelope encryption. Vendor shared secrets are
   stored as generated and can be rotated from the studio.
 
+## Access and personal data (Milestone 5)
+
+- The `INTERVIEWER` role is deny-by-default: the API guard lets it reach only endpoints that name it
+  (`/api/capi/*`, `/api/auth/me`). Tests assert it cannot read projects, surveys or exports.
+- CAPI uploads are tied to the signed-in interviewer and to surveys they were assigned; a device id
+  is a random UUID per installation, not a hardware id.
+- Respondent network addresses are not stored. The same-network quality check keeps
+  `HMAC(key, tenantId:address)` truncated to 128 bits; the key is derived from `JWT_SECRET`.
+- Open-answer fingerprints are SHA-256 of normalized text and compared only within one survey.
+- Interviews on a CAPI device live in that browser's IndexedDB until synced. Devices should use the
+  operating system's screen lock and storage encryption; remote wipe needs device management (not
+  part of ZAPX yet).
+
 ## Reporting
 
 Report vulnerabilities privately to the maintainer; do not open a public issue.

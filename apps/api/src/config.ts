@@ -23,6 +23,8 @@ const schema = z
     JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
     API_PORT: z.coerce.number().default(4000),
     RUNTIME_BASE_URL: z.string().url().default('http://localhost:5173'),
+    /** Where interviewers open the offline CAPI app (shown in the studio). */
+    CAPI_APP_URL: z.string().url().default('http://localhost:5174'),
     ALLOW_SIGNUP: z
       .string()
       .optional()

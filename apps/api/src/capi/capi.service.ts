@@ -13,6 +13,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Prisma, type ResponseStatus, type SurveyVersion } from '@zapx/db';
 import { classifyDevice, matchingQuotas, replayInterview } from '@zapx/logic-engine';
 import type { Answers, SurveyDefinition } from '@zapx/survey-schema';
+import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../auth/auth.types';
@@ -80,6 +81,7 @@ export class CapiService {
       this.prisma.response.groupBy({ by: ['interviewerId', 'status'], where: { surveyId, mode: 'CAPI' }, _count: true }),
     ]);
     return {
+      appUrl: config().CAPI_APP_URL,
       interviewers,
       assignments: list.map((a) => ({
         ...a,

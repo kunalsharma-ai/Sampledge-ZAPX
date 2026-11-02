@@ -11,5 +11,7 @@ they are accepted; a later record supersedes an earlier one.
 | [0004](0004-ai-gateway.md)                       | AI model gateway                                                       | Accepted |
 | [0005](0005-aws-deployment.md)                   | Containers locally, AWS (ECS/Fargate) in production                    | Accepted |
 | [0006](0006-engineering-governance.md)           | Engineering governance and quality gates                               | Accepted |
+| [0007](0007-data-quality.md)                     | Data quality scoring with human review                                 | Accepted |
+| [0008](0008-capi-offline-app.md)                 | Offline CAPI app with server-side replay                               | Accepted |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.
