@@ -7,6 +7,7 @@ import { defineConfig } from '@playwright/test';
  */
 // Every spec signs up a fresh organization, so the run needs more than the default 5 sign-ups a minute.
 // Transcription (Milestone 17) goes to a stand-in for Deepgram that the milestone 12 spec runs on port 5191.
+// The dialer (Milestone 19) goes to a stand-in for Twilio that the milestone 19 spec runs on port 5192.
 const env = {
   ...process.env,
   ALLOW_SIGNUP: 'true',
@@ -16,6 +17,12 @@ const env = {
   DEEPGRAM_API_KEY: 'e2e-key',
   DEEPGRAM_MODEL: 'e2e-model',
   DEEPGRAM_API_BASE: 'http://127.0.0.1:5191',
+  TELEPHONY: 'twilio',
+  TWILIO_ACCOUNT_SID: `AC${'e'.repeat(32)}`,
+  TWILIO_AUTH_TOKEN: 'e2e-twilio-token',
+  TWILIO_CALLER_ID: '+442070000000',
+  TWILIO_API_BASE: 'http://127.0.0.1:5192',
+  TELEPHONY_WEBHOOK_BASE: 'http://localhost:4000/api',
 } as Record<string, string>;
 export default defineConfig({
   testDir: './tests',

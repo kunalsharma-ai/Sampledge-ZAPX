@@ -119,24 +119,24 @@ enum CallbackState {
 }
 
 model Tenant {
-  id               String          @id @default(cuid())
-  name             String
+  id                    String          @id @default(cuid())
+  name                  String
   /// Organization-level redirect defaults: {urls, words, countries} (lowest precedence).
-  redirectDefaults Json            @default("{}")
+  redirectDefaults      Json            @default("{}")
   /// Plan code (Milestone 8): free, team, business or enterprise. Limits live in code (plans.ts).
-  plan             String          @default("enterprise")
+  plan                  String          @default("enterprise")
   /// Billing (Milestone 13): the Stripe customer and subscription behind the plan, when billing is on.
-  billingCustomerId     String?    @unique
+  billingCustomerId     String?         @unique
   billingSubscriptionId String?
   /// Stripe subscription status (active, trialing, past_due, canceled, ...).
   billingStatus         String?
   billingPeriodEnd      DateTime?
-  createdAt        DateTime        @default(now())
-  users            User[]
-  projects         Project[]
-  aiPolicy         TenantAiPolicy?
-  sso              TenantSso?
-  scim             TenantScim?
+  createdAt             DateTime        @default(now())
+  users                 User[]
+  projects              Project[]
+  aiPolicy              TenantAiPolicy?
+  sso                   TenantSso?
+  scim                  TenantScim?
 }
 
 /// Single sign-on for one organization: OpenID Connect (Milestone 8) or SAML 2.0 (Milestone 13).
@@ -218,6 +218,9 @@ model User {
   capiInterviews  Response[]       @relation("CapiInterviewer")
   projects        ProjectMember[]
   apiKeys         ApiKey[]
+  /// Milestone 19: the phone the dialer rings for this interviewer (sealed), and its last digits.
+  phoneSealed     String?
+  phoneHint       String?
 
   @@unique([tenantId, ssoSubject])
   @@index([tenantId])
@@ -414,17 +417,17 @@ model Response {
 
   // ---- Milestone 12: fraud signals and face-to-face capture ----
   /// Keyed HMAC of browser traits (screen, time zone, languages, platform, user agent). The traits are not stored.
-  deviceHash String?
+  deviceHash   String?
   /// Browser signals while answering: {automation?, honeypot?, quietPages?, pasted?: [questionId]}.
-  signals    Json      @default("{}")
+  signals      Json      @default("{}")
   /// Two-letter country reported by the edge network (GEO_COUNTRY_HEADER), when configured.
-  geoCountry String?
+  geoCountry   String?
   /// Milestone 16: what a network reputation service said about the respondent's address (vpn, proxy,
   /// tor, relay, hosting). Only these words are kept: not the address, not the provider's answer.
-  networkFlags String[] @default([])
+  networkFlags String[]  @default([])
   /// CAPI: {start?, end?: {lat, lon, accuracy, at}} and {audioConsent?}. Rounded to about a metre.
-  location   Json?
-  captures   Capture[]
+  location     Json?
+  captures     Capture[]
 
   @@unique([surveyId, vendorId, uid])
   @@index([surveyId, reviewState])
@@ -720,6 +723,49 @@ model DoNotCall {
 }
 
 /// One call attempt on a case, with its disposition.
+/// Milestone 19: a survey's phone dialer settings. No row: interviewers dial by hand.
+model CatiDialer {
+  surveyId        String   @id
+  tenantId        String
+  enabled         Boolean  @default(false)
+  /// Record calls (both sides) and keep the recording with the interview.
+  recordCalls     Boolean  @default(false)
+  /// Read to the respondent before the call is connected when calls are recorded.
+  recordingNotice String?
+  updatedAt       DateTime @updatedAt
+}
+
+/// Milestone 19: one call placed by the dialer. The interviewer's phone rings first; the respondent
+/// is dialled when the interviewer answers. The id is random and appears in the provider's webhooks.
+model CatiDial {
+  id               String    @id
+  tenantId         String
+  surveyId         String
+  caseId           String
+  interviewerId    String
+  provider         String
+  /// The provider's id of the interviewer's call (Twilio CallSid).
+  providerCallId   String?   @unique
+  /// The interviewer's leg: queued | ringing | in-progress | completed | busy | no-answer | failed | canceled
+  status           String    @default("queued")
+  /// The respondent's leg, once dialled: answered | completed | busy | no-answer | failed | canceled
+  respondentStatus String?
+  /// Seconds the respondent was connected.
+  talkSeconds      Int?
+  record           Boolean   @default(false)
+  /// none | pending | stored | discarded | failed
+  recordingStatus  String    @default("none")
+  recordingSid     String?
+  recordingTries   Int       @default(0)
+  captureId        String?
+  error            String?
+  createdAt        DateTime  @default(now())
+  endedAt          DateTime?
+
+  @@index([caseId, createdAt])
+  @@index([recordingStatus])
+}
+
 model CatiCall {
   id            String    @id @default(cuid())
   tenantId      String
@@ -907,24 +953,24 @@ model MediaAsset {
 /// survey can open it, and every view is audited. Files live in the file store.
 model Capture {
   /// 22-character random id.
-  id           String    @id
-  tenantId     String
-  surveyId     String
-  responseId   String?
-  response     Response? @relation(fields: [responseId], references: [id])
+  id                 String    @id
+  tenantId           String
+  surveyId           String
+  responseId         String?
+  response           Response? @relation(fields: [responseId], references: [id])
   /// CAPI: the interview's device-generated id. Captures are uploaded before the interview syncs.
-  clientId     String?
+  clientId           String?
   /// The value stored in the photo answer, or "audio" for the interview recording.
-  ref          String
+  ref                String
   /// photo | audio
-  kind         String
-  contentType  String
-  size         Int
-  sha256       String
-  storageKey   String    @unique
-  uploadedById String?
-  createdAt    DateTime  @default(now())
-  deletedAt    DateTime?
+  kind               String
+  contentType        String
+  size               Int
+  sha256             String
+  storageKey         String    @unique
+  uploadedById       String?
+  createdAt          DateTime  @default(now())
+  deletedAt          DateTime?
   /// Milestone 17: speech-to-text of a recording, when a reviewer asked for it. Deleted with the file.
   transcript         String?
   transcriptLanguage String?

@@ -13,6 +13,7 @@ import type { Job, Prisma } from '@zapx/db';
 import { PrismaService } from '../common/prisma.service';
 import { CaptureService } from '../captures/capture.service';
 import { TranscriptionError, TranscriptionService } from '../captures/transcription.service';
+import { TelephonyService } from '../cati/telephony.service';
 import { config } from '../config';
 import type { AuthUser } from '../auth/auth.types';
 import { AiError, type AiDocument } from '../ai/ai-provider';
@@ -60,6 +61,7 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly proposer: ProposeService,
     private readonly captures: CaptureService,
     private readonly transcription: TranscriptionService,
+    private readonly telephony: TelephonyService,
   ) {}
 
   onApplicationBootstrap() {
@@ -312,8 +314,10 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     // Unfinished SAML sign-ins (Milestone 13) and applied billing events older than 90 days.
     const ssoRequests = await this.prisma.ssoRequest.deleteMany({ where: { expiresAt: { lt: new Date() } } });
     await this.prisma.billingEvent.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 90 * 86_400_000) } } });
-    const out = { files, jobs: jobs.count, webhookDeliveries: deliveries.count, captures, ssoRequests: ssoRequests.count };
-    if (files || jobs.count || deliveries.count || captures || ssoRequests.count)
+    // Dialer call recordings (Milestone 19) that could not be copied from the provider yet.
+    const callRecordings = await this.telephony.retryRecordings();
+    const out = { files, jobs: jobs.count, webhookDeliveries: deliveries.count, captures, ssoRequests: ssoRequests.count, callRecordings };
+    if (files || jobs.count || deliveries.count || captures || ssoRequests.count || callRecordings)
       this.log.log(`Housekeeping removed ${JSON.stringify(out)}`);
     return out;
   }

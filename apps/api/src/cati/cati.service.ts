@@ -62,6 +62,16 @@ export class CatiService {
     private readonly interviews: InterviewService,
   ) {}
 
+  /** A survey the member can see (for the dialer settings, Milestone 19). */
+  surveyFor(user: AuthUser, surveyId: string) {
+    return this.survey(user, surveyId);
+  }
+
+  /** The interviewer's open case, or a conflict (for the dialer, Milestone 19). */
+  openCase(user: AuthUser, caseId: string) {
+    return this.mine(user, caseId);
+  }
+
   private async survey(user: AuthUser, surveyId: string) {
     const s = await this.prisma.survey.findFirst({ where: { id: surveyId, ...this.access.surveys(user) } });
     if (!s) throw new NotFoundException('Survey not found');
@@ -404,8 +414,12 @@ export class CatiService {
     // Revealing a phone number is personal data access, so it is audited.
     await this.audit.record(user, 'cati.case_open', 'survey', c.surveyId, { caseId: c.id, code: c.code });
     const calls = await this.prisma.catiCall.findMany({ where: { caseId: c.id }, orderBy: { endedAt: 'desc' }, take: 20 });
+    // Milestone 19: on surveys that use the dialer the interviewer never sees the number.
+    const dialer = await this.prisma.catiDialer.findUnique({ where: { surveyId: c.surveyId } });
+    const dialed = config().TELEPHONY !== 'off' && !!dialer?.enabled;
     return {
-      ...this.present(c, true),
+      ...this.present(c, !dialed),
+      dialer: dialed ? { record: dialer.recordCalls } : null,
       lockedUntil: c.lockedUntil,
       calls: calls.map((k) => ({ disposition: k.disposition, note: k.note, callbackAt: k.callbackAt, endedAt: k.endedAt })),
     };

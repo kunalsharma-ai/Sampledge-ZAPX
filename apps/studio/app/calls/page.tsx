@@ -2,6 +2,8 @@
 /**
  * The CATI calling screen (Milestone 9): pick a survey, take the next case (callbacks first), call
  * the number, run the interview in the respondent runtime, then record how the call ended.
+ * Milestone 19: on surveys that use the dialer, Call rings the interviewer's phone and then the
+ * respondent's, and the number stays hidden.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -18,13 +20,51 @@ interface Case {
   code: string;
   name: string | null;
   phone: string | null;
+  phoneHint: string;
   data: Record<string, string>;
   attempts: number;
   maxAttempts: number;
   status: string;
   lastDisposition: string | null;
   calls: Array<{ disposition: string; note: string | null; callbackAt: string | null; endedAt: string }>;
+  /** Milestone 19: the survey places calls through the dialer (the number is then hidden). */
+  dialer: { record: boolean } | null;
 }
+interface Dial {
+  id: string;
+  status: string;
+  respondentStatus: string | null;
+  talkSeconds: number | null;
+  record: boolean;
+  recordingStatus: string;
+  error: string | null;
+}
+interface Me {
+  dialerAvailable: boolean;
+  phoneHint: string | null;
+}
+const LIVE = new Set(['queued', 'initiated', 'ringing', 'in-progress']);
+const YOUR_LEG: Record<string, string> = {
+  queued: 'Ringing your phone…',
+  initiated: 'Ringing your phone…',
+  ringing: 'Ringing your phone…',
+  'in-progress': 'Connected. Answer your phone; the respondent is being called.',
+  completed: 'The call has ended.',
+  busy: 'Your phone was busy.',
+  'no-answer': 'Your phone was not answered.',
+  failed: 'The call could not be placed.',
+  canceled: 'The call was cancelled.',
+};
+const THEIR_LEG: Record<string, string> = {
+  completed: 'the respondent answered',
+  answered: 'the respondent answered',
+  busy: 'the respondent was busy',
+  'no-answer': 'the respondent did not answer',
+  failed: 'the respondent could not be reached',
+  canceled: 'the call to the respondent was cancelled',
+};
+/** The outcome to suggest from how the respondent's line behaved. */
+const SUGGEST: Record<string, string> = { busy: 'busy', 'no-answer': 'no_answer', failed: 'wrong_number' };
 interface Disposition {
   code: string;
   label: string;
@@ -49,6 +89,9 @@ export default function CallsPage() {
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
+  const [me, setMe] = useState<Me | null>(null);
+  const [myPhone, setMyPhone] = useState('');
+  const [dial, setDial] = useState<Dial | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -60,7 +103,54 @@ export default function CallsPage() {
   useEffect(() => {
     void load();
     void api<Disposition[]>('/cati/dispositions').then(setDispositions, setError);
+    void api<Me>('/cati/me').then(setMe, setError);
   }, [load]);
+
+  // Follow the dialer call while it is live (Milestone 19).
+  const caseId = current?.id;
+  const liveDial = dial && LIVE.has(dial.status) ? dial.id : null;
+  useEffect(() => {
+    if (!caseId || !liveDial) return;
+    const t = setInterval(() => {
+      void api<{ dial: Dial | null }>(`/cati/cases/${caseId}/dial`).then(({ dial: d }) => {
+        if (!d) return;
+        setDial(d);
+        const suggest = d.respondentStatus ? SUGGEST[d.respondentStatus] : undefined;
+        if (suggest) setForm((f) => (f.disposition === 'no_answer' ? { ...f, disposition: suggest } : f));
+      }, setError);
+    }, 2000);
+    return () => clearInterval(t);
+  }, [caseId, liveDial]);
+
+  const saveMyPhone = async (clear = false) => {
+    setError(null);
+    try {
+      setMe(await api<Me>('/cati/me/phone', { method: 'PUT', body: { phone: clear ? null : myPhone } }));
+      setMyPhone('');
+    } catch (e) {
+      setError(e);
+    }
+  };
+
+  const placeCall = async () => {
+    if (!current) return;
+    setError(null);
+    try {
+      setDial(await api<Dial>(`/cati/cases/${current.id}/dial`, { method: 'POST' }));
+    } catch (e) {
+      setError(e);
+    }
+  };
+
+  const hangUp = async () => {
+    if (!dial) return;
+    setError(null);
+    try {
+      setDial(await api<Dial>(`/cati/dials/${dial.id}/hangup`, { method: 'POST' }));
+    } catch (e) {
+      setError(e);
+    }
+  };
 
   const label = (code: string) => dispositions.find((d) => d.code === code)?.label ?? code;
 
@@ -73,6 +163,7 @@ export default function CallsPage() {
       const { case: c } = await api<{ case: Case | null }>(`/cati/surveys/${id}/next`, { method: 'POST' });
       setSurveyId(id);
       setCurrent(c);
+      setDial(c ? ((await api<{ dial: Dial | null }>(`/cati/cases/${c.id}/dial`)).dial ?? null) : null);
       setEmpty(!c);
       setInterviewOpen(false);
       setOpenedAt(new Date().toISOString());
@@ -115,6 +206,7 @@ export default function CallsPage() {
       const r = await api<{ status: string; lastDisposition: string }>(`/cati/cases/${current.id}/disposition`, { method: 'POST', body });
       setNote(`Saved: ${label(r.lastDisposition)} (${r.status.toLowerCase()}).`);
       setCurrent(null);
+      setDial(null);
       await load();
     } catch (e) {
       setError(e);
@@ -129,6 +221,7 @@ export default function CallsPage() {
     try {
       await api(`/cati/cases/${current.id}/release`, { method: 'POST' });
       setCurrent(null);
+      setDial(null);
       setNote('The case is back in the queue.');
       await load();
     } catch (e) {
@@ -178,6 +271,30 @@ export default function CallsPage() {
               calling hours where the respondent lives.
             </p>
           ) : null}
+          {me?.dialerAvailable ? (
+            <div className="stack small" data-testid="my-phone" style={{ gap: 4 }}>
+              <strong>Your phone for the dialer</strong>
+              <span className="muted">
+                {me.phoneHint
+                  ? `The dialer rings your number ending ${me.phoneHint}.`
+                  : 'Surveys that use the dialer ring your phone first. Add your number.'}
+              </span>
+              <div className="row">
+                <label className="field">
+                  Phone number
+                  <input value={myPhone} placeholder="+44 7700 900123" onChange={(e) => setMyPhone(e.target.value)} />
+                </label>
+                <button disabled={!myPhone.trim()} onClick={() => void saveMyPhone()}>
+                  Save my number
+                </button>
+                {me.phoneHint ? (
+                  <button className="link" onClick={() => void saveMyPhone(true)}>
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <ErrorNote error={error} />
         </section>
 
@@ -188,7 +305,33 @@ export default function CallsPage() {
               Id {current.code} · attempt {current.attempts + 1} of {current.maxAttempts}
               {current.status === 'IN_CALL' && current.lastDisposition === 'callback' ? ' · callback' : ''}
             </div>
-            {current.phone ? (
+            {current.dialer ? (
+              <div className="stack" data-testid="dialer" style={{ gap: 4 }}>
+                <div className="row">
+                  {dial && LIVE.has(dial.status) ? (
+                    <button onClick={() => void hangUp()}>Hang up</button>
+                  ) : (
+                    <button className="primary" onClick={() => void placeCall()} disabled={!me?.phoneHint}>
+                      {dial ? 'Call again' : 'Call the respondent'}
+                    </button>
+                  )}
+                  <span className="small muted">Number {current.phoneHint}</span>
+                </div>
+                {!me?.phoneHint ? <span className="small warn-text">Add your phone number first (left).</span> : null}
+                {current.dialer.record ? (
+                  <span className="small muted">Calls on this survey are recorded; the respondent hears a notice.</span>
+                ) : null}
+                {dial ? (
+                  <span className="small" role="status" data-testid="dial-status">
+                    {YOUR_LEG[dial.status] ?? dial.status}
+                    {dial.respondentStatus ? ` Then ${THEIR_LEG[dial.respondentStatus] ?? dial.respondentStatus}` : ''}
+                    {dial.talkSeconds ? ` (${dial.talkSeconds} s)` : ''}
+                    {dial.respondentStatus ? '.' : ''}
+                    {dial.error ? ` ${dial.error}` : ''}
+                  </span>
+                ) : null}
+              </div>
+            ) : current.phone ? (
               <a className="btn primary call-number" href={`tel:${current.phone}`} data-testid="call-number">
                 Call {current.phone}
               </a>

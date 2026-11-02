@@ -13,6 +13,8 @@ import { AnalysisController } from './analysis/analysis.controller';
 import { AnalysisService } from './analysis/analysis.service';
 import { CatiController } from './cati/cati.controller';
 import { CatiService } from './cati/cati.service';
+import { TelephonyController } from './cati/telephony.controller';
+import { TelephonyService } from './cati/telephony.service';
 import { SsoController } from './auth/sso.controller';
 import { SsoService } from './auth/sso.service';
 import { SamlService } from './auth/saml.service';
@@ -73,6 +75,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
   ],
   controllers: [
     HealthController,
+    TelephonyController,
     AuthController,
     UsersController,
     CatiController,
@@ -102,6 +105,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
   ],
   providers: [
     CatiService,
+    TelephonyService,
     AnalysisService,
     MediaService,
     SsoService,
