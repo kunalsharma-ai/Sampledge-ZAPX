@@ -40,6 +40,28 @@ export function edgeTrust(req: EdgeRequest) {
   if (ip) Object.defineProperty(req, 'ip', { value: ip, configurable: true });
 }
 
+/**
+ * Headers on every API response (Milestone 20). The API answers JSON, files and a few XML documents,
+ * never pages, so the content security policy allows nothing: if a response is ever opened as a page
+ * (for example an uploaded file), no script runs and it cannot be framed. Routes that serve media
+ * to other origins override Cross-Origin-Resource-Policy themselves.
+ */
+export function securityHeaders(https: boolean): Array<[string, string]> {
+  const h: Array<[string, string]> = [
+    ['X-Content-Type-Options', 'nosniff'],
+    ['Referrer-Policy', 'no-referrer'],
+    ['Cache-Control', 'no-store'],
+    ['Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"],
+    ['X-Frame-Options', 'DENY'],
+    ['Cross-Origin-Opener-Policy', 'same-origin'],
+    ['Cross-Origin-Resource-Policy', 'same-origin'],
+    ['Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()'],
+    ['X-Permitted-Cross-Domain-Policies', 'none'],
+  ];
+  if (https) h.push(['Strict-Transport-Security', 'max-age=31536000; includeSubDomains']);
+  return h;
+}
+
 /** Shared app setup used by main.ts and the integration tests. */
 export function configureApp(app: INestApplication) {
   app.use(cookieParser());
@@ -62,10 +84,9 @@ export function configureApp(app: INestApplication) {
     edgeTrust(req);
     next();
   });
+  const secure = config().COOKIE_SECURE;
   http.use((_req: unknown, res: { setHeader(k: string, v: string): void }, next: () => void) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Cache-Control', 'no-store');
+    for (const [k, v] of securityHeaders(secure)) res.setHeader(k, v);
     next();
   });
   return app;

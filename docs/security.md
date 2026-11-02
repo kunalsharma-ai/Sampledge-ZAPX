@@ -2,8 +2,10 @@
 
 ## Automated checks
 
-`pnpm check` runs the dependency audit with every other gate on your machine
-([ADR 0009](adr/0009-local-quality-gates.md)). When GitHub Actions is enabled, CI also runs:
+`pnpm check` runs the secret scan and the dependency audit with every other gate on your machine
+([ADR 0009](adr/0009-local-quality-gates.md)). The secret scan also runs before every commit and
+push ([repository protections](operations/github-security.md)). When GitHub Actions is enabled, CI
+also runs:
 
 - CodeQL `security-extended` on every pull request and weekly.
 - `pnpm audit --prod --audit-level high` fails the build on high or critical advisories.
@@ -12,11 +14,13 @@
 
 ## Accepted exceptions
 
-| Advisory                   | Package | Why accepted                                                 | Mitigation                                                                            | Exit                              |
-| -------------------------- | ------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------- | --------------------------------- |
-| GHSA-mrhx-c7xc-m3w5 (high) | zod 3   | Fixed only in zod 4, a breaking upgrade across every package | Request bodies are size-limited before validation, so a crafted collection is bounded | Migrate to zod 4 (next milestone) |
+| Advisory                       | Package                         | Why accepted                                                                          | Exit                                  |
+| ------------------------------ | ------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------- |
+| GHSA-g3hv-75wg-m249 (moderate) | minimatch 3 and 5, from exceljs | Matches only exceljs's own fixed glob patterns, never user input; fixes break its API | exceljs release with archiver upgrade |
 
-Floors for transitive packages (`postcss`, `sharp`, `path-to-regexp`, `multer`) are set as overrides
+zod was upgraded to 4 in Milestone 20, which closed GHSA-mrhx-c7xc-m3w5.
+
+Floors for transitive packages (`postcss`, `sharp`, `path-to-regexp`, `multer`, `uuid`) are set as overrides
 in `pnpm-workspace.yaml`.
 
 ## Secrets
@@ -102,6 +106,31 @@ in `pnpm-workspace.yaml`.
   Deepgram over HTTPS only when an admin or programmer asks, after a confirmation. The transcript is
   stored with the recording, has the same access, and is deleted with it.
 
+## Security hardening (Milestone 20)
+
+Details and reasons: [ADR 0026](adr/0026-security-hardening.md).
+
+- **Outbound requests to customer addresses** (callbacks, webhooks, OIDC) go through
+  `common/net-guard.ts`: private, loopback, link-local and metadata addresses are refused in every
+  spelling (including IPv6 forms that embed IPv4), and the check happens when the socket connects,
+  so DNS rebinding cannot slip past it. Redirects are not followed.
+- **Sign-in:** 10 attempts per minute per address (`LOGIN_RATE_PER_MINUTE`), and an account locks
+  for 15 minutes after 10 wrong passwords in a row (`LOGIN_MAX_FAILURES`, `LOGIN_LOCK_MINUTES`);
+  locks are audited (`auth.locked`). On AWS, WAF also limits `/api/auth/` to 100 requests per 5
+  minutes per address. Common and patterned passwords are refused when accounts are created.
+- **Sessions:** HS256 only; sign-out revokes the session on the server; `POST /api/auth/logout-all`
+  ends every session of the member. Disabled members are still refused on every request.
+- **After SSO** only paths on this site are followed (no control characters, no `//`, no `\`).
+- **Production start-up** fails with `COOKIE_SECURE=false`, an example `JWT_SECRET` or
+  `SECRETS_KEY`, or `SECRETS_KEY` equal to `JWT_SECRET`.
+- **Headers:** API: `Content-Security-Policy: default-src 'none'`, `X-Frame-Options: DENY`,
+  `Cross-Origin-Resource-Policy: same-origin` (survey media: cross-origin), COOP,
+  `Permissions-Policy`, HSTS over https. Studio, runtime and CAPI app: CSP, HSTS, COOP and
+  Permissions-Policy from Next.js, nginx (`infra/nginx/*-headers.conf`) and CloudFront response
+  headers policies. The runtime may be framed by customers' sites; the studio and CAPI app may not.
+- **Secrets in git:** `scripts/secret-scan.mjs` in `pnpm check` and the pre-commit and pre-push
+  hooks; `.gitignore` covers env files, keys and Terraform state.
+
 ## Reporting
 
-Report vulnerabilities privately to the maintainer; do not open a public issue.
+See [SECURITY.md](../SECURITY.md): report privately; do not open a public issue.

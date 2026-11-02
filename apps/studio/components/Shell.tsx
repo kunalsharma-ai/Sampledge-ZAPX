@@ -43,6 +43,18 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
         >
           Sign out
         </button>
+        <button
+          className="link small"
+          title="Ends your sessions on every computer and phone"
+          data-testid="sign-out-everywhere"
+          onClick={async () => {
+            if (!window.confirm('Sign out on every device, including this one?')) return;
+            await api('/auth/logout-all', { method: 'POST' });
+            window.location.href = '/login';
+          }}
+        >
+          Sign out everywhere
+        </button>
       </header>
       <main className="container">
         {me?.role === 'INTERVIEWER' && !forInterviewers ? (

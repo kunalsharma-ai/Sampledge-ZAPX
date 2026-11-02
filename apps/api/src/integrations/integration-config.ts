@@ -24,7 +24,7 @@ const WORD = z.string().min(1).max(60);
 export const statusMap = (value: z.ZodTypeAny) =>
   z.object(Object.fromEntries(REDIRECT_STATUSES.map((s) => [s, value.optional()])) as Record<string, z.ZodTypeAny>).strict();
 
-export const rulesSchema = z.object({ urls: statusMap(URL_TEMPLATE).default({}), words: statusMap(WORD).default({}) }).strict();
+export const rulesSchema = z.object({ urls: statusMap(URL_TEMPLATE).prefault({}), words: statusMap(WORD).prefault({}) }).strict();
 
 export const countryCode = z.string().regex(/^[A-Za-z]{2,3}$/, 'Use a 2 or 3 letter country code');
 
@@ -33,7 +33,7 @@ export const countryRulesSchema = z
   .refine((m) => Object.keys(m).length <= 250, 'Too many countries')
   .transform((m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k.toUpperCase(), v])));
 
-export const layerSchema = rulesSchema.extend({ countries: countryRulesSchema.default({}) }).strict();
+export const layerSchema = rulesSchema.extend({ countries: countryRulesSchema.prefault({}) }).strict();
 export type LayerInput = z.infer<typeof layerSchema>;
 
 /** Lenient reader for stored JSON: drops anything that is not a known status with a string. */

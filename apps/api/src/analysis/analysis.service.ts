@@ -46,7 +46,7 @@ export const filtersSchema = z
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
   })
-  .default({});
+  .prefault({});
 export type Filters = z.infer<typeof filtersSchema>;
 
 /** Rim weighting targets (Milestone 15): per variable, a target share per category. */

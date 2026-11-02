@@ -26,9 +26,9 @@ const vendorSchema = z
     code: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Letters, digits, _ or - only'),
     integration: z.enum(['DIRECT', 'PROJEXA']).default('DIRECT'),
     redirectMode: z.enum(['STATIC', 'DYNAMIC', 'HYBRID']).default('STATIC'),
-    staticUrls: statusMap(URL_TEMPLATE).default({}),
-    statusWords: statusMap(z.string().min(1).max(60)).default({}),
-    countryRedirects: countryRulesSchema.default({}),
+    staticUrls: statusMap(URL_TEMPLATE).prefault({}),
+    statusWords: statusMap(z.string().min(1).max(60)).prefault({}),
+    countryRedirects: countryRulesSchema.prefault({}),
     dynamicAllowedHosts: z
       .array(z.string().regex(/^[A-Za-z0-9.-]{1,253}$/, 'Host names only, e.g. example.com'))
       .max(20)

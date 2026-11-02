@@ -33,7 +33,7 @@ const casesSchema = z.object({
         phone: z.string().max(40),
         name: z.string().max(120).optional(),
         timeZone: z.string().max(64).optional(),
-        data: z.record(z.string()).optional(),
+        data: z.record(z.string(), z.string()).optional(),
       }),
     )
     .min(1)

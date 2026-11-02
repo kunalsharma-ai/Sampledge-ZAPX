@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
+import { isCommonPassword } from '../auth/password-policy';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { parseBody } from '../common/validation';
@@ -11,7 +12,11 @@ import { PlanService } from '../plans/plan.service';
 const createSchema = z.object({
   name: z.string().min(1).max(120),
   email: z.string().email().toLowerCase(),
-  password: z.string().min(10).max(200),
+  password: z
+    .string()
+    .min(10)
+    .max(200)
+    .refine((p) => !isCommonPassword(p), 'This password is too common. Choose another one.'),
   role: z.enum(['ADMIN', 'PROGRAMMER', 'VIEWER', 'INTERVIEWER']),
   projectScope: z.enum(['ALL', 'ASSIGNED']).default('ALL'),
 });

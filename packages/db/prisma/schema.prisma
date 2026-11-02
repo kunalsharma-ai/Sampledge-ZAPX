@@ -199,28 +199,33 @@ model TenantScim {
 }
 
 model User {
-  id              String           @id @default(cuid())
-  tenantId        String
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  email           String           @unique
-  name            String
-  passwordHash    String
-  role            Role             @default(PROGRAMMER)
-  projectScope    ProjectScope     @default(ALL)
+  id                String           @id @default(cuid())
+  tenantId          String
+  tenant            Tenant           @relation(fields: [tenantId], references: [id])
+  email             String           @unique
+  name              String
+  passwordHash      String
+  role              Role             @default(PROGRAMMER)
+  projectScope      ProjectScope     @default(ALL)
   /// Disabled members cannot sign in, and their sessions and API keys stop working at once.
-  disabledAt      DateTime?
+  disabledAt        DateTime?
   /// Subject from the organization's identity provider (OIDC `sub`), set on first SSO sign-in.
-  ssoSubject      String?
+  ssoSubject        String?
   /// The identity provider's id for this member when provisioned through SCIM.
-  scimExternalId  String?
-  createdAt       DateTime         @default(now())
-  capiAssignments CapiAssignment[]
-  capiInterviews  Response[]       @relation("CapiInterviewer")
-  projects        ProjectMember[]
-  apiKeys         ApiKey[]
+  scimExternalId    String?
+  createdAt         DateTime         @default(now())
+  capiAssignments   CapiAssignment[]
+  capiInterviews    Response[]       @relation("CapiInterviewer")
+  projects          ProjectMember[]
+  apiKeys           ApiKey[]
   /// Milestone 19: the phone the dialer rings for this interviewer (sealed), and its last digits.
-  phoneSealed     String?
-  phoneHint       String?
+  phoneSealed       String?
+  phoneHint         String?
+  /// Milestone 20: failed password sign-ins in a row, and when the account may try again.
+  failedLogins      Int              @default(0)
+  lockedUntil       DateTime?
+  /// Milestone 20: sessions issued before this moment no longer work ("sign out everywhere").
+  sessionsRevokedAt DateTime?
 
   @@unique([tenantId, ssoSubject])
   @@index([tenantId])
@@ -996,4 +1001,15 @@ model FraudBlock {
   createdAt   DateTime @default(now())
 
   @@unique([tenantId, kind, hash])
+}
+
+/// Milestone 20: a session that was signed out before it expired. Rows are removed once the session
+/// would have expired anyway.
+model RevokedSession {
+  jti       String   @id
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
 }

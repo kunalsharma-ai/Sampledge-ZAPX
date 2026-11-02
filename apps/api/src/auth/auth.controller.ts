@@ -1,15 +1,29 @@
-import { Body, Controller, ForbiddenException, Get, HttpCode, Post, Res, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpException,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { compare, hash, hashSync } from 'bcryptjs';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { parseBody } from '../common/validation';
 import { AUTH_COOKIE, type AuthUser } from './auth.types';
-import { issueSession } from './session';
+import { issueSession, sessionCookieOptions } from './session';
+import { verifySession } from './auth.guard';
+import { isCommonPassword } from './password-policy';
 import { SsoService } from './sso.service';
 import { ALL_ROLES, CurrentUser, Public, Roles } from './decorators';
 
@@ -18,7 +32,11 @@ const registerSchema = z.object({
   organization: z.string().min(1).max(120),
   name: z.string().min(1).max(120),
   email: z.string().email().toLowerCase(),
-  password: z.string().min(10, 'Use at least 10 characters').max(200),
+  password: z
+    .string()
+    .min(10, 'Use at least 10 characters')
+    .max(200)
+    .refine((p) => !isCommonPassword(p), 'This password is too common. Choose another one.'),
 });
 
 /** Used when the email is unknown so that response timing does not reveal which accounts exist. */
@@ -38,7 +56,7 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: () => config().LOGIN_RATE_PER_MINUTE, ttl: 60_000 } })
   @Post('login')
   @HttpCode(200)
   async login(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
@@ -46,7 +64,22 @@ export class AuthController {
     const user = await this.prisma.user.findUnique({ where: { email } });
     // Compare against a dummy hash when the user does not exist to keep timing uniform.
     const ok = await compare(password, user?.passwordHash ?? DUMMY_HASH);
-    if (!user || !ok) throw new UnauthorizedException('Email or password is incorrect');
+    // Account lockout (Milestone 20): after LOGIN_MAX_FAILURES wrong passwords in a row the account
+    // refuses every password, right or wrong, until the lock ends. This stops password guessing that
+    // is spread over many addresses, which the per-address rate limit alone cannot.
+    if (user?.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+      throw new HttpException(
+        { message: 'Too many failed sign-ins for this account. Try again later or ask your administrator.', code: 'ACCOUNT_LOCKED' },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+    if (!user || !ok) {
+      if (user) await this.recordFailure(user);
+      throw new UnauthorizedException('Email or password is incorrect');
+    }
+    if (user.failedLogins > 0 || user.lockedUntil) {
+      await this.prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
+    }
     if (user.disabledAt) throw new UnauthorizedException('Your account is disabled. Ask your administrator.');
     if (await this.sso.passwordBlocked(user.tenantId, user.role)) {
       throw new ForbiddenException({
@@ -85,11 +118,49 @@ export class AuthController {
     return { user: { id: user.id, email: user.email, name: user.name, role: user.role }, token };
   }
 
+  private async recordFailure(user: { id: string; tenantId: string; role: AuthUser['role']; email: string }) {
+    const c = config();
+    const u = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { failedLogins: { increment: 1 } },
+      select: { failedLogins: true },
+    });
+    if (u.failedLogins < c.LOGIN_MAX_FAILURES) return;
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { failedLogins: 0, lockedUntil: new Date(Date.now() + c.LOGIN_LOCK_MINUTES * 60_000) },
+    });
+    await this.audit.record(user, 'auth.locked', 'user', user.id, { minutes: c.LOGIN_LOCK_MINUTES });
+  }
+
+  /** Signs this session out on the server too, so a copied token stops working (Milestone 20). */
   @Public()
   @Post('logout')
   @HttpCode(204)
-  logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie(AUTH_COOKIE, { path: '/' });
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const header = req.headers.authorization;
+    const bearer = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
+    const token = bearer ?? (req.cookies as Record<string, string> | undefined)?.[AUTH_COOKIE];
+    res.clearCookie(AUTH_COOKIE, sessionCookieOptions());
+    const p = token ? await verifySession(this.jwt, token) : null;
+    if (!p?.jti || !p.exp) return;
+    await this.prisma.revokedSession.upsert({
+      where: { jti: p.jti },
+      create: { jti: p.jti, userId: p.sub, expiresAt: new Date(p.exp * 1000) },
+      update: {},
+    });
+    await this.prisma.revokedSession.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+  }
+
+  /** Ends every session of the signed-in member on every device (API keys are managed separately). */
+  @Post('logout-all')
+  @Roles(...ALL_ROLES)
+  @HttpCode(204)
+  async logoutAll(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
+    if (user.apiKeyId) throw new ForbiddenException('Sign out everywhere needs a signed-in session, not an API key');
+    await this.prisma.user.update({ where: { id: user.id }, data: { sessionsRevokedAt: new Date() } });
+    res.clearCookie(AUTH_COOKIE, sessionCookieOptions());
+    await this.audit.record(user, 'auth.logout_all', 'user', user.id);
   }
 
   @Get('me')
