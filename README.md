@@ -42,6 +42,10 @@ members, interviewers, live surveys and monthly completes, with a usage page.
 shared queue from Calls (callbacks first, retries for no answer and busy, maximum attempts), run
 the interview in the same runtime, and record each call's outcome. Phone numbers are encrypted.
 
+**Milestone 10 (analysis)** adds an Analysis tab: frequencies and crosstabs on live data with
+significance letters (column proportions and means at 90/95/99%), filters by status, mode, date and
+quality review, and saved reports that anyone on the team can rerun or download as Excel.
+
 ## What works today
 
 | Area                    | What you can do                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -88,10 +92,11 @@ the interview in the same runtime, and record each call's outcome. Phone numbers
 | SCIM provisioning       | Your identity provider creates, updates and deactivates members through SCIM 2.0 (users; roles from `roles`). Token shown once, rotate or revoke any time                                                                                                                                                                                                                                                                                  |
 | Plans and usage         | Settings → Plan: team members, interviewers, live surveys and this month's completes against the plan. Limits are enforced; operators change plans with a command (no billing)                                                                                                                                                                                                                                                             |
 | Phone interviews (CATI) | Upload a call list (CSV); interviewers take the next case from Calls, dial the shown number, run the interview in the runtime and record the outcome. Callbacks, retries, max attempts, reopen, erase numbers. No dialer or recording yet ([guide](docs/modules/cati.md))                                                                                                                                                                  |
+| Analysis and reports    | Analysis tab: frequencies (counts, shares, numeric statistics, open-answer samples) and crosstabs with significance letters; filters; saved reports rerun on the latest data, Excel download. Unweighted ([guide](docs/modules/analytics.md))                                                                                                                                                                                              |
 | Row-level security      | PostgreSQL policy on respondent data: the studio's reads of responses, exports, review queue and fieldwork run scoped to the organization in the database too. Applies when the API's database role is not a superuser ([details](docs/adr/0012-row-level-security.md))                                                                                                                                                                    |
 | Deletion                | Projects, surveys and vendors are soft-deleted: they disappear and their links stop working, history is kept                                                                                                                                                                                                                                                                                                                               |
 
-Not yet built (later milestones): voice-over and transcription, rich media and custom animations, a CATI dialer and call recording, audio/photo/GPS capture in CAPI, advanced fraud detection (device fingerprinting, AI open-end review), analytics dashboards beyond fieldwork, SAML and billing. See
+Not yet built (later milestones): voice-over and transcription, rich media and custom animations, a CATI dialer and call recording, audio/photo/GPS capture in CAPI, advanced fraud detection (device fingerprinting, AI open-end review), weighting and charts in analysis, SAML and billing. See
 [docs/architecture.md](docs/architecture.md).
 
 ## Repository layout

@@ -240,6 +240,7 @@ model Survey {
   changeSets      ChangeSet[]
   capiAssignments CapiAssignment[]
   catiCases       CatiCase[]
+  reports         Report[]
 
   @@index([tenantId, projectId, deletedAt])
 }
@@ -775,4 +776,20 @@ model StoredFile {
 
   @@index([expiresAt, deletedAt])
   @@index([tenantId, createdAt])
+}
+
+/// A saved analysis (Milestone 10): filters plus frequencies or a crosstab definition.
+model Report {
+  id          String   @id @default(cuid())
+  tenantId    String
+  surveyId    String
+  survey      Survey   @relation(fields: [surveyId], references: [id])
+  name        String
+  /// {type: "crosstab" | "frequencies", filters, banner?, stubs?, variables?, confidence?}
+  config      Json
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, surveyId])
 }

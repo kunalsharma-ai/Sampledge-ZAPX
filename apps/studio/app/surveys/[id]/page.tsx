@@ -22,6 +22,7 @@ import { Quality } from '@/components/Quality';
 import { CapiAssignments } from '@/components/CapiAssignments';
 import { CatiCalls } from '@/components/CatiCalls';
 import { ExportJobs } from '@/components/ExportJobs';
+import { Analysis } from '@/components/Analysis';
 
 interface SurveyDetail {
   id: string;
@@ -41,7 +42,19 @@ interface DraftVersion {
   presentation: unknown;
 }
 
-type Tab = 'build' | 'json' | 'assist' | 'design' | 'languages' | 'preview' | 'qa' | 'distribute' | 'capi' | 'quality' | 'results';
+type Tab =
+  | 'build'
+  | 'json'
+  | 'assist'
+  | 'design'
+  | 'languages'
+  | 'preview'
+  | 'qa'
+  | 'distribute'
+  | 'capi'
+  | 'quality'
+  | 'results'
+  | 'analysis';
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -233,6 +246,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             ['capi', 'Interviewers'],
             ['quality', 'Quality & fieldwork'],
             ['results', 'Quotas & data'],
+            ['analysis', 'Analysis'],
           ] as Array<[Tab, string]>
         ).map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
@@ -282,6 +296,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       ) : null}
       {tab === 'quality' ? <Quality surveyId={id} def={def} readOnly={readOnly} onChange={edit} /> : null}
       {tab === 'results' ? <Results surveyId={id} /> : null}
+      {tab === 'analysis' ? <Analysis surveyId={id} readOnly={readOnly} /> : null}
     </Shell>
   );
 }

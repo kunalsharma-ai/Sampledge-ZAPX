@@ -20,5 +20,6 @@ they are accepted; a later record supersedes an earlier one.
 | [0013](0013-background-jobs-and-file-storage.md) | Background jobs and file storage in PostgreSQL                         | Accepted                                               |
 | [0014](0014-sso-scim-and-plans.md)               | Single sign-on, SCIM provisioning and plan limits                      | Accepted                                               |
 | [0015](0015-cati-call-lists.md)                  | CATI call lists on the existing interview engine                       | Accepted                                               |
+| [0016](0016-analysis-and-reports.md)             | Survey analysis and saved reports in the API                           | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

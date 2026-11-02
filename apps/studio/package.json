@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@zapx/analysis-core": "workspace:*",
     "@zapx/logic-engine": "workspace:*",
     "@zapx/survey-renderer": "workspace:*",
     "@zapx/survey-schema": "workspace:*",

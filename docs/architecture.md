@@ -172,6 +172,17 @@ Details: [modules/sso-scim-plans.md](modules/sso-scim-plans.md).
 
 Details: [modules/cati.md](modules/cati.md).
 
+## Analysis (Milestone 10)
+
+- **`@zapx/analysis-core`** (pure): variables from the definition (grid rows as `Q_row`, system
+  variables from the data), frequencies, and crosstabs with column significance letters (pooled
+  two-proportion z-test, Welch's test for means; low bases and multiple choice banners not tested).
+- **`AnalysisService`** reads response rows through the tenant-scoped client in pages of 5,000, up
+  to 200,000 per analysis. **Saved reports** (`Report`) store a validated config and are rerun on
+  the latest data; Excel exports hold aggregates only. Unweighted. [ADR 0016](adr/0016-analysis-and-reports.md)
+
+Details: [modules/analytics.md](modules/analytics.md).
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -209,6 +220,8 @@ Details: [modules/cati.md](modules/cati.md).
   `docker compose` database role (a superuser). Other tables rely on application filters.
 - API keys are role-scoped only (no per-endpoint scopes or IP allow lists).
 - CATI has no dialer, call recording, time-zone calling windows or do-not-call list.
+- Analysis is unweighted, reads rows in the API process (up to 200,000 interviews) and has no
+  nets, banner books, charts or scheduled delivery yet.
 - SSO is OpenID Connect only (no SAML) and has been tested against a mock provider, not a real one.
   SCIM covers users, not groups. Plans have no billing or self-service changes.
 - Webhooks are organization-wide (no per-project webhooks). Deliveries are kept for
