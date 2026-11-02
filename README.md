@@ -2,9 +2,12 @@
 
 AI-native survey programming, QA, hosting and fieldwork platform.
 
-This repository holds **Milestone 1 (Foundation)**: a working vertical slice that proves the core
-architecture end to end. A programmer builds a survey, passes an automatic logic check, publishes it,
-and respondents take it through vendor links with redirects, quotas and data export.
+**Milestone 1 (Foundation)** is a working vertical slice that proves the core architecture end to
+end: a programmer builds a survey, passes an automatic logic check, publishes it, and respondents take
+it through vendor links with redirects, quotas and data export.
+
+**Milestone 2 (AI programming and QA)** adds the AI Survey Architect, questionnaire file import,
+reviewable change sets, and the QA Laboratory.
 
 ## What works today
 
@@ -22,9 +25,13 @@ and respondents take it through vendor links with redirects, quotas and data exp
 | Fieldwork control | Live, paused and closed status; test links that never count toward quotas |
 | Quotas | Atomic counting at completion, so quotas cannot overfill under concurrent traffic |
 | Data | CSV and Excel export (codes, one column per option or grid row, codebook sheet, spreadsheet formula-injection protection) |
-| Audit | Append-only audit trail of logins, edits, publishes, vendor changes, links and exports |
+| Audit | Append-only audit trail of logins, edits, publishes, vendor changes, links, exports, QA runs and change-set decisions |
+| AI Survey Architect | Build or edit a survey from a typed or dictated instruction plus an optional brief or questionnaire (Word, PDF, text). The AI's answer is validated by the same schema and logic check as a manual edit, with one automatic repair round, and lists the assumptions a programmer should confirm. Needs `ANTHROPIC_API_KEY` |
+| File import | The ZAPX Excel/CSV template is imported deterministically with a confidence score and issues per row (download it from the studio). Word, PDF and text questionnaires are read by the AI. Files are checked by content, not just extension, and limited in size |
+| Change sets | AI output, imports and pasted definitions become proposals with a structured diff, data-impact warning, logic check and a 200-respondent QA preview. A programmer applies or rejects them; applying fails if the draft changed since the proposal was made |
+| QA Laboratory | Simulate up to 2,000 synthetic respondents per run on the draft or live version: outcome mix, coverage of pages, questions, options, branches and outcomes, and defects (never shown, constant conditions, impossible completes, stuck pages) with an example respondent. Runs are deterministic per seed, saved, and never touch responses or quotas |
 
-Not yet built (later milestones): AI and voice programming, file intake, themes and animations,
+Not yet built (later milestones): themes and animations,
 translations, CAPI and CATI apps, fraud scoring, analytics dashboards, SSO and billing. See
 [docs/architecture.md](docs/architecture.md).
 
@@ -69,6 +76,11 @@ pnpm --filter @zapx/runtime preview      # Respondent runtime on :5173
 Open http://localhost:3000, sign in, create a project, add a vendor (try **+ Sampledge preset**),
 create a survey, paste [docs/examples/demo-screener.json](docs/examples/demo-screener.json) into the
 JSON tab, publish, and generate a link under **Links & status**.
+
+To enable the AI Survey Architect, set `ANTHROPIC_API_KEY` in `.env` (and optionally `AI_MODEL`,
+default `claude-opus-5-5`) and restart the API. Without a key the AI panel says AI is not configured
+and every other feature, including template import and the QA lab, works as normal. Voice dictation
+uses the browser's speech recognition (Chrome, Edge, Safari).
 
 ## Tests
 

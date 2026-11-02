@@ -10,6 +10,14 @@ const schema = z.object({
     .string()
     .optional()
     .transform((v) => v === 'true'),
+  /** Enables the AI Survey Architect. Without it, AI endpoints answer 503 and everything else works. */
+  ANTHROPIC_API_KEY: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
+  AI_MODEL: z.string().default('claude-opus-5-5'),
+  /** Max upload size for questionnaire files, in megabytes. */
+  UPLOAD_MAX_MB: z.coerce.number().min(1).max(50).default(15),
   COOKIE_SECURE: z
     .string()
     .optional()

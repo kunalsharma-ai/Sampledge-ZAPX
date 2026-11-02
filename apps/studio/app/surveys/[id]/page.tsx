@@ -8,6 +8,8 @@ import { useMe } from '@/lib/useMe';
 import { CopyField, ErrorNote, Shell } from '@/components/Shell';
 import { VisualEditor } from '@/components/VisualEditor';
 import { Preview } from '@/components/Preview';
+import { Assist } from '@/components/Assist';
+import { QaLab } from '@/components/QaLab';
 
 interface SurveyDetail {
   id: string;
@@ -26,7 +28,7 @@ interface DraftVersion {
   definition: unknown;
 }
 
-type Tab = 'build' | 'json' | 'preview' | 'distribute' | 'results';
+type Tab = 'build' | 'json' | 'assist' | 'preview' | 'qa' | 'distribute' | 'results';
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -161,7 +163,9 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
           [
             ['build', 'Build'],
             ['json', 'JSON'],
+            ['assist', 'AI & import'],
             ['preview', 'Preview'],
+            ['qa', 'QA lab'],
             ['distribute', 'Links & status'],
             ['results', 'Quotas & data'],
           ] as Array<[Tab, string]>
@@ -181,6 +185,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         </div>
       ) : null}
       {tab === 'preview' ? <Preview key={JSON.stringify(def).length + draft.version} def={def} /> : null}
+      {tab === 'assist' ? <Assist surveyId={id} language={def.language} readOnly={readOnly} dirty={dirty} onApplied={load} /> : null}
+      {tab === 'qa' ? <QaLab surveyId={id} readOnly={readOnly} dirty={dirty} hasLive={!!survey.liveVersionId} /> : null}
       {tab === 'distribute' ? <Distribute survey={survey} readOnly={readOnly} onChanged={load} /> : null}
       {tab === 'results' ? <Results surveyId={id} /> : null}
     </Shell>

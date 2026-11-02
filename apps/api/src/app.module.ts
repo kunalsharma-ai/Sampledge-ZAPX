@@ -16,6 +16,12 @@ import { LocalRedirectService, RedirectService } from './vendors/redirect.servic
 import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
 import { HealthController } from './health.controller';
+import { QaController } from './qa/qa.controller';
+import { ChangeSetsController } from './changesets/changesets.controller';
+import { ChangeSetsService } from './changesets/changesets.service';
+import { ArchitectService } from './ai/architect.service';
+import { AiProvider } from './ai/ai-provider';
+import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -35,11 +41,22 @@ import { HealthController } from './health.controller';
     SurveysController,
     VendorsController,
     InterviewController,
+    QaController,
+    ChangeSetsController,
   ],
   providers: [
     SurveysService,
     ExportService,
     InterviewService,
+    ChangeSetsService,
+    ArchitectService,
+    {
+      provide: AiProvider,
+      useFactory: (): AiProvider => {
+        const { ANTHROPIC_API_KEY, AI_MODEL } = config();
+        return ANTHROPIC_API_KEY ? new ClaudeAiProvider(ANTHROPIC_API_KEY, AI_MODEL) : new UnconfiguredAiProvider(AI_MODEL);
+      },
+    },
     { provide: RedirectService, useClass: LocalRedirectService },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
