@@ -32,7 +32,7 @@ let auth: Record<string, string>;
 let projectId: string;
 
 let members = 0;
-async function member(role: 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER', name = role) {
+async function member(role: 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER', name: string = role) {
   const email = `${role.toLowerCase()}${++members}-${run}@test.zapx`;
   const created = (await http.post('/api/users').set(auth).send({ name, email, password: 'member-password-1', role }).expect(201)).body;
   const login = await http.post('/api/auth/login').send({ email, password: 'member-password-1' }).expect(200);
