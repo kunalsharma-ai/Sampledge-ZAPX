@@ -6,7 +6,7 @@
 #   docker build --target capi -t zapx-capi .
 # The same images run locally under docker compose and on AWS ECS/Fargate.
 
-FROM node:22-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
