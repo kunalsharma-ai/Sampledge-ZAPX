@@ -163,7 +163,13 @@ async function vendor(body: Record<string, unknown>) {
 
 /** Make every pending callback due now, then run one worker pass. */
 async function deliverNow() {
-  await prisma.outboundCallback.updateMany({ where: { state: 'PENDING' }, data: { nextAttemptAt: new Date(Date.now() - 1000) } });
+  // Other test files share the database: park their pending callbacks so only ours are delivered.
+  const tenantId = (await prisma.project.findUniqueOrThrow({ where: { id: projectId } })).tenantId;
+  await prisma.outboundCallback.updateMany({
+    where: { state: 'PENDING', tenantId: { not: tenantId } },
+    data: { nextAttemptAt: new Date(Date.now() + 365 * 86_400_000) },
+  });
+  await prisma.outboundCallback.updateMany({ where: { state: 'PENDING', tenantId }, data: { nextAttemptAt: new Date(Date.now() - 1000) } });
   return worker.runOnce();
 }
 

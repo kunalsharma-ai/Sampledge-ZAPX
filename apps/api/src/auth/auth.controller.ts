@@ -9,7 +9,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { parseBody } from '../common/validation';
 import { AUTH_COOKIE, type AuthUser } from './auth.types';
-import { CurrentUser, Public } from './decorators';
+import { ALL_ROLES, CurrentUser, Public, Roles } from './decorators';
 
 const loginSchema = z.object({ email: z.string().email().toLowerCase(), password: z.string().min(1).max(200) });
 const registerSchema = z.object({
@@ -95,6 +95,7 @@ export class AuthController {
   }
 
   @Get('me')
+  @Roles(...ALL_ROLES)
   async me(@CurrentUser() user: AuthUser) {
     const u = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },

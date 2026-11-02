@@ -16,9 +16,25 @@ interface Column {
 
 type ExportRow = Pick<
   Response,
-  'id' | 'uid' | 'country' | 'language' | 'device' | 'status' | 'outcomeReason' | 'isTest' | 'startedAt' | 'completedAt' | 'answers'
+  | 'id'
+  | 'uid'
+  | 'country'
+  | 'language'
+  | 'device'
+  | 'status'
+  | 'outcomeReason'
+  | 'isTest'
+  | 'startedAt'
+  | 'completedAt'
+  | 'answers'
+  | 'mode'
+  | 'durationMs'
+  | 'qualityScore'
+  | 'qualityFlags'
+  | 'reviewState'
 > & {
   vendor: { code: string } | null;
+  interviewer?: { email: string } | null;
   version: { version: number };
 };
 
@@ -50,6 +66,23 @@ export class ExportService {
       { key: 'test', label: 'Test response (1 = yes)', get: (r) => (r.isTest ? 1 : 0) },
       { key: 'started_at', label: 'Started (UTC)', get: (r) => r.startedAt.toISOString() },
       { key: 'completed_at', label: 'Finished (UTC)', get: (r) => r.completedAt?.toISOString() ?? null },
+      { key: 'mode', label: 'Mode (cawi = online, capi = interviewer)', get: (r) => r.mode.toLowerCase() },
+      { key: 'interviewer', label: 'Interviewer (CAPI)', get: (r) => r.interviewer?.email ?? null },
+      {
+        key: 'loi_seconds',
+        label: 'Length of interview (seconds)',
+        get: (r) => (r.durationMs === null ? null : Math.round(r.durationMs / 1000)),
+      },
+      { key: 'quality_score', label: 'Quality score (0-100)', get: (r) => r.qualityScore },
+      {
+        key: 'quality_flags',
+        label: 'Quality flags',
+        get: (r) => {
+          const flags = Array.isArray(r.qualityFlags) ? (r.qualityFlags as Array<{ code: string; ref?: string }>) : [];
+          return flags.length ? flags.map((f) => (f.ref ? `${f.code}:${f.ref}` : f.code)).join(' ') : null;
+        },
+      },
+      { key: 'review', label: 'Quality review (none, pending, accepted, rejected)', get: (r) => r.reviewState.toLowerCase() },
     ];
     const seen = new Set(cols.map((c) => c.key));
     const add = (c: Column) => {

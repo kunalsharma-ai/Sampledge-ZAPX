@@ -7,7 +7,8 @@ describe('survey definition schema', () => {
     expect(def.pages[0]!.questions[0]!.type).toBe('single');
     const q = def.pages[0]!.questions[0]!;
     expect(q.type !== 'info' && q.required).toBe(true);
-    expect(def.settings).toEqual({ allowBack: false, showProgress: true });
+    expect(def.settings).toMatchObject({ allowBack: false, showProgress: true });
+    expect(def.settings.quality).toMatchObject({ enabled: true, reviewBelow: 70, rejectBelow: 0, checks: [] });
     expect(parseSurveyDefinition(JSON.parse(JSON.stringify(def))).ok).toBe(true);
   });
 

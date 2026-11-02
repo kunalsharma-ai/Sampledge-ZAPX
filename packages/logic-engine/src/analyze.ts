@@ -3,7 +3,7 @@
  *
  * Errors block publishing. Warnings are shown to the programmer but do not block.
  */
-import type { Question, SurveyDefinition } from '@zapx/survey-schema';
+import { qualitySettingsOf, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 import { ExpressionError, FUNCTIONS, evaluate, parse, references, truthy, type Node, type Value } from './expression.js';
 import { PIPE_PATTERN } from './interview.js';
 
@@ -28,7 +28,8 @@ export interface LogicIssue {
     | 'UNREACHABLE'
     | 'INVALID_RANGE'
     | 'PIPING_UNDEFINED'
-    | 'ZERO_QUOTA';
+    | 'ZERO_QUOTA'
+    | 'QUALITY_SETTINGS';
   message: string;
   /** Where the problem is, e.g. "pages.P2.questions.Q5.condition". */
   location: string;
@@ -105,6 +106,17 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
     });
   });
   def.terminations.forEach((t) => claim(t.id, `terminations.${t.id}`));
+  qualitySettingsOf(def).checks.forEach((c) => claim(c.id, `settings.quality.checks.${c.id}`));
+  {
+    const q = qualitySettingsOf(def);
+    if (q.enabled && q.rejectBelow > q.reviewBelow)
+      add(
+        'warning',
+        'QUALITY_SETTINGS',
+        `Quality: completes scoring below ${q.rejectBelow} are rejected in the survey, which is stricter than the review threshold ${q.reviewBelow}; nothing between them can be reviewed.`,
+        'settings.quality',
+      );
+  }
   def.quotas.forEach((q) => {
     claim(q.id, `quotas.${q.id}`);
     if (q.target === 0)
@@ -255,6 +267,14 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
     if (references(ast).length === 0 && truthy(evaluate(ast, { lookup: () => null })))
       add('error', 'ALWAYS_TERMINATES', `Termination ${t.id} is always true: every respondent would be terminated.`, loc);
     else if (!satisfiable(ast)) add('warning', 'IMPOSSIBLE_CONDITION', `Termination ${t.id} can never trigger.`, loc);
+  });
+  qualitySettingsOf(def).checks.forEach((c) => {
+    const loc = `settings.quality.checks.${c.id}.condition`;
+    const ast = checkExpr(c.condition, { kind: 'global' }, loc);
+    if (!ast) return;
+    if (references(ast).length === 0 && truthy(evaluate(ast, { lookup: () => null })))
+      add('warning', 'QUALITY_SETTINGS', `Quality check ${c.id} is always true: every complete would fail it.`, loc);
+    else if (!satisfiable(ast)) add('warning', 'IMPOSSIBLE_CONDITION', `Quality check ${c.id} can never fail.`, loc);
   });
   def.quotas.forEach((q) => {
     const loc = `quotas.${q.id}.condition`;

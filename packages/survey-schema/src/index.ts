@@ -169,6 +169,54 @@ export const quotaSchema = z.object({
 });
 export type Quota = z.infer<typeof quotaSchema>;
 
+// ---- Data quality (Milestone 5) -----------------------------------------------------------------
+// Quality settings are part of the versioned definition: an in-survey quality reject changes where a
+// respondent is redirected, so it is published, diffed and reviewed like any other logic.
+
+export const qualityCheckSchema = z.object({
+  id: variableName,
+  /** When true for a completed interview, the check fails (e.g. `ATTN != 3`). Uses the logic language. */
+  condition: expression,
+  label: z.string().max(200).optional(),
+  /** Points taken off the quality score when the check fails. */
+  weight: z.number().int().min(1).max(100).default(20),
+});
+export type QualityCheck = z.infer<typeof qualityCheckSchema>;
+
+export const qualitySettingsSchema = z.object({
+  /** Score every complete and record the reasons. Off: no score, no review queue, no in-survey rejects. */
+  enabled: z.boolean().default(true),
+  /** Hard floor: an interview faster than this many seconds is a speeder. */
+  minSeconds: z.number().int().min(0).max(36000).optional(),
+  /** Relative speeder: faster than this share of the median length of interview (needs 20 completes). */
+  speederRatio: z.number().min(0).max(1).default(0.4),
+  /** Grids with at least this many rows are checked for straightlining (same column in every row). */
+  straightlineMinRows: z.number().int().min(2).max(100).default(5),
+  /** Open answers are checked for gibberish, very short answers and copies of other respondents' answers. */
+  openEnds: z.boolean().default(true),
+  /** Flag several completes from the same network (a keyed hash of the IP address, never the address). */
+  sameNetwork: z.boolean().default(true),
+  /** Survey-specific checks, such as attention or consistency checks. */
+  checks: z.array(qualityCheckSchema).max(50).default([]),
+  /** Completes scoring below this go to the review queue. */
+  reviewBelow: z.number().int().min(0).max(100).default(70),
+  /**
+   * Completes scoring below this end as quality_fail inside the survey (redirected as quality fail,
+   * not counted toward quotas). 0 = never reject automatically; people decide in the review queue.
+   */
+  rejectBelow: z.number().int().min(0).max(100).default(0),
+});
+export type QualitySettings = z.infer<typeof qualitySettingsSchema>;
+
+/**
+ * Quality settings of a definition, with defaults. Versions published before Milestone 5 have no
+ * `settings.quality`, so always read it through this function.
+ */
+export function qualitySettingsOf(def: { settings?: { quality?: unknown } }): QualitySettings {
+  const parsed = qualitySettingsSchema.safeParse(def.settings?.quality ?? {});
+  return parsed.success ? parsed.data : qualitySettingsSchema.parse({});
+}
+
 export const surveyDefinitionSchema = z.object({
   schemaVersion: z.literal(1),
   title: z.string().min(1),
@@ -183,6 +231,7 @@ export const surveyDefinitionSchema = z.object({
     .object({
       allowBack: z.boolean().default(false),
       showProgress: z.boolean().default(true),
+      quality: qualitySettingsSchema.default({}),
     })
     .default({}),
 });

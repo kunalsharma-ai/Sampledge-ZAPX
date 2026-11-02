@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Ip, Param, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import { Public } from '../auth/decorators';
@@ -26,6 +26,7 @@ export class InterviewController {
   start(
     @Param('surveyId') surveyId: string,
     @Body() body: unknown,
+    @Ip() ip: string,
     @Headers('user-agent') userAgent?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ) {
@@ -34,6 +35,7 @@ export class InterviewController {
     const client = clientSchema.safeParse(b.client ?? {});
     return this.interview.start(surveyId, query, {
       userAgent,
+      ip,
       acceptLanguage: acceptLanguage?.slice(0, 200),
       client: client.success ? client.data : {},
     });

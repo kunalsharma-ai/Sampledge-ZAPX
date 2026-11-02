@@ -18,6 +18,7 @@
     "@nestjs/throttler": "6.4.0",
     "@zapx/db": "workspace:*",
     "@zapx/logic-engine": "workspace:*",
+    "@zapx/quality-core": "workspace:*",
     "@zapx/redirect-core": "workspace:*",
     "@zapx/survey-schema": "workspace:*",
     "bcryptjs": "3.0.2",
