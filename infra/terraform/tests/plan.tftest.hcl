@@ -14,6 +14,7 @@ mock_provider "aws" {
     defaults = {
       address            = "zapx-staging.abc.eu-west-1.rds.amazonaws.com"
       port               = 5432
+      arn                = "arn:aws:rds:eu-west-1:111122223333:db:zapx-staging"
       master_user_secret = [{ secret_arn = "arn:aws:secretsmanager:eu-west-1:111122223333:secret:rds-abc", kms_key_id = "k", secret_status = "active" }]
     }
   }
@@ -41,6 +42,15 @@ mock_provider "aws" {
   mock_resource "aws_lb_listener" {
     defaults = { arn = "arn:aws:elasticloadbalancing:eu-west-1:111122223333:listener/app/zapx-staging/abc/def" }
   }
+  mock_resource "aws_wafv2_web_acl" {
+    defaults = { arn = "arn:aws:wafv2:eu-west-1:111122223333:regional/webacl/zapx-staging-alb/abc" }
+  }
+  mock_resource "aws_cloudwatch_log_group" {
+    defaults = { arn = "arn:aws:logs:eu-west-1:111122223333:log-group:aws-waf-logs-zapx-staging-alb" }
+  }
+  mock_resource "aws_s3_bucket" {
+    defaults = { arn = "arn:aws:s3:::zapx-staging-files-abc", id = "zapx-staging-files-abc", bucket_regional_domain_name = "zapx-staging-files-abc.s3.eu-west-1.amazonaws.com" }
+  }
   mock_resource "aws_secretsmanager_secret" {
     defaults = { arn = "arn:aws:secretsmanager:eu-west-1:111122223333:secret:zapx-staging/app" }
   }
@@ -48,6 +58,12 @@ mock_provider "aws" {
 
 mock_provider "aws" {
   alias = "us_east_1"
+  mock_resource "aws_wafv2_web_acl" {
+    defaults = { arn = "arn:aws:wafv2:us-east-1:111122223333:global/webacl/zapx-staging-edge/abc" }
+  }
+  mock_resource "aws_cloudwatch_log_group" {
+    defaults = { arn = "arn:aws:logs:us-east-1:111122223333:log-group:aws-waf-logs-zapx-staging-edge" }
+  }
 }
 
 variables {
@@ -93,6 +109,58 @@ run "plan" {
     condition     = length(aws_cloudfront_distribution.static) == 2
     error_message = "Runtime and CAPI each have a CloudFront distribution"
   }
+  assert {
+    condition     = alltrue([for d in aws_cloudfront_distribution.static : d.web_acl_id == aws_wafv2_web_acl.edge[0].arn]) && length(aws_wafv2_web_acl_association.alb) == 1
+    error_message = "WAF is in front of CloudFront and the load balancer by default"
+  }
+  assert {
+    condition     = length(one([for r in aws_wafv2_web_acl.alb[0].rule : r if r.name == "AWSManagedRulesCommonRuleSet"]).override_action[0].count) == 1
+    error_message = "Managed rules start in count mode"
+  }
+  assert {
+    condition     = aws_appautoscaling_target.service["api"].min_capacity == 2 && aws_appautoscaling_target.service["api"].max_capacity == 6
+    error_message = "The API scales between 2 and 6 tasks"
+  }
+  assert {
+    condition     = length(aws_backup_selection.main) == 1 && length(aws_backup_selection.main[0].resources) == 2
+    error_message = "AWS Backup covers the database and the files bucket"
+  }
+  assert {
+    condition     = !aws_ecs_service.api.enable_execute_command
+    error_message = "ECS Exec is off unless asked for"
+  }
+}
+
+run "waf_block" {
+  command = plan
+  variables {
+    waf_mode = "block"
+  }
+  assert {
+    condition     = length(one([for r in aws_wafv2_web_acl.edge[0].rule : r if r.name == "AWSManagedRulesCommonRuleSet"]).override_action[0].none) == 1 && length(one([for r in aws_wafv2_web_acl.edge[0].rule : r if r.name == "AWSManagedRulesCommonRuleSet"]).override_action[0].count) == 0
+    error_message = "Block mode lets the managed rules block"
+  }
+}
+
+run "waf_off" {
+  command = plan
+  variables {
+    waf_mode         = "off"
+    backup_enabled   = false
+    ecs_exec_enabled = true
+  }
+  assert {
+    condition     = length(aws_wafv2_web_acl.edge) == 0 && length(aws_backup_plan.main) == 0 && aws_ecs_service.api.enable_execute_command
+    error_message = "WAF and backups can be turned off, ECS Exec on"
+  }
+}
+
+run "bad_waf_mode_is_refused" {
+  command = plan
+  variables {
+    waf_mode = "maybe"
+  }
+  expect_failures = [var.waf_mode]
 }
 
 run "short_edge_secret_is_refused" {

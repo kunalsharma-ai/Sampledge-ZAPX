@@ -29,7 +29,7 @@ Secrets Manager/KMS, CloudWatch and OpenTelemetry, while staying portable.
 
 - **Portability through seams, added when a consumer exists**: `SecretBox` (local AES-GCM today,
   KMS later), `CallbackWorker.runOnce()` (timer today, worker task or SQS consumer later),
-  `RedirectService`, `AiProvider`. Valkey, SQS, S3 and OpenTelemetry are not wired yet because no
+  `RedirectService`, `AiProvider`. S3 is wired since Milestone 13 (ADR 0019); Valkey, SQS and OpenTelemetry are not, because no
   code needs them; adding unused infrastructure would only add cost and failure modes.
 
 ## Consequences

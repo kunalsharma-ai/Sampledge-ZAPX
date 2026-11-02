@@ -22,7 +22,7 @@ below the server's `max_connections` (leave room for migrations and admin sessio
 |                       | Local / single server                                       | AWS                                                                      |
 | --------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Continuous            | –                                                           | RDS automated backups with point-in-time recovery (retention 14–35 days) |
-| Daily                 | `infra/scripts/backup.sh` (pg_dump custom format, keeps 14) | automated snapshots; copy to a second region for DR                      |
+| Daily                 | `infra/scripts/backup.sh` (pg_dump custom format, keeps 14) | AWS Backup daily plan for RDS and the files bucket, 35 days (Terraform)  |
 | Before risky releases | `infra/scripts/backup.sh`                                   | manual snapshot                                                          |
 | Restore               | `infra/scripts/restore.sh <file>` into an empty database    | restore to a new instance, verify, switch the endpoint                   |
 

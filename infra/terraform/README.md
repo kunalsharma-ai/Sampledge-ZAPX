@@ -24,16 +24,19 @@ Apply it to a staging account first and expect to adjust details there.
                RDS PostgreSQL 16 (Multi-AZ)  S3 files bucket (SSE-KMS)
 ```
 
-| Part             | Resources                                                                                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Network          | VPC over 2 zones, public and private subnets, NAT (one shared, or one per zone), S3 gateway endpoint                                        |
-| Compute          | ECS cluster; services `api` (2), `worker` (1), `studio` (2); task `migrate`; ECR repos `api`, `studio`                                      |
-| Database         | RDS PostgreSQL 16, encrypted, Multi-AZ, managed master password, `rds.force_ssl`, 14-day backups, deletion protection, Performance Insights |
-| Files            | Private bucket, SSE-KMS, versioning (old versions expire after 30 days), TLS-only policy                                                    |
-| Static apps      | Two private buckets behind CloudFront with origin access control and an SPA rewrite function                                                |
-| Edge             | ALB with HTTP→HTTPS, TLS 1.3 policy; CloudFront with security headers, `/api/*` uncached to the ALB                                         |
-| Secrets and keys | One KMS key (rotation on) for data, logs, secrets and images; Secrets Manager secret `zapx-<env>/app`                                       |
-| Observability    | CloudWatch log groups (30 days, encrypted), Container Insights, alarms (API 5xx, unhealthy tasks, DB CPU, DB storage) to an SNS topic       |
+| Part             | Resources                                                                                                                                                                               |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Network          | VPC over 2 zones, public and private subnets, NAT (one shared, or one per zone), S3 gateway endpoint                                                                                    |
+| Compute          | ECS cluster; services `api` (2), `worker` (1), `studio` (2); task `migrate`; ECR repos `api`, `studio`                                                                                  |
+| Database         | RDS PostgreSQL 16, encrypted, Multi-AZ, managed master password, `rds.force_ssl`, 14-day backups, deletion protection, Performance Insights                                             |
+| Files            | Private bucket, SSE-KMS, versioning (old versions expire after 30 days), TLS-only policy                                                                                                |
+| Static apps      | Two private buckets behind CloudFront with origin access control and an SPA rewrite function                                                                                            |
+| Edge             | ALB with HTTP→HTTPS, TLS 1.3 policy; CloudFront with security headers, `/api/*` uncached to the ALB                                                                                     |
+| Secrets and keys | One KMS key (rotation on) for data, logs, secrets and images; Secrets Manager secret `zapx-<env>/app`                                                                                   |
+| Protection       | AWS WAF on CloudFront and the ALB: AWS common, known-bad-inputs and IP-reputation rules, a per-address rate limit, logs of blocked and counted requests (sessions and secrets redacted) |
+| Scaling          | API (2–6 tasks) and studio (2–4) scale on CPU; the worker stays at 1                                                                                                                    |
+| Backups          | AWS Backup vault (KMS) with a daily plan for RDS and the files bucket, kept 35 days, on top of RDS point-in-time restore                                                                |
+| Observability    | CloudWatch log groups (30 days, encrypted), Container Insights, alarms (API 5xx, unhealthy tasks, DB CPU, DB storage) to an SNS topic                                                   |
 
 ## Before the first apply
 
@@ -90,14 +93,26 @@ health checks), then publishes the runtime and CAPI app to S3 and refreshes Clou
   `ALLOW_SIGNUP = "true"` in `app_environment`, then remove it.
 - `nat_gateway_per_az = true` survives a zone outage for outbound calls at the cost of a second NAT.
 - `db_multi_az = false` is fine for staging.
+- **WAF** starts with `waf_mode = "count"`: the managed rules only log. Read the logs
+  (`aws-waf-logs-zapx-<env>-edge` in us-east-1, `-alb` in the region) over a week of fieldwork, add
+  any rule that hits real traffic to `waf_count_only_rules`, then set `waf_mode = "block"`. The rate
+  limit (`waf_rate_limit`, per address per 5 minutes) blocks in both modes; raise it for interview
+  centres that share one address. `waf_mode = "off"` removes WAF (about USD 15 a month plus requests).
+- **Autoscaling** owns the API and studio task counts after the first apply: Terraform no longer
+  resets them. Raise `api_max_count` before a big fieldwork launch.
+- **Reaching the database:** set `ecs_exec_enabled = true`, apply, and run
+  `aws ecs execute-command --cluster <cluster> --task <task> --container api --interactive --command sh`
+  (Session Manager plugin needed; every session is in CloudTrail). Turn it off again afterwards.
+- **Restores:** restore a recovery point from the AWS Backup vault into a new instance or bucket,
+  never over the live one, then point a scratch stack at it. Do one restore test before go-live.
 
 ## Costs (rough, eu-west-1, before traffic)
 
-NAT gateway(s), the ALB, RDS (`db.t4g.medium` Multi-AZ) and five small Fargate tasks are the fixed
+NAT gateway(s), the ALB, WAF, RDS (`db.t4g.medium` Multi-AZ) and five small Fargate tasks are the fixed
 costs; together roughly USD 250–400 a month for production and about half for a staging stack with
 a single-AZ database. CloudFront, S3 and logs grow with use.
 
 ## Not included yet
 
-WAF rules, AWS Backup plans beyond RDS automated backups, a bastion or Session Manager access to the
-database, autoscaling policies, and Valkey or SQS (not needed at the current volume, ADR 0005).
+Cross-region copies of backups, a bot-control or CAPTCHA layer (paid WAF rule groups), and Valkey or SQS
+(not needed at the current volume, ADR 0005). Go-live order: [docs/operations/go-live.md](../../docs/operations/go-live.md).

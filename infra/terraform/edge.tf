@@ -200,6 +200,7 @@ resource "aws_cloudfront_distribution" "static" {
   default_root_object = "index.html"
   price_class         = "PriceClass_All"
   comment             = "${local.name} ${each.key}"
+  web_acl_id          = local.waf_on ? aws_wafv2_web_acl.edge[0].arn : null
 
   origin {
     origin_id                = "s3"

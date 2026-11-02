@@ -1,0 +1,46 @@
+# Going live: what needs a person with the accounts
+
+Everything in ZAPX that could be built and tested without real accounts is done (milestones 1 to
+14). The steps below need credentials, accounts or decisions that only the owner has. Do them on a
+**staging** stack first, in this order; each links to the guide with the details.
+
+| #   | Step                                                                                                | Needs                                  | Guide                                                        |
+| --- | --------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
+| 1   | Review and merge the milestone pull requests (#1 to #14, stacked: merge in order)                   | GitHub                                 | [ADR 0009](../adr/0009-local-quality-gates.md)               |
+| 2   | Create the Terraform state bucket, ACM certificates (one in us-east-1) and DNS validation           | AWS account, DNS for the domains       | [infra/terraform/README.md](../../infra/terraform/README.md) |
+| 3   | `terraform apply` with `waf_mode = "count"`, then put the app secret JSON in Secrets Manager        | AWS                                    | same                                                         |
+| 4   | First release: `ENVIRONMENT=staging infra/scripts/deploy-aws.sh` (Docker and the AWS CLI on the PC) | AWS                                    | same                                                         |
+| 5   | Create the first organization (temporary `ALLOW_SIGNUP = "true"`, then remove it)                   | —                                      | same                                                         |
+| 6   | Add `ANTHROPIC_API_KEY` to the app secret and set `AI_MODEL`; check AI budgets in Settings → AI     | Claude API key                         | [ai-gateway.md](../modules/ai-gateway.md)                    |
+| 7   | Run `scripts/projexa-check.mjs` against the deployed PROJEXA                                        | A deployed PROJEXA and its client keys | [redirects.md](../modules/redirects.md)                      |
+| 8   | Connect your real identity provider (OpenID Connect or SAML) and, if wanted, SCIM                   | IdP admin (Entra ID, Okta, Google)     | [sso-scim-plans.md](../modules/sso-scim-plans.md)            |
+| 9   | Optional billing: Stripe products and prices, `STRIPE_PRICES`, webhook endpoint, test mode first    | Stripe account                         | [billing.md](../modules/billing.md)                          |
+| 10  | Read a week of WAF logs from real fieldwork, then set `waf_mode = "block"`                          | AWS                                    | [infra/terraform/README.md](../../infra/terraform/README.md) |
+| 11  | Restore test: restore the database and a file from AWS Backup into a scratch stack                  | AWS                                    | [database.md](database.md)                                   |
+| 12  | Production stack: repeat 2 to 5 with `environment = "production"` and `db_multi_az = true`          | AWS                                    | same                                                         |
+
+## What to watch on staging
+
+These parts were tested only against stand-ins, so they are the most likely to need adjustment:
+
+- **S3** (tested against a fake S3): an export download, a media upload and a CAPI photo.
+- **SAML and OpenID Connect** (tested against test identity providers): one sign-in per provider,
+  from a private window, with an administrator keeping a password.
+- **Stripe** (tested against a fake Stripe): one Checkout in test mode, one cancellation in the
+  portal, and the webhook log in the Stripe dashboard showing 200 answers.
+- **Terraform** (validated and plan-tested with a mocked provider): the first apply. AWS Backup of
+  the files bucket and the KMS key permissions it needs are the parts most likely to need a fix.
+- **WAF** (count mode first): CAPI sync, large exports and question text with HTML are the likely
+  false positives; three of them are already count-only (`waf_count_only_rules`).
+- **PROJEXA**: tested against PROJEXA's code run locally. Separate PROJEXA finding: a duplicate
+  client code on `POST /api/v1/clients` answers 500 instead of 409.
+
+## Product gaps that need a provider or a decision
+
+Not built because each needs a third-party service or a product decision:
+
+- Voice-over per language and transcription of open answers and recordings (a speech provider).
+- A phone dialer, call recording and do-not-call lists for CATI (a telephony provider).
+- VPN and proxy reputation for fraud checks (a commercial feed).
+- Weighting, nets, banner books and PowerPoint in analysis; MaxDiff and conjoint question types.
+- Seat-based or usage-based billing; SAML single logout and encrypted assertions.
