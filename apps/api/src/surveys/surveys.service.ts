@@ -4,6 +4,8 @@ import { analyzeSurvey, translationStatus, type AnalysisReport, type Translation
 import { emptySurvey, parsePresentation, parseSurveyDefinition, type SchemaIssue, type SurveyDefinition } from '@zapx/survey-schema';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AccessService } from '../common/access.service';
+import { WebhookService } from '../integrations/webhook.service';
 import type { AuthUser } from '../auth/auth.types';
 
 export interface CheckResult {
@@ -27,16 +29,18 @@ export class SurveysService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly access: AccessService,
+    private readonly webhooks: WebhookService,
   ) {}
 
   async getSurvey(user: AuthUser, id: string): Promise<Survey> {
-    const survey = await this.prisma.survey.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
+    const survey = await this.prisma.survey.findFirst({ where: { id, ...this.access.surveys(user) } });
     if (!survey) throw new NotFoundException('Survey not found');
     return survey;
   }
 
   async create(user: AuthUser, projectId: string, name: string) {
-    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId, deletedAt: null } });
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, ...this.access.projects(user) } });
     if (!project) throw new NotFoundException('Project not found');
     const survey = await this.prisma.$transaction(async (tx) => {
       const s = await tx.survey.create({ data: { tenantId: user.tenantId, projectId, name } });
@@ -201,6 +205,7 @@ export class SurveysService {
       await this.audit.record(user, 'survey.publish', 'survey', id, { version: v.version, warnings: check.analysis?.warnings ?? 0 }, tx);
       return v;
     });
+    await this.webhooks.emit(user.tenantId, 'survey.published', { surveyId: id, projectId: survey.projectId, version: published.version });
     return { version: published, check };
   }
 
@@ -209,6 +214,13 @@ export class SurveysService {
     if (status === 'LIVE' && !survey.liveVersionId) throw new ConflictException('Publish a version before going live');
     const updated = await this.prisma.survey.update({ where: { id }, data: { status } });
     await this.audit.record(user, 'survey.status', 'survey', id, { from: survey.status, to: status });
+    if (survey.status !== status)
+      await this.webhooks.emit(user.tenantId, 'survey.status_changed', {
+        surveyId: id,
+        projectId: survey.projectId,
+        from: survey.status,
+        to: status,
+      });
     return updated;
   }
 
@@ -236,7 +248,7 @@ export class SurveysService {
 
   async responses(user: AuthUser, id: string, opts: { includeTest: boolean; take: number }) {
     await this.getSurvey(user, id);
-    return this.prisma.response.findMany({
+    return this.prisma.forTenant(user.tenantId).response.findMany({
       where: { surveyId: id, ...(opts.includeTest ? {} : { isTest: false }) },
       orderBy: { startedAt: 'desc' },
       take: opts.take,

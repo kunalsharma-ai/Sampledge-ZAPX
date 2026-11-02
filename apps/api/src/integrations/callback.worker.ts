@@ -1,7 +1,8 @@
 /**
  * Background work of the integration module, run in-process on a timer:
  *   1. deliver due callbacks from the outbox (retries with backoff, dead letter),
- *   2. record stale unfinished interviews as partial and queue their callbacks.
+ *   2. record stale unfinished interviews as partial and queue their callbacks,
+ *   3. deliver due webhook events (Milestone 6).
  *
  * Safe with several API instances: callbacks are claimed with FOR UPDATE SKIP LOCKED and a
  * lease, and the partial sweep uses a conditional update. On AWS the same runOnce() can be
@@ -16,6 +17,7 @@ import { toIntegrationConfig } from './integration-config';
 import { RedirectRepository } from './redirect.repository';
 import { RedirectService } from './redirect.service';
 import { HttpDelivery } from './http-delivery';
+import { WebhookService, type WebhookRun } from './webhook.service';
 
 const LEASE_MS = 120_000;
 const BATCH = 25;
@@ -26,6 +28,7 @@ export interface WorkerRun {
   failed: number;
   dead: number;
   abandoned: number;
+  webhooks: WebhookRun;
 }
 
 @Injectable()
@@ -39,6 +42,7 @@ export class CallbackWorker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly redirects: RedirectService,
     private readonly http: HttpDelivery,
     private readonly box: SecretBox,
+    private readonly webhooks: WebhookService,
   ) {}
 
   onApplicationBootstrap() {
@@ -67,7 +71,14 @@ export class CallbackWorker implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private async pass(): Promise<WorkerRun> {
-    const run: WorkerRun = { delivered: 0, retrying: 0, failed: 0, dead: 0, abandoned: 0 };
+    const run: WorkerRun = {
+      delivered: 0,
+      retrying: 0,
+      failed: 0,
+      dead: 0,
+      abandoned: 0,
+      webhooks: { delivered: 0, retrying: 0, failed: 0, dead: 0 },
+    };
     const cutoff = new Date(Date.now() - config().ABANDON_AFTER_MINUTES * 60_000);
     for (const r of await this.repo.abandonStale(cutoff, 200)) {
       run.abandoned++;
@@ -78,6 +89,7 @@ export class CallbackWorker implements OnApplicationBootstrap, OnModuleDestroy {
       if (due.length === 0) break;
       for (const cb of due) run[await this.deliver(cb)]++;
     }
+    run.webhooks = await this.webhooks.deliverDue();
     return run;
   }
 

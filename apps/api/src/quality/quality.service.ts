@@ -25,6 +25,8 @@ import { allQuestions, qualitySettingsOf, type Answers, type SurveyDefinition } 
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AccessService } from '../common/access.service';
+import { WebhookService } from '../integrations/webhook.service';
 import { RedirectService } from '../integrations/redirect.service';
 import type { AuthUser } from '../auth/auth.types';
 
@@ -47,6 +49,8 @@ export class QualityService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly redirects: RedirectService,
+    private readonly access: AccessService,
+    private readonly webhooks: WebhookService,
   ) {}
 
   /**
@@ -121,7 +125,7 @@ export class QualityService {
   // ---- Review queue ---------------------------------------------------------------------------
 
   private async survey(user: AuthUser, surveyId: string) {
-    const s = await this.prisma.survey.findFirst({ where: { id: surveyId, tenantId: user.tenantId, deletedAt: null } });
+    const s = await this.prisma.survey.findFirst({ where: { id: surveyId, ...this.access.surveys(user) } });
     if (!s) throw new NotFoundException('Survey not found');
     return s;
   }
@@ -133,7 +137,7 @@ export class QualityService {
     if (filter === 'accepted') where.reviewState = 'ACCEPTED';
     if (filter === 'rejected') where.reviewState = 'REJECTED';
     if (filter === 'flagged') Object.assign(where, { qualityScore: { lt: 100 } });
-    const rows = await this.prisma.response.findMany({
+    const rows = await this.prisma.forTenant(user.tenantId).response.findMany({
       where,
       orderBy: [{ qualityScore: 'asc' }, { completedAt: 'asc' }],
       take,
@@ -185,7 +189,7 @@ export class QualityService {
     await this.survey(user, surveyId);
     const result = { accepted: 0, rejected: 0, skipped: 0 };
     for (const id of ids) {
-      const r = await this.prisma.response.findFirst({ where: { id, surveyId } });
+      const r = await this.prisma.forTenant(user.tenantId).response.findFirst({ where: { id, surveyId } });
       if (!r || r.status !== 'COMPLETE' || r.reviewState === 'REJECTED') {
         result.skipped++;
         continue;
@@ -198,6 +202,7 @@ export class QualityService {
         if (n.count === 1) {
           result.accepted++;
           await this.audit.record(user, 'quality.accept', 'response', id, { uid: r.uid, score: r.qualityScore, note: note ?? null });
+          await this.decided(r, 'accepted');
         } else result.skipped++;
         continue;
       }
@@ -229,15 +234,33 @@ export class QualityService {
       }
       result.rejected++;
       await this.redirects.outcomeRecorded(r, 'quality_fail');
+      await this.decided(r, 'rejected');
     }
     return result;
+  }
+
+  private async decided(
+    r: { id: string; tenantId: string; surveyId: string; uid: string; isTest: boolean; qualityScore: number | null },
+    decision: 'accepted' | 'rejected',
+  ) {
+    if (r.isTest) return;
+    const s = await this.prisma.survey.findUnique({ where: { id: r.surveyId }, select: { projectId: true } });
+    await this.webhooks.emit(r.tenantId, 'response.review_decided', {
+      responseId: r.id,
+      surveyId: r.surveyId,
+      projectId: s?.projectId ?? null,
+      uid: r.uid,
+      decision,
+      status: decision === 'rejected' ? 'quality_fail' : 'complete',
+      qualityScore: r.qualityScore,
+    });
   }
 
   // ---- Fieldwork dashboard ----------------------------------------------------------------------
 
   async fieldwork(user: AuthUser, surveyId: string) {
     await this.survey(user, surveyId);
-    const rows = await this.prisma.response.findMany({
+    const rows = await this.prisma.forTenant(user.tenantId).response.findMany({
       where: { surveyId, isTest: false },
       select: {
         status: true,

@@ -30,6 +30,9 @@ import { QualityController } from './quality/quality.controller';
 import { QualityService } from './quality/quality.service';
 import { CapiAppController, CapiAssignmentsController } from './capi/capi.controller';
 import { CapiService } from './capi/capi.service';
+import { ProjectMembersController } from './projects/members.controller';
+import { ApiKeysController } from './enterprise/api-keys.controller';
+import { AuditLogController } from './enterprise/audit-log.controller';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -57,6 +60,9 @@ import { CapiService } from './capi/capi.service';
     QualityController,
     CapiAssignmentsController,
     CapiAppController,
+    ProjectMembersController,
+    ApiKeysController,
+    AuditLogController,
   ],
   providers: [
     SurveysService,

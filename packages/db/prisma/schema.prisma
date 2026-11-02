@@ -35,6 +35,14 @@ enum ReviewState {
   REJECTED
 }
 
+/// Which projects a member can see (Milestone 6). Admins always see every project.
+enum ProjectScope {
+  /// Every project in the organization.
+  ALL
+  /// Only projects the member was added to (ProjectMember).
+  ASSIGNED
+}
+
 enum SurveyStatus {
   DRAFT
   LIVE
@@ -114,28 +122,46 @@ model User {
   name            String
   passwordHash    String
   role            Role             @default(PROGRAMMER)
+  projectScope    ProjectScope     @default(ALL)
   createdAt       DateTime         @default(now())
   capiAssignments CapiAssignment[]
   capiInterviews  Response[]       @relation("CapiInterviewer")
+  projects        ProjectMember[]
+  apiKeys         ApiKey[]
 
   @@index([tenantId])
 }
 
 model Project {
-  id               String    @id @default(cuid())
+  id               String          @id @default(cuid())
   tenantId         String
-  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  tenant           Tenant          @relation(fields: [tenantId], references: [id])
   name             String
   client           String?
   /// Project-level redirect defaults: {urls, words, countries}. Vendors override these.
-  redirectDefaults Json      @default("{}")
-  createdAt        DateTime  @default(now())
+  redirectDefaults Json            @default("{}")
+  createdAt        DateTime        @default(now())
   /// Soft delete: hidden everywhere, kept for audit and data retention.
   deletedAt        DateTime?
   surveys          Survey[]
   vendors          Vendor[]
+  members          ProjectMember[]
 
   @@index([tenantId, deletedAt])
+}
+
+/// A member with ASSIGNED project scope can see and work on this project (Milestone 6).
+model ProjectMember {
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  tenantId  String
+  addedById String?
+  createdAt DateTime @default(now())
+
+  @@id([projectId, userId])
+  @@index([userId])
 }
 
 model Survey {
@@ -511,4 +537,67 @@ model CapiAssignment {
 
   @@unique([surveyId, interviewerId])
   @@index([tenantId, interviewerId])
+}
+
+/// Organization API key (Milestone 6). Acts as the member who created it, with at most the key's
+/// role. Only a SHA-256 hash of the secret is stored; the full key is shown once.
+model ApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  name        String
+  /// Public part of the key ("zapx_<prefix>_<secret>"), used to look it up.
+  prefix      String    @unique
+  secretHash  String
+  /// PROGRAMMER or VIEWER. The effective role is the lower of this and the creator's role.
+  role        Role
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+/// Outbound webhook subscription (Milestone 6). Payloads are signed and never carry answers.
+model Webhook {
+  id          String            @id @default(cuid())
+  tenantId    String
+  url         String
+  description String?
+  /// Event types, e.g. ["response.finished", "survey.published"].
+  events      String[]
+  /// Signing secret sealed with SecretBox (it must be readable to sign).
+  secretEnc   String
+  active      Boolean           @default(true)
+  createdById String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deliveries  WebhookDelivery[]
+
+  @@index([tenantId])
+}
+
+/// Outbox row for one webhook event: delivered by the background worker with retries.
+model WebhookDelivery {
+  id             String        @id @default(cuid())
+  tenantId       String
+  webhookId      String
+  webhook        Webhook       @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+  event          String
+  /// The exact JSON body that is signed and sent.
+  payload        Json
+  state          CallbackState @default(PENDING)
+  attempts       Int           @default(0)
+  maxAttempts    Int           @default(6)
+  nextAttemptAt  DateTime      @default(now())
+  lastHttpStatus Int?
+  lastError      String?
+  deliveredAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([state, nextAttemptAt])
+  @@index([webhookId, createdAt])
 }

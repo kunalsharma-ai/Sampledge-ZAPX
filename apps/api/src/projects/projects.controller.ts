@@ -2,6 +2,7 @@ import { Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundExc
 import { z } from 'zod';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AccessService, isScoped } from '../common/access.service';
 import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
@@ -13,12 +14,13 @@ export class ProjectsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly access: AccessService,
   ) {}
 
   @Get()
   list(@CurrentUser() user: AuthUser) {
     return this.prisma.project.findMany({
-      where: { tenantId: user.tenantId, deletedAt: null },
+      where: this.access.projects(user),
       orderBy: { createdAt: 'desc' },
       include: { _count: { select: { surveys: { where: { deletedAt: null } }, vendors: { where: { deletedAt: null } } } } },
     });
@@ -28,7 +30,14 @@ export class ProjectsController {
   @Roles(...CAN_EDIT)
   async create(@CurrentUser() user: AuthUser, @Body() body: unknown) {
     const input = parseBody(createSchema, body);
-    const project = await this.prisma.project.create({ data: { ...input, tenantId: user.tenantId } });
+    const project = await this.prisma.project.create({
+      // A member who only sees assigned projects is added to the project they create.
+      data: {
+        ...input,
+        tenantId: user.tenantId,
+        ...(isScoped(user) ? { members: { create: { userId: user.id, tenantId: user.tenantId } } } : {}),
+      },
+    });
     await this.audit.record(user, 'project.create', 'project', project.id, input);
     return project;
   }
@@ -36,7 +45,7 @@ export class ProjectsController {
   @Get(':id')
   async get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const project = await this.prisma.project.findFirst({
-      where: { id, tenantId: user.tenantId, deletedAt: null },
+      where: { id, ...this.access.projects(user) },
       include: {
         surveys: { where: { deletedAt: null }, orderBy: { createdAt: 'desc' } },
         vendors: {
@@ -59,7 +68,7 @@ export class ProjectsController {
   @HttpCode(204)
   async remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const project = await this.prisma.project.findFirst({
-      where: { id, tenantId: user.tenantId, deletedAt: null },
+      where: { id, ...this.access.projects(user) },
       include: { surveys: { where: { deletedAt: null } } },
     });
     if (!project) throw new NotFoundException('Project not found');
@@ -77,7 +86,7 @@ export class ProjectsController {
   @Get(':id/audit')
   async audit_(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     const project = await this.prisma.project.findFirst({
-      where: { id, tenantId: user.tenantId },
+      where: { id, ...this.access.projects(user), deletedAt: undefined },
       include: { surveys: true, vendors: true },
     });
     if (!project) throw new NotFoundException('Project not found');

@@ -2,6 +2,7 @@ import { Body, Controller, ForbiddenException, Get, NotFoundException, Param, Po
 import type { Prisma } from '@zapx/db';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AccessService } from '../common/access.service';
 import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
@@ -17,10 +18,11 @@ export class IntegrationsController {
     private readonly audit: AuditService,
     private readonly repo: RedirectRepository,
     private readonly worker: CallbackWorker,
+    private readonly access: AccessService,
   ) {}
 
   private async vendor(user: AuthUser, id: string) {
-    const v = await this.prisma.vendor.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
+    const v = await this.prisma.vendor.findFirst({ where: { id, ...this.access.vendors(user) } });
     if (!v) throw new NotFoundException('Vendor not found');
     return v;
   }
@@ -58,7 +60,7 @@ export class IntegrationsController {
 
   @Get('projects/:id/redirect-defaults')
   async projectDefaults(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    const p = await this.prisma.project.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
+    const p = await this.prisma.project.findFirst({ where: { id, ...this.access.projects(user) } });
     if (!p) throw new NotFoundException('Project not found');
     return readLayer(p.redirectDefaults);
   }
@@ -66,7 +68,7 @@ export class IntegrationsController {
   @Put('projects/:id/redirect-defaults')
   @Roles(...CAN_EDIT)
   async saveProjectDefaults(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
-    const p = await this.prisma.project.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
+    const p = await this.prisma.project.findFirst({ where: { id, ...this.access.projects(user) } });
     if (!p) throw new NotFoundException('Project not found');
     const layer = parseBody(layerSchema, body);
     await this.prisma.project.update({ where: { id }, data: { redirectDefaults: layer as Prisma.InputJsonValue } });

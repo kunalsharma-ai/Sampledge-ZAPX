@@ -99,8 +99,9 @@ export class AuthController {
   async me(@CurrentUser() user: AuthUser) {
     const u = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { id: true, email: true, name: true, role: true, tenant: { select: { id: true, name: true } } },
+      select: { id: true, email: true, name: true, role: true, projectScope: true, tenant: { select: { id: true, name: true } } },
     });
-    return u;
+    // With an API key the effective role can be lower than the member's own.
+    return { ...u, role: user.role, viaApiKey: user.apiKeyId ?? null };
   }
 }

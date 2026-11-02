@@ -104,6 +104,9 @@ export class ChangeSetsService {
   async get(user: AuthUser, id: string): Promise<ChangeSet & { stale: boolean }> {
     const cs = await this.prisma.changeSet.findFirst({ where: { id, tenantId: user.tenantId } });
     if (!cs) throw new NotFoundException('Change set not found');
+    await this.surveys.getSurvey(user, cs.surveyId).catch(() => {
+      throw new NotFoundException('Change set not found');
+    });
     return { ...cs, stale: cs.status === 'PROPOSED' && !(await this.isCurrent(cs)) };
   }
 

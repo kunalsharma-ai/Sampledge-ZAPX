@@ -7,6 +7,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { Response, Vendor } from '@zapx/db';
 import { planCallback, resolveRedirect, type RedirectStatus, type ResolvedRedirect, type RespondentContext } from '@zapx/redirect-core';
 import { SecretBox } from '../platform/secret-box';
+import { WebhookService } from './webhook.service';
 import { toIntegrationConfig } from './integration-config';
 import { RedirectRepository } from './redirect.repository';
 
@@ -34,7 +35,7 @@ export abstract class RedirectService {
     status: RedirectStatus,
     meta: RedirectMeta,
   ): Promise<ResolvedRedirect>;
-  /** An outcome was recorded on a response: queue the vendor callback, if any. Never throws. */
+  /** An outcome was recorded on a response: queue the vendor callback, if any, and webhook events. Never throws. */
   abstract outcomeRecorded(
     response: Pick<Response, 'id' | 'tenantId' | 'vendorId' | 'uid' | 'country' | 'returnUrl' | 'entryParams' | 'isTest'>,
     status: RedirectStatus,
@@ -52,6 +53,7 @@ export class LocalRedirectService extends RedirectService {
   constructor(
     private readonly repo: RedirectRepository,
     private readonly box: SecretBox,
+    private readonly webhooks: WebhookService,
   ) {
     super();
   }
@@ -90,7 +92,9 @@ export class LocalRedirectService extends RedirectService {
   }
 
   async outcomeRecorded(response: Parameters<RedirectService['outcomeRecorded']>[0], status: RedirectStatus) {
-    if (response.isTest || !response.vendorId) return;
+    if (response.isTest) return;
+    await this.webhooks.responseFinished(response.id, status);
+    if (!response.vendorId) return;
     try {
       const ctx = await this.repo.vendorContext(response.vendorId);
       if (!ctx) return;

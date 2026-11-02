@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { Prisma, Vendor } from '@zapx/db';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AccessService } from '../common/access.service';
 import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
@@ -75,10 +76,11 @@ export class VendorsController {
     private readonly audit: AuditService,
     private readonly redirects: RedirectService,
     private readonly box: SecretBox,
+    private readonly access: AccessService,
   ) {}
 
   private async own(user: AuthUser, id: string): Promise<Vendor> {
-    const v = await this.prisma.vendor.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
+    const v = await this.prisma.vendor.findFirst({ where: { id, ...this.access.vendors(user) } });
     if (!v) throw new NotFoundException('Vendor not found');
     return v;
   }
@@ -121,7 +123,7 @@ export class VendorsController {
   @Get('projects/:projectId/vendors')
   async list(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string) {
     const rows = await this.prisma.vendor.findMany({
-      where: { projectId, tenantId: user.tenantId, deletedAt: null },
+      where: { projectId, ...this.access.vendors(user) },
       orderBy: { createdAt: 'asc' },
     });
     return rows.map(presentVendor);
@@ -130,7 +132,7 @@ export class VendorsController {
   @Post('projects/:projectId/vendors')
   @Roles(...CAN_EDIT)
   async create(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string, @Body() body: unknown) {
-    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId, deletedAt: null } });
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, ...this.access.projects(user) } });
     if (!project) throw new NotFoundException('Project not found');
     const data = this.toData(parseBody(vendorSchema, body));
     const taken = await this.prisma.vendor.findUnique({ where: { projectId_code: { projectId, code: data.code } } });
