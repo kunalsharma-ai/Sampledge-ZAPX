@@ -1,0 +1,107 @@
+openapi: 3.1.0
+info:
+  title: ZAPX CAPI app API
+  version: 1.0.0
+  description: |
+    Used by the offline interviewer app (apps/capi). Requires a signed-in user with the INTERVIEWER
+    role: the session cookie from POST /api/auth/login (then every POST needs the header
+    `x-zapx-csrf: 1`) or `Authorization: Bearer <token>`. Behaviour is described in
+    docs/modules/capi.md and docs/adr/0008-capi-offline-app.md.
+servers:
+  - url: https://{host}/api
+    variables:
+      host: { default: capi.zapx.example.com }
+paths:
+  /capi/package:
+    get:
+      summary: The live version of every survey assigned to the interviewer
+      responses:
+        '200':
+          description: Survey package for offline use
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Package' }
+        '401': { description: Not signed in }
+        '403': { description: Not an interviewer }
+  /capi/sync:
+    post:
+      summary: Upload finished interviews (idempotent by clientId)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SyncRequest' }
+      responses:
+        '200':
+          description: One result per interview, in order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [results]
+                properties:
+                  results: { type: array, items: { $ref: '#/components/schemas/SyncResult' } }
+        '400': { description: Invalid body }
+        '401': { description: Not signed in (keep the interviews and sign in again) }
+        '403': { description: Not an interviewer }
+components:
+  schemas:
+    Package:
+      type: object
+      required: [interviewer, generatedAt, surveys]
+      properties:
+        interviewer:
+          type: object
+          properties: { id: { type: string }, name: { type: string }, email: { type: string } }
+        generatedAt: { type: string, format: date-time }
+        surveys:
+          type: array
+          items:
+            type: object
+            required: [assignmentId, surveyId, name, status, version]
+            properties:
+              assignmentId: { type: string }
+              surveyId: { type: string }
+              name: { type: string }
+              status: { type: string, enum: [DRAFT, LIVE, PAUSED, CLOSED], description: Only LIVE accepts new interviews. }
+              target: { type: [integer, 'null'] }
+              completesSynced: { type: integer }
+              version:
+                type: object
+                properties:
+                  id: { type: string }
+                  version: { type: integer }
+                  definition: { type: object, description: Survey definition (packages/survey-schema). }
+                  presentation: { type: object, description: Theme, languages and device settings. }
+    SyncRequest:
+      type: object
+      required: [deviceId, interviews]
+      properties:
+        deviceId: { type: string, format: uuid, description: Random id of the app installation. }
+        interviews:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: object
+            required: [clientId, surveyId, versionId, answers, startedAt, finishedAt, durationMs]
+            properties:
+              clientId: { type: string, format: uuid }
+              surveyId: { type: string }
+              versionId: { type: string, description: The published version the interview was recorded on. }
+              answers: { type: object, additionalProperties: true }
+              startedAt: { type: string, format: date-time }
+              finishedAt: { type: string, format: date-time }
+              durationMs: { type: number, minimum: 0 }
+              language: { type: string }
+              endedEarly: { type: boolean }
+    SyncResult:
+      type: object
+      required: [clientId, result]
+      properties:
+        clientId: { type: string }
+        result: { type: string, enum: [stored, already_synced, rejected] }
+        status:
+          type: string
+          enum: [complete, terminate, quota_full, quality_fail, partial, technical_error]
+        reason: { type: string }

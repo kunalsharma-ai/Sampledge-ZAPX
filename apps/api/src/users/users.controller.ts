@@ -11,7 +11,7 @@ const createSchema = z.object({
   name: z.string().min(1).max(120),
   email: z.string().email().toLowerCase(),
   password: z.string().min(10).max(200),
-  role: z.enum(['ADMIN', 'PROGRAMMER', 'VIEWER']),
+  role: z.enum(['ADMIN', 'PROGRAMMER', 'VIEWER', 'INTERVIEWER']),
 });
 
 /** Team members within the caller's tenant. Admins only. */

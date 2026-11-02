@@ -217,7 +217,7 @@ export class SurveysController {
         ...(statusFilter ? { status: { in: statusFilter } } : {}),
       },
       orderBy: { startedAt: 'asc' },
-      include: { vendor: { select: { code: true } }, version: { select: { version: true } } },
+      include: { vendor: { select: { code: true } }, version: { select: { version: true } }, interviewer: { select: { email: true } } },
     });
     const columns = this.exporter.columns(versions);
     const name = survey.name.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60) || 'survey';

@@ -40,6 +40,9 @@ export class AuthGuard implements CanActivate {
     req.user = { id: payload.sub, tenantId: payload.tid, role: payload.role, email: payload.email };
 
     const roles = this.reflector.getAllAndOverride<RoleName[] | undefined>(ROLES, targets);
+    // Interviewers are deny-by-default: they reach only endpoints that list them explicitly
+    // (the CAPI app API), never the studio's projects, surveys, data or settings.
+    if (req.user.role === 'INTERVIEWER' && !roles?.includes('INTERVIEWER')) throw new ForbiddenException('Your role cannot do this');
     if (roles && !roles.includes(req.user.role)) throw new ForbiddenException('Your role cannot do this');
     return true;
   }

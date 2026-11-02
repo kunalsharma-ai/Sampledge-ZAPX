@@ -5,3 +5,4 @@ export * from './simulate.js';
 export * from './diff.js';
 export * from './localize.js';
 export * from './device.js';
+export * from './replay.js';

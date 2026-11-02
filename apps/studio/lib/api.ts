@@ -34,7 +34,7 @@ export interface Me {
   id: string;
   email: string;
   name: string;
-  role: 'ADMIN' | 'PROGRAMMER' | 'VIEWER';
+  role: 'ADMIN' | 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
   tenant: { id: string; name: string };
 }
 

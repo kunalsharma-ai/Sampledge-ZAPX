@@ -18,6 +18,8 @@ import { Assist } from '@/components/Assist';
 import { QaLab } from '@/components/QaLab';
 import { DesignStudio } from '@/components/DesignStudio';
 import { Languages } from '@/components/Languages';
+import { Quality } from '@/components/Quality';
+import { CapiAssignments } from '@/components/CapiAssignments';
 
 interface SurveyDetail {
   id: string;
@@ -37,7 +39,7 @@ interface DraftVersion {
   presentation: unknown;
 }
 
-type Tab = 'build' | 'json' | 'assist' | 'design' | 'languages' | 'preview' | 'qa' | 'distribute' | 'results';
+type Tab = 'build' | 'json' | 'assist' | 'design' | 'languages' | 'preview' | 'qa' | 'distribute' | 'capi' | 'quality' | 'results';
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -226,6 +228,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             ['preview', 'Preview'],
             ['qa', 'QA lab'],
             ['distribute', 'Links & status'],
+            ['capi', 'Interviewers'],
+            ['quality', 'Quality & fieldwork'],
             ['results', 'Quotas & data'],
           ] as Array<[Tab, string]>
         ).map(([k, label]) => (
@@ -268,6 +272,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       {tab === 'assist' ? <Assist surveyId={id} language={def.language} readOnly={readOnly} dirty={unsaved} onApplied={load} /> : null}
       {tab === 'qa' ? <QaLab surveyId={id} readOnly={readOnly} dirty={dirty} hasLive={!!survey.liveVersionId} /> : null}
       {tab === 'distribute' ? <Distribute survey={survey} readOnly={readOnly} onChanged={load} /> : null}
+      {tab === 'capi' ? <CapiAssignments surveyId={id} readOnly={readOnly} hasLive={!!survey.liveVersionId} /> : null}
+      {tab === 'quality' ? <Quality surveyId={id} def={def} readOnly={readOnly} onChange={edit} /> : null}
       {tab === 'results' ? <Results surveyId={id} /> : null}
     </Shell>
   );
@@ -543,6 +549,10 @@ interface ResponseRow {
   completedAt: string | null;
   vendor: { code: string } | null;
   version: { version: number };
+  mode: 'CAWI' | 'CAPI';
+  qualityScore: number | null;
+  reviewState: string;
+  interviewer: { name: string } | null;
 }
 
 function Results({ surveyId }: { surveyId: string }) {
@@ -628,6 +638,7 @@ function Results({ surveyId }: { surveyId: string }) {
                 <th>Language · device</th>
                 <th>Status</th>
                 <th>Reason</th>
+                <th>Quality</th>
                 <th>Version</th>
                 <th>Started</th>
               </tr>
@@ -638,12 +649,18 @@ function Results({ surveyId }: { surveyId: string }) {
                   <td className="mono">
                     {r.uid} {r.isTest ? <span className="badge">test</span> : null}
                   </td>
-                  <td>{r.vendor?.code ?? '—'}</td>
+                  <td>{r.vendor?.code ?? (r.interviewer ? `CAPI · ${r.interviewer.name}` : '—')}</td>
                   <td>{[r.language, r.device].filter(Boolean).join(' · ') || '—'}</td>
                   <td>
                     <span className={`badge ${r.status.toLowerCase()}`}>{r.status.toLowerCase()}</span>
                   </td>
                   <td className="mono small">{r.outcomeReason ?? ''}</td>
+                  <td>
+                    {r.qualityScore ?? '—'}
+                    {r.reviewState !== 'NONE' ? (
+                      <span className={`badge ${r.reviewState.toLowerCase()}`}> {r.reviewState.toLowerCase()}</span>
+                    ) : null}
+                  </td>
                   <td>v{r.version.version}</td>
                   <td className="small">{new Date(r.startedAt).toLocaleString()}</td>
                 </tr>

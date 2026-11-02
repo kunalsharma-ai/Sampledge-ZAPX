@@ -42,6 +42,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { isAllowedReturnUrl, verifySignedParams } from '@zapx/redirect-core';
 import { RedirectService } from '../integrations/redirect.service';
+import { MAX_PAGE_MS, QualityService } from '../quality/quality.service';
 
 const MAX_PARAMS = 30;
 const MAX_PARAM_LENGTH = 2000;
@@ -139,6 +140,8 @@ export function interviewContext(version: { definition: unknown; presentation: u
 
 export interface EntryMeta {
   userAgent?: string;
+  /** Network address, used only as a keyed hash for same-network quality checks. */
+  ip?: string;
   acceptLanguage?: string;
   client?: DeviceHints;
 }
@@ -155,6 +158,11 @@ function validTestSignature(surveyId: string, uid: string, sig: string | undefin
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
+interface Timing {
+  durationMs: number;
+  lastPageId: string;
+}
+
 class QuotaFull extends Error {
   constructor(public readonly quotaId: string) {
     super(quotaId);
@@ -169,6 +177,7 @@ export class InterviewService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly redirects: RedirectService,
+    private readonly quality: QualityService,
   ) {}
 
   // ---- Entry --------------------------------------------------------------------------------
@@ -250,6 +259,7 @@ export class InterviewService {
 
     const def = sourceDef;
     const token = randomBytes(32).toString('base64url');
+    const firstPage = nextPageIndex(def, {}, -1);
     try {
       const response = await this.prisma.response.create({
         data: {
@@ -260,7 +270,11 @@ export class InterviewService {
           uid,
           country: params.cc?.slice(0, 10) ?? null,
           isTest,
-          currentPage: nextPageIndex(def, {}, -1),
+          currentPage: firstPage,
+          lastPageId: def.pages[firstPage]?.id ?? null,
+          pageShownAt: new Date(),
+          durationMs: 0,
+          ipHash: this.quality.networkHash(survey.tenantId, meta.ip),
           entryParams: entryParams as Prisma.InputJsonValue,
           returnUrl,
           sessionTokenHash: hashToken(token),
@@ -284,7 +298,11 @@ export class InterviewService {
   private async reenter(existing: Response, vendor: Vendor | null) {
     if (existing.status === 'IN_PROGRESS') {
       const token = randomBytes(32).toString('base64url');
-      const updated = await this.prisma.response.update({ where: { id: existing.id }, data: { sessionTokenHash: hashToken(token) } });
+      // Time away is not interview time: the clock restarts when the page is shown again.
+      const updated = await this.prisma.response.update({
+        where: { id: existing.id },
+        data: { sessionTokenHash: hashToken(token), pageShownAt: new Date() },
+      });
       return { ...(await this.stateOf(updated, await this.ctxOf(updated), vendor)), token };
     }
     return this.outcomeState(vendor, existing, 'duplicate', await this.ctxOf(existing), undefined, 'reentry');
@@ -469,21 +487,30 @@ export class InterviewService {
     const result = validatePage(def, page, prior, submitted, ctx.msg);
     if (!result.ok) throw new InterviewValidationError(result.errors);
     const answers: Answers = { ...prior, ...result.answers };
+    const now = new Date();
+    const onPage = r.pageShownAt ? Math.min(MAX_PAGE_MS, Math.max(0, now.getTime() - r.pageShownAt.getTime())) : 0;
+    const timing = { durationMs: (r.durationMs ?? 0) + onPage, lastPageId: page.id };
 
     const termination = firstMatchingTermination(def, answers);
-    if (termination) return this.finish(r, ctx, vendor, answers, termination.status, termination.id);
+    if (termination) return this.finish(r, ctx, vendor, answers, termination.status, termination.id, timing);
 
     if (!r.isTest) {
       const full = await this.firstFullQuota(r.surveyId, def, answers);
-      if (full) return this.finish(r, ctx, vendor, answers, 'quota_full', full);
+      if (full) return this.finish(r, ctx, vendor, answers, 'quota_full', full, timing);
     }
 
     const next = nextPageIndex(def, answers, r.currentPage);
-    if (next === -1) return this.complete(r, ctx, vendor, answers);
+    if (next === -1) return this.complete(r, ctx, vendor, answers, timing);
 
     const moved = await this.prisma.response.updateMany({
       where: { id: r.id, status: 'IN_PROGRESS', currentPage: r.currentPage },
-      data: { answers: answers as Prisma.InputJsonValue, currentPage: next },
+      data: {
+        answers: answers as Prisma.InputJsonValue,
+        currentPage: next,
+        pageShownAt: now,
+        durationMs: timing.durationMs,
+        lastPageId: def.pages[next]!.id,
+      },
     });
     if (moved.count === 0) throw new ConflictException('This page was already submitted. Reload to continue.');
     return this.stateOf({ ...r, answers: answers as Prisma.JsonValue, currentPage: next }, ctx, vendor);
@@ -504,7 +531,10 @@ export class InterviewService {
       }
     }
     if (prev === -1) return this.stateOf(r, ctx, vendor);
-    await this.prisma.response.update({ where: { id: r.id }, data: { currentPage: prev } });
+    await this.prisma.response.update({
+      where: { id: r.id },
+      data: { currentPage: prev, pageShownAt: new Date(), lastPageId: def.pages[prev]!.id },
+    });
     return this.stateOf({ ...r, currentPage: prev }, ctx, vendor);
   }
 
@@ -520,8 +550,15 @@ export class InterviewService {
   }
 
   /** Complete the interview, counting it toward every matching quota atomically (no overfill). */
-  private async complete(r: Response, ctx: Ctx, vendor: Vendor | null, answers: Answers): Promise<InterviewState> {
+  private async complete(r: Response, ctx: Ctx, vendor: Vendor | null, answers: Answers, timing: Timing): Promise<InterviewState> {
     const def = ctx.def;
+    // Quality is decided before the quota place is taken: an in-survey quality reject never counts.
+    const assessment = await this.quality.assess(r, def, answers, timing.durationMs);
+    const scored = { ...timing, ...this.quality.fields(def, assessment, r.isTest) };
+    if (assessment.decision === 'reject') {
+      const codes = [...new Set(assessment.flags.map((f) => f.code))].join(',');
+      return this.finish(r, ctx, vendor, answers, 'quality_fail', `quality:${codes}`.slice(0, 200), scored);
+    }
     const quotas = r.isTest ? [] : matchingQuotas(def, answers);
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -532,14 +569,15 @@ export class InterviewService {
         }
         const done = await tx.response.updateMany({
           where: { id: r.id, status: 'IN_PROGRESS' },
-          data: { status: 'COMPLETE', answers: answers as Prisma.InputJsonValue, currentPage: -1, completedAt: new Date() },
+          data: { status: 'COMPLETE', answers: answers as Prisma.InputJsonValue, currentPage: -1, completedAt: new Date(), ...scored },
         });
         if (done.count === 0) throw new ConflictException('This interview has already finished.');
       });
     } catch (e) {
-      if (e instanceof QuotaFull) return this.finish(r, ctx, vendor, answers, 'quota_full', e.quotaId);
+      if (e instanceof QuotaFull) return this.finish(r, ctx, vendor, answers, 'quota_full', e.quotaId, timing);
       throw e;
     }
+    await this.quality.rememberOpenEnds(r, def, answers);
     await this.redirects.outcomeRecorded(r, 'complete');
     return this.outcomeState(vendor, r, 'complete', ctx);
   }
@@ -551,10 +589,12 @@ export class InterviewService {
     answers: Answers,
     status: OutcomeStatus,
     reason: string,
+    extra: Partial<Prisma.ResponseUpdateManyMutationInput> = {},
   ): Promise<InterviewState> {
     const changed = await this.prisma.response.updateMany({
       where: { id: r.id, status: 'IN_PROGRESS' },
       data: {
+        ...extra,
         status: toEnum(status),
         outcomeReason: reason,
         answers: answers as Prisma.InputJsonValue,

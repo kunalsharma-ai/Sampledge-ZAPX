@@ -26,6 +26,10 @@ import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
 import { AiGateway } from './ai/ai-gateway';
 import { AiUsageRepository } from './ai/ai-usage.repository';
 import { AiSettingsController } from './ai/ai-settings.controller';
+import { QualityController } from './quality/quality.controller';
+import { QualityService } from './quality/quality.service';
+import { CapiAppController, CapiAssignmentsController } from './capi/capi.controller';
+import { CapiService } from './capi/capi.service';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -50,6 +54,9 @@ import { AiSettingsController } from './ai/ai-settings.controller';
     ChangeSetsController,
     TranslateController,
     AiSettingsController,
+    QualityController,
+    CapiAssignmentsController,
+    CapiAppController,
   ],
   providers: [
     SurveysService,
@@ -59,6 +66,8 @@ import { AiSettingsController } from './ai/ai-settings.controller';
     ArchitectService,
     AiGateway,
     AiUsageRepository,
+    QualityService,
+    CapiService,
     {
       // Provider registry: AI_PROVIDER picks the implementation. Adding OpenAI or Gemini means
       // one more AiProvider subclass and one more case here (docs/modules/ai-gateway.md).

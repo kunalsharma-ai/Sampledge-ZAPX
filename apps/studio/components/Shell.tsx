@@ -34,7 +34,18 @@ export function Shell({ children, crumbs }: { children: ReactNode; crumbs?: Reac
           Sign out
         </button>
       </header>
-      <main className="container">{children}</main>
+      <main className="container">
+        {me?.role === 'INTERVIEWER' ? (
+          <section className="panel" data-testid="interviewer-notice">
+            <h1>Use the interviewer app</h1>
+            <p>
+              Your account is for face-to-face interviewing. Sign in to the ZAPX interviewer (CAPI) app on your tablet or phone instead.
+            </p>
+          </section>
+        ) : (
+          children
+        )}
+      </main>
     </>
   );
 }
