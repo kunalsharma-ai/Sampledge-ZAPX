@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptySurvey, parseSurveyDefinition } from './index.js';
+import { defaultPresentation, emptySurvey, parsePresentation, parseSurveyDefinition } from './index.js';
 
 describe('survey definition schema', () => {
   it('applies defaults and accepts the starter survey', () => {
@@ -29,5 +29,16 @@ describe('survey definition schema', () => {
     expect(
       parseSurveyDefinition({ schemaVersion: 1, title: 't', pages: [{ id: 'P1', questions: [{ id: 'Q1', type: 'single', text: 'x', options: [] }] }] }).ok,
     ).toBe(false);
+  });
+});
+
+describe('presentation', () => {
+  it('fills defaults and rejects unsafe logos and bad colours', () => {
+    expect(defaultPresentation().theme.accent).toBe('#2f5bea');
+    expect(defaultPresentation().devices.allowed).toEqual(['desktop', 'tablet', 'mobile']);
+    expect(parsePresentation({ theme: { logo: 'data:image/svg+xml;base64,PHN2Zz4=' } }).ok).toBe(false);
+    expect(parsePresentation({ theme: { accent: 'red' } }).ok).toBe(false);
+    expect(parsePresentation({ theme: { logo: 'data:image/png;base64,iVBORw0KGgo=' } }).ok).toBe(true);
+    expect(parsePresentation({ languages: [{ tag: 'not a tag', name: 'x' }] }).ok).toBe(false);
   });
 });

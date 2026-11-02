@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { BetaContentBlockParam, BetaMessage } from '@anthropic-ai/sdk/resources/beta/messages/messages';
-import { AiError, AiProvider, type ArchitectRequest, type ArchitectResult } from './ai-provider';
-import { ARCHITECT_SYSTEM } from './prompts';
+import { AiError, AiProvider, type ArchitectRequest, type ArchitectResult, type TranslateRequest, type TranslateResult } from './ai-provider';
+import { ARCHITECT_SYSTEM, TRANSLATOR_SYSTEM } from './prompts';
 
 /** JSON schema the model's answer must follow (structured outputs). */
 const OUTPUT_SCHEMA = {
@@ -12,6 +12,23 @@ const OUTPUT_SCHEMA = {
     summary: { type: 'string' },
     assumptions: { type: 'array', items: { type: 'string' } },
     definition_json: { type: 'string' },
+  },
+} as const;
+
+const TRANSLATION_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['translations'],
+  properties: {
+    translations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['key', 'text'],
+        properties: { key: { type: 'string' }, text: { type: 'string' } },
+      },
+    },
   },
 } as const;
 
@@ -107,6 +124,54 @@ export class ClaudeAiProvider extends AiProvider {
       usage: { inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens },
     };
   }
+
+  async translate(req: TranslateRequest): Promise<TranslateResult> {
+    let message: BetaMessage;
+    const payload = JSON.stringify(req.items.map((i) => ({ key: i.key, context: i.context, text: i.text })));
+    try {
+      message = await this.client.beta.messages
+        .stream({
+          model: this.model,
+          max_tokens: 32000,
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+          thinking: { type: 'adaptive' },
+          output_config: { effort: 'medium', format: { type: 'json_schema', schema: TRANSLATION_SCHEMA } },
+          system: TRANSLATOR_SYSTEM,
+          messages: [
+            {
+              role: 'user',
+              content:
+                `Survey: ${req.surveyTitle}\nTranslate from ${req.from.name} (${req.from.tag}) into ${req.to.name} (${req.to.tag}).\n` +
+                `Items (JSON array of {key, context, text}):\n<items>\n${payload.replace(/<\/items/gi, '<\\/items')}\n</items>`,
+            },
+          ],
+        })
+        .finalMessage();
+    } catch (err) {
+      throw mapError(err);
+    }
+    let parsed: { translations?: Array<{ key?: unknown; text?: unknown }> };
+    try {
+      parsed = JSON.parse(finalText(message));
+    } catch (e) {
+      if (e instanceof AiError) throw e;
+      throw new AiError('The AI returned translations that could not be read. Try again.', 502, 'BAD_OUTPUT');
+    }
+    const translations: Record<string, string> = {};
+    for (const t of parsed.translations ?? []) if (typeof t.key === 'string' && typeof t.text === 'string') translations[t.key] = t.text;
+    return { translations, model: message.model };
+  }
+}
+
+function finalText(message: BetaMessage): string {
+  if (message.stop_reason === 'refusal') {
+    throw new AiError('The AI declined this request.', 422, 'REFUSED');
+  }
+  if (message.stop_reason === 'max_tokens') {
+    throw new AiError('The AI answer was cut off because it was too long. Try fewer texts at a time.', 422, 'TOO_LONG');
+  }
+  return message.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
 }
 
 function mapError(err: unknown): AiError {
@@ -129,8 +194,13 @@ export class UnconfiguredAiProvider extends AiProvider {
     super();
   }
   architect(): Promise<ArchitectResult> {
-    return Promise.reject(
-      new AiError('AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED'),
-    );
+    return Promise.reject(notConfigured());
   }
+  translate(): Promise<TranslateResult> {
+    return Promise.reject(notConfigured());
+  }
+}
+
+export function notConfigured(): AiError {
+  return new AiError('AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED');
 }

@@ -14,7 +14,7 @@ interface Column {
   get(r: ExportRow): string | number | null;
 }
 
-type ExportRow = Pick<Response, 'id' | 'uid' | 'country' | 'status' | 'outcomeReason' | 'isTest' | 'startedAt' | 'completedAt' | 'answers'> & {
+type ExportRow = Pick<Response, 'id' | 'uid' | 'country' | 'language' | 'device' | 'status' | 'outcomeReason' | 'isTest' | 'startedAt' | 'completedAt' | 'answers'> & {
   vendor: { code: string } | null;
   version: { version: number };
 };
@@ -39,6 +39,8 @@ export class ExportService {
       { key: 'uid', label: 'Respondent id (UID)', get: (r) => r.uid },
       { key: 'vendor', label: 'Vendor code', get: (r) => r.vendor?.code ?? null },
       { key: 'country', label: 'Country', get: (r) => r.country },
+      { key: 'language', label: 'Language', get: (r) => r.language },
+      { key: 'device', label: 'Device', get: (r) => r.device },
       { key: 'status', label: 'Status', get: (r) => r.status.toLowerCase() },
       { key: 'outcome_reason', label: 'Termination or quota that ended the interview', get: (r) => r.outcomeReason },
       { key: 'survey_version', label: 'Survey version answered', get: (r) => r.version.version },

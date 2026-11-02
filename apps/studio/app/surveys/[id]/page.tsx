@@ -1,8 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { use, useCallback, useEffect, useMemo, useState } from 'react';
-import { analyzeSurvey, type AnalysisReport } from '@zapx/logic-engine';
-import { parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
+import { analyzeSurvey, translationStatus, type AnalysisReport } from '@zapx/logic-engine';
+import { defaultPresentation, parsePresentation, parseSurveyDefinition, type Presentation, type SurveyDefinition } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { CopyField, ErrorNote, Shell } from '@/components/Shell';
@@ -10,6 +10,8 @@ import { VisualEditor } from '@/components/VisualEditor';
 import { Preview } from '@/components/Preview';
 import { Assist } from '@/components/Assist';
 import { QaLab } from '@/components/QaLab';
+import { DesignStudio } from '@/components/DesignStudio';
+import { Languages } from '@/components/Languages';
 
 interface SurveyDetail {
   id: string;
@@ -26,9 +28,10 @@ interface DraftVersion {
   status: string;
   updatedAt: string;
   definition: unknown;
+  presentation: unknown;
 }
 
-type Tab = 'build' | 'json' | 'assist' | 'preview' | 'qa' | 'distribute' | 'results';
+type Tab = 'build' | 'json' | 'assist' | 'design' | 'languages' | 'preview' | 'qa' | 'distribute' | 'results';
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -38,6 +41,9 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [draft, setDraft] = useState<DraftVersion | null>(null);
   const [def, setDef] = useState<SurveyDefinition | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [pres, setPres] = useState<Presentation>(defaultPresentation());
+  const [presDirty, setPresDirty] = useState(false);
+  const [aiConfigured, setAiConfigured] = useState(false);
   const [tab, setTab] = useState<Tab>('build');
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -50,22 +56,26 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       setDraft(d.version);
       const parsed = parseSurveyDefinition(d.version.definition);
       setDef(parsed.ok ? parsed.definition : (d.version.definition as SurveyDefinition));
+      const p = parsePresentation(d.version.presentation);
+      setPres(p.ok ? p.presentation : defaultPresentation());
       setDirty(false);
+      setPresDirty(false);
     } catch (e) {
       setError(e);
     }
   }, [id]);
   useEffect(() => {
     void load();
+    void api<{ configured: boolean }>('/ai/status').then((s) => setAiConfigured(s.configured), () => undefined);
   }, [load]);
 
   useEffect(() => {
     const warn = (e: BeforeUnloadEvent) => {
-      if (dirty) e.preventDefault();
+      if (dirty || presDirty) e.preventDefault();
     };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
+  }, [dirty, presDirty]);
 
   const report = useMemo<{ schemaIssues: Array<{ path: string; message: string }>; analysis: AnalysisReport | null }>(() => {
     if (!def) return { schemaIssues: [], analysis: null };
@@ -73,7 +83,22 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     if (!parsed.ok) return { schemaIssues: parsed.issues, analysis: null };
     return { schemaIssues: [], analysis: analyzeSurvey(parsed.definition) };
   }, [def]);
-  const publishable = report.schemaIssues.length === 0 && !!report.analysis?.ok;
+  const languageBlockers = useMemo(() => {
+    if (!def || report.schemaIssues.length) return [];
+    const parsed = parseSurveyDefinition(def);
+    if (!parsed.ok) return [];
+    return translationStatus(parsed.definition, pres)
+      .filter((t) => t.enabled && !t.complete)
+      .map((t) => `${t.name} is offered to respondents but ${t.total - t.reviewed} text(s) are missing, outdated or not reviewed.`);
+  }, [def, pres, report.schemaIssues.length]);
+  const publishable = report.schemaIssues.length === 0 && !!report.analysis?.ok && languageBlockers.length === 0;
+  const unsaved = dirty || presDirty;
+
+  const editPres = (p: Presentation) => {
+    setPres(p);
+    setPresDirty(true);
+    setNotice(null);
+  };
 
   const edit = (d: SurveyDefinition) => {
     setDef(d);
@@ -86,10 +111,18 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ version: DraftVersion }>(`/surveys/${id}/draft`, { method: 'PUT', body: { definition: def, expectedUpdatedAt: draft.updatedAt } });
-      setDraft(r.version);
-      setDirty(false);
-      setNotice(`Saved draft v${r.version.version}.`);
+      let current = draft;
+      if (dirty) {
+        current = (await api<{ version: DraftVersion }>(`/surveys/${id}/draft`, { method: 'PUT', body: { definition: def, expectedUpdatedAt: current.updatedAt } })).version;
+        setDraft(current);
+        setDirty(false);
+      }
+      if (presDirty) {
+        current = (await api<{ version: DraftVersion }>(`/surveys/${id}/draft/presentation`, { method: 'PUT', body: { presentation: pres, expectedUpdatedAt: current.updatedAt } })).version;
+        setDraft(current);
+        setPresDirty(false);
+      }
+      setNotice(`Saved draft v${current.version}.`);
     } catch (e) {
       setError(e);
     } finally {
@@ -98,7 +131,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   };
 
   const publish = async () => {
-    if (dirty) await save();
+    if (unsaved) await save();
     setBusy(true);
     setError(null);
     try {
@@ -140,16 +173,21 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               Editing draft v{draft.version}
               {draft.status !== 'DRAFT' ? ` (${draft.status.toLowerCase()})` : ''} · live version: {live ? `v${live.version}` : 'none'}
             </span>
-            {dirty ? <span className="badge warn">unsaved changes</span> : null}
+            {unsaved ? <span className="badge warn">unsaved changes</span> : null}
           </div>
         </div>
         <div style={{ flex: 1 }} />
         {!readOnly ? (
           <>
-            <button onClick={save} disabled={busy || !dirty}>
+            <button onClick={save} disabled={busy || !unsaved}>
               Save draft
             </button>
-            <button className="primary" onClick={publish} disabled={busy || !publishable} title={publishable ? '' : 'Fix the errors in the logic check first'}>
+            <button
+              className="primary"
+              onClick={publish}
+              disabled={busy || !publishable}
+              title={publishable ? '' : languageBlockers.length ? languageBlockers.join(' ') : 'Fix the errors in the logic check first'}
+            >
               Publish
             </button>
           </>
@@ -164,6 +202,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             ['build', 'Build'],
             ['json', 'JSON'],
             ['assist', 'AI & import'],
+            ['design', 'Design'],
+            ['languages', 'Languages'],
             ['preview', 'Preview'],
             ['qa', 'QA lab'],
             ['distribute', 'Links & status'],
@@ -181,11 +221,28 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
           <div>
             {tab === 'build' ? <VisualEditor def={def} onChange={edit} readOnly={readOnly} /> : <JsonEditor def={def} onApply={edit} readOnly={readOnly} />}
           </div>
-          <LogicReport schemaIssues={report.schemaIssues} analysis={report.analysis} />
+          <LogicReport schemaIssues={report.schemaIssues} analysis={report.analysis} languageBlockers={languageBlockers} />
         </div>
       ) : null}
-      {tab === 'preview' ? <Preview key={JSON.stringify(def).length + draft.version} def={def} /> : null}
-      {tab === 'assist' ? <Assist surveyId={id} language={def.language} readOnly={readOnly} dirty={dirty} onApplied={load} /> : null}
+      {tab === 'preview' ? <Preview key={JSON.stringify(def).length + draft.version} def={def} presentation={pres} /> : null}
+      {tab === 'design' ? <DesignStudio def={def} presentation={pres} readOnly={readOnly} onChange={editPres} /> : null}
+      {tab === 'languages' ? (
+        <Languages
+          surveyId={id}
+          def={def}
+          presentation={pres}
+          readOnly={readOnly}
+          dirty={unsaved}
+          aiConfigured={aiConfigured}
+          onChange={editPres}
+          onServerUpdate={(v) => {
+            const p = parsePresentation(v.presentation);
+            if (p.ok) setPres(p.presentation);
+            setDraft((d) => (d ? { ...d, updatedAt: v.updatedAt, presentation: v.presentation } : d));
+          }}
+        />
+      ) : null}
+      {tab === 'assist' ? <Assist surveyId={id} language={def.language} readOnly={readOnly} dirty={unsaved} onApplied={load} /> : null}
       {tab === 'qa' ? <QaLab surveyId={id} readOnly={readOnly} dirty={dirty} hasLive={!!survey.liveVersionId} /> : null}
       {tab === 'distribute' ? <Distribute survey={survey} readOnly={readOnly} onChanged={load} /> : null}
       {tab === 'results' ? <Results surveyId={id} /> : null}
@@ -227,7 +284,15 @@ function JsonEditor({ def, onApply, readOnly }: { def: SurveyDefinition; onApply
   );
 }
 
-function LogicReport({ schemaIssues, analysis }: { schemaIssues: Array<{ path: string; message: string }>; analysis: AnalysisReport | null }) {
+function LogicReport({
+  schemaIssues,
+  analysis,
+  languageBlockers = [],
+}: {
+  schemaIssues: Array<{ path: string; message: string }>;
+  analysis: AnalysisReport | null;
+  languageBlockers?: string[];
+}) {
   return (
     <aside className="panel" aria-live="polite" data-testid="logic-report">
       <h2>Logic check</h2>
@@ -246,6 +311,12 @@ function LogicReport({ schemaIssues, analysis }: { schemaIssues: Array<{ path: s
           <p className={analysis.ok ? 'ok-text' : 'error-text'}>
             {analysis.ok ? 'Ready to publish.' : 'Fix these errors before publishing.'} {analysis.errors} error(s), {analysis.warnings} warning(s).
           </p>
+          {languageBlockers.map((b) => (
+            <div key={b} className="issue error">
+              <div>{b}</div>
+              <div className="loc">Languages tab</div>
+            </div>
+          ))}
           {analysis.issues.map((i, n) => (
             <div key={n} className={`issue ${i.severity}`}>
               <div>{i.message}</div>
@@ -422,6 +493,8 @@ interface ResponseRow {
   id: string;
   uid: string;
   country: string | null;
+  language: string | null;
+  device: string | null;
   status: string;
   outcomeReason: string | null;
   isTest: boolean;
@@ -511,6 +584,7 @@ function Results({ surveyId }: { surveyId: string }) {
               <tr>
                 <th>UID</th>
                 <th>Vendor</th>
+                <th>Language · device</th>
                 <th>Status</th>
                 <th>Reason</th>
                 <th>Version</th>
@@ -524,6 +598,7 @@ function Results({ surveyId }: { surveyId: string }) {
                     {r.uid} {r.isTest ? <span className="badge">test</span> : null}
                   </td>
                   <td>{r.vendor?.code ?? '—'}</td>
+                  <td>{[r.language, r.device].filter(Boolean).join(' · ') || '—'}</td>
                   <td>
                     <span className={`badge ${r.status.toLowerCase()}`}>{r.status.toLowerCase()}</span>
                   </td>

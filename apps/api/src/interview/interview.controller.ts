@@ -10,6 +10,9 @@ const answersSchema = z.object({
   answers: z.record(z.string().max(64), z.unknown()).refine((a) => Object.keys(a).length <= 500, 'Too many answers'),
 });
 
+const clientSchema = z.object({ touch: z.boolean().optional(), screenShortSide: z.number().min(0).max(20000).optional() });
+const languageSchema = z.object({ language: z.string().min(2).max(35) });
+
 /** Respondent-facing endpoints. No login: access is by signed link and an unguessable session token. */
 @Public()
 @Throttle({ default: { limit: 120, ttl: 60_000 } })
@@ -20,9 +23,22 @@ export class InterviewController {
   @Post('s/:surveyId/start')
   @HttpCode(200)
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  start(@Param('surveyId') surveyId: string, @Body() body: unknown, @Headers('user-agent') ua?: string) {
-    const query = (body && typeof body === 'object' && 'query' in body ? (body as { query: unknown }).query : {}) ?? {};
-    return this.interview.start(surveyId, query as Record<string, unknown>, ua);
+  start(
+    @Param('surveyId') surveyId: string,
+    @Body() body: unknown,
+    @Headers('user-agent') userAgent?: string,
+    @Headers('accept-language') acceptLanguage?: string,
+  ) {
+    const b = (body && typeof body === 'object' ? body : {}) as { query?: unknown; client?: unknown };
+    const query = (b.query && typeof b.query === 'object' ? b.query : {}) as Record<string, unknown>;
+    const client = clientSchema.safeParse(b.client ?? {});
+    return this.interview.start(surveyId, query, { userAgent, acceptLanguage: acceptLanguage?.slice(0, 200), client: client.success ? client.data : {} });
+  }
+
+  @Post('r/:token/language')
+  @HttpCode(200)
+  language(@Param('token') token: string, @Body() body: unknown) {
+    return this.interview.setLanguage(token, parseBody(languageSchema, body).language);
   }
 
   @Get('r/:token')

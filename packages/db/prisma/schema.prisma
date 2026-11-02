@@ -59,9 +59,9 @@ enum ResponseStatus {
 }
 
 model Tenant {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   name      String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   users     User[]
   projects  Project[]
 }
@@ -113,48 +113,51 @@ model Survey {
 }
 
 model SurveyVersion {
-  id          String        @id @default(cuid())
-  surveyId    String
-  survey      Survey        @relation(fields: [surveyId], references: [id])
-  version     Int
+  id           String        @id @default(cuid())
+  surveyId     String
+  survey       Survey        @relation(fields: [surveyId], references: [id])
+  version      Int
   /// Canonical survey definition (see @zapx/survey-schema). Immutable once published.
-  definition  Json
-  status      VersionStatus @default(DRAFT)
+  definition   Json
+  status       VersionStatus @default(DRAFT)
+  /// Presentation layer: theme, translations and device settings (see presentationSchema).
+  /// Versioned with the definition, so a published version always looks the same.
+  presentation Json          @default("{}")
   /// Static logic analysis report captured at publish time.
-  checkReport Json?
-  createdById String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  publishedAt DateTime?
-  responses   Response[]
+  checkReport  Json?
+  createdById  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  publishedAt  DateTime?
+  responses    Response[]
 
   @@unique([surveyId, version])
 }
 
 model Vendor {
-  id                     String       @id @default(cuid())
-  tenantId               String
-  projectId              String
-  project                Project      @relation(fields: [projectId], references: [id])
-  name                   String
+  id                  String       @id @default(cuid())
+  tenantId            String
+  projectId           String
+  project             Project      @relation(fields: [projectId], references: [id])
+  name                String
   /// Vendor ID passed on survey links (vid=...). Unique within a project.
-  code                   String
-  redirectMode           RedirectMode @default(STATIC)
+  code                String
+  redirectMode        RedirectMode @default(STATIC)
   /// Static redirect URL per outcome status, e.g. {"complete": "https://...?uid=[UID]"}.
-  staticUrls             Json         @default("{}")
+  staticUrls          Json         @default("{}")
   /// Words sent for [STATUS] per outcome, e.g. {"quota_full": "overquota"}.
-  statusWords            Json         @default("{}")
+  statusWords         Json         @default("{}")
   /// Hosts allowed for dynamic return URLs supplied at entry (protects against open redirects).
-  dynamicAllowedHosts    String[]     @default([])
+  dynamicAllowedHosts String[]     @default([])
   /// Query parameter that carries the dynamic return URL on entry.
-  dynamicParam           String       @default("rurl")
+  dynamicParam        String       @default("rurl")
   /// Shared secret for signed entry links and signed redirects.
-  secret                 String
-  requireSignedEntry     Boolean      @default(false)
-  signRedirects          Boolean      @default(false)
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
-  responses              Response[]
+  secret              String
+  requireSignedEntry  Boolean      @default(false)
+  signRedirects       Boolean      @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  responses           Response[]
 
   @@unique([projectId, code])
   @@index([tenantId])
@@ -186,6 +189,10 @@ model Response {
   /// SHA-256 of the respondent's session token; the token itself is never stored.
   sessionTokenHash String         @unique
   userAgent        String?
+  /// Language the respondent answered in (BCP 47 tag).
+  language         String?
+  /// desktop, tablet or mobile, classified at entry.
+  device           String?
   startedAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   completedAt      DateTime?

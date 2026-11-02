@@ -27,6 +27,20 @@ export interface ArchitectResult {
   usage?: { inputTokens: number; outputTokens: number };
 }
 
+export interface TranslateRequest {
+  /** Source and target language tags and names. */
+  from: { tag: string; name: string };
+  to: { tag: string; name: string };
+  /** Survey title, for tone and domain. */
+  surveyTitle: string;
+  items: Array<{ key: string; text: string; context: string }>;
+}
+
+export interface TranslateResult {
+  translations: Record<string, string>;
+  model: string;
+}
+
 /** Errors a provider can raise; the controller maps `status` to the HTTP response. */
 export class AiError extends Error {
   constructor(
@@ -46,4 +60,5 @@ export abstract class AiProvider {
   abstract readonly configured: boolean;
   abstract readonly model: string;
   abstract architect(req: ArchitectRequest): Promise<ArchitectResult>;
+  abstract translate(req: TranslateRequest): Promise<TranslateResult>;
 }

@@ -37,7 +37,7 @@ export class ChangeSetsService {
   async create(user: AuthUser, surveyId: string, input: NewChangeSet): Promise<ChangeSet> {
     const draft = await this.surveys.draft(user, surveyId);
     const base = parseSurveyDefinition(draft.definition);
-    const check = this.surveys.check(input.proposed);
+    const check = this.surveys.check(input.proposed, draft.presentation);
     const qa = check.schemaOk ? simulateSurvey(input.proposed, { respondents: PREVIEW_RESPONDENTS, seed: 'changeset' }) : null;
     const diff = base.ok ? diffSurveys(base.definition, input.proposed) : null;
     const cs = await this.prisma.changeSet.create({
@@ -130,7 +130,7 @@ export class ChangeSetsService {
       await this.audit.record(user, 'changeset.apply', 'survey', cs.surveyId, { changeSetId: id, source: cs.source, producer: cs.producer }, tx);
       return tx.surveyVersion.findUniqueOrThrow({ where: { id: cs.baseVersionId } });
     });
-    return { version: result, check: this.surveys.check(parsed.definition) };
+    return { version: result, check: this.surveys.check(parsed.definition, result.presentation) };
   }
 
   async reject(user: AuthUser, id: string) {

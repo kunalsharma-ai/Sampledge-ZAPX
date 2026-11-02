@@ -17,6 +17,7 @@ import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
 import { HealthController } from './health.controller';
 import { QaController } from './qa/qa.controller';
+import { TranslateController } from './surveys/translate.controller';
 import { ChangeSetsController } from './changesets/changesets.controller';
 import { ChangeSetsService } from './changesets/changesets.service';
 import { ArchitectService } from './ai/architect.service';
@@ -43,6 +44,7 @@ import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
     InterviewController,
     QaController,
     ChangeSetsController,
+    TranslateController,
   ],
   providers: [
     SurveysService,
