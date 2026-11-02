@@ -1,5 +1,8 @@
 'use client';
-/** Organization settings (administrators): AI permissions, limits and usage, redirect defaults and the team. */
+/**
+ * Organization settings (administrators): AI permissions, limits and usage, redirect defaults, the
+ * team, API keys, webhooks and the audit log. Programmers see only their own API keys here.
+ */
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -7,6 +10,8 @@ import { useMe } from '@/lib/useMe';
 import { ErrorNote, Shell } from '@/components/Shell';
 import { LayerEditor, emptyLayer, type Layer } from '@/components/RedirectRules';
 import { Team } from '@/components/Team';
+import { ApiKeys } from '@/components/ApiKeys';
+import { Webhooks } from '@/components/Webhooks';
 
 type Task = 'architect' | 'translate';
 const TASK_NAMES: Record<Task, string> = { architect: 'AI Survey Architect (build and edit surveys)', translate: 'AI translation' };
@@ -63,6 +68,7 @@ export default function SettingsPage() {
   const [error, setError] = useState<unknown>(null);
 
   const load = useCallback(async () => {
+    if (me?.role !== 'ADMIN') return;
     try {
       const s = await api<AiSettings>('/organization/ai');
       setAi(s);
@@ -72,11 +78,19 @@ export default function SettingsPage() {
     } catch (e) {
       setError(e);
     }
-  }, []);
+  }, [me]);
   useEffect(() => {
     void load();
   }, [load]);
 
+  if (me && me.role === 'PROGRAMMER') {
+    return (
+      <Shell crumbs={<Link href="/">Projects</Link>}>
+        <h1>API keys</h1>
+        <ApiKeys isAdmin={false} />
+      </Shell>
+    );
+  }
   if (me && me.role !== 'ADMIN') {
     return (
       <Shell crumbs={<Link href="/">Projects</Link>}>
@@ -102,7 +116,13 @@ export default function SettingsPage() {
 
   return (
     <Shell crumbs={<Link href="/">Projects</Link>}>
-      <h1>Organization settings</h1>
+      <div className="row">
+        <h1 style={{ margin: 0 }}>Organization settings</h1>
+        <div style={{ flex: 1 }} />
+        <Link href="/settings/audit" className="btn">
+          Audit log
+        </Link>
+      </div>
       <ErrorNote error={error} />
       <div className="grid2" style={{ marginTop: 16 }}>
         <section className="panel stack" data-testid="ai-settings">
@@ -243,6 +263,8 @@ export default function SettingsPage() {
         </section>
 
         <Team />
+        <ApiKeys isAdmin />
+        <Webhooks />
       </div>
     </Shell>
   );

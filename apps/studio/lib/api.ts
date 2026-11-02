@@ -35,6 +35,7 @@ export interface Me {
   email: string;
   name: string;
   role: 'ADMIN' | 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
+  projectScope: 'ALL' | 'ASSIGNED';
   tenant: { id: string; name: string };
 }
 

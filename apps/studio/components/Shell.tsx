@@ -18,6 +18,10 @@ export function Shell({ children, crumbs }: { children: ReactNode; crumbs?: Reac
           <Link href="/settings" className="small">
             Settings
           </Link>
+        ) : me?.role === 'PROGRAMMER' ? (
+          <Link href="/settings" className="small">
+            API keys
+          </Link>
         ) : null}
         {me ? (
           <span className="muted small">

@@ -29,6 +29,8 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true'),
+    /** Sign-ups allowed per minute from one address (raise only for automated test runs). */
+    SIGNUP_RATE_PER_MINUTE: z.coerce.number().int().min(1).max(1000).default(5),
     /** Enables the AI Survey Architect. Without it, AI endpoints answer 503 and everything else works. */
     ANTHROPIC_API_KEY: z
       .string()

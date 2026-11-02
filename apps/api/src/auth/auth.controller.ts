@@ -63,7 +63,7 @@ export class AuthController {
 
   /** Self-service sign-up creating a new tenant. Disabled unless ALLOW_SIGNUP=true. */
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: () => config().SIGNUP_RATE_PER_MINUTE, ttl: 60_000 } })
   @Post('register')
   async register(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     if (!config().ALLOW_SIGNUP) throw new ForbiddenException('Sign-up is disabled');

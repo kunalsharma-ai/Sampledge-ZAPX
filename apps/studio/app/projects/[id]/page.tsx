@@ -5,6 +5,8 @@ import { api } from '@/lib/api';
 import { ErrorNote, Shell } from '@/components/Shell';
 import { VendorEditor, emptyVendor, type Vendor, type VendorDraft } from '@/components/VendorEditor';
 import { LayerEditor, emptyLayer, type Layer } from '@/components/RedirectRules';
+import { ProjectAccess } from '@/components/ProjectAccess';
+import { useMe } from '@/lib/useMe';
 
 interface Project {
   id: string;
@@ -15,6 +17,7 @@ interface Project {
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const me = useMe();
   const [project, setProject] = useState<Project | null>(null);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [surveyName, setSurveyName] = useState('');
@@ -152,6 +155,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               />
             ) : null}
           </section>
+          <ProjectAccess projectId={id} isAdmin={me?.role === 'ADMIN'} />
           {editing ? (
             <VendorEditor
               projectId={id}
