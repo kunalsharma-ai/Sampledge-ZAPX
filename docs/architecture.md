@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 8)
+# ZAPX architecture (Milestones 1 to 9)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -163,6 +163,15 @@ Details: [modules/jobs-and-files.md](modules/jobs-and-files.md).
 
 Details: [modules/sso-scim-plans.md](modules/sso-scim-plans.md).
 
+## Phone interviewing (Milestone 9)
+
+- **CATI call lists** with encrypted phone numbers, a shared queue (callbacks first, `SKIP LOCKED`
+  claims with a 30-minute lease), dispositions with retry rules and maximum attempts.
+- Interviews run on the same engine and runtime with mode `CATI`; finished interviews close their
+  case automatically. Dialing is manual (`tel:` links). [ADR 0015](adr/0015-cati-call-lists.md)
+
+Details: [modules/cati.md](modules/cati.md).
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -199,6 +208,7 @@ Details: [modules/sso-scim-plans.md](modules/sso-scim-plans.md).
 - Row-level security covers `Response` for studio reads only, and is bypassed by the local
   `docker compose` database role (a superuser). Other tables rely on application filters.
 - API keys are role-scoped only (no per-endpoint scopes or IP allow lists).
+- CATI has no dialer, call recording, time-zone calling windows or do-not-call list.
 - SSO is OpenID Connect only (no SAML) and has been tested against a mock provider, not a real one.
   SCIM covers users, not groups. Plans have no billing or self-service changes.
 - Webhooks are organization-wide (no per-project webhooks). Deliveries are kept for

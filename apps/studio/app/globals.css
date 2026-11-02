@@ -135,7 +135,8 @@ button,
 button:hover {
   border-color: var(--accent);
 }
-button.primary {
+button.primary,
+.btn.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
@@ -475,4 +476,24 @@ table.data th {
 }
 .bar.full > div {
   background: var(--bad);
+}
+
+/* Milestone 9: CATI calling screen */
+.call-number {
+  text-decoration: none;
+  font-size: 18px;
+  text-align: center;
+  padding: 12px;
+}
+.case-data {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px 12px;
+  margin: 0;
+}
+.case-data dt {
+  color: var(--muted);
+}
+.case-data dd {
+  margin: 0;
 }

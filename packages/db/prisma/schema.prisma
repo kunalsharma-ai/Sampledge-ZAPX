@@ -25,6 +25,21 @@ enum InterviewMode {
   CAWI
   /// Face to face with an interviewer, in the offline CAPI app.
   CAPI
+  /// By telephone, an interviewer working a call list (Milestone 9).
+  CATI
+}
+
+enum CatiCaseStatus {
+  /// Waiting to be called (first call, or a retry after no answer or busy).
+  PENDING
+  /// A callback was agreed for a time.
+  CALLBACK
+  /// An interviewer has the case open now.
+  IN_CALL
+  /// The interview finished (any outcome: complete, terminate, quota full...).
+  DONE
+  /// No more calls: refused, wrong number, not eligible, or out of attempts.
+  CLOSED
 }
 
 /// Human quality review of a complete (Milestone 5).
@@ -224,6 +239,7 @@ model Survey {
   qaRuns          QaRun[]
   changeSets      ChangeSet[]
   capiAssignments CapiAssignment[]
+  catiCases       CatiCase[]
 
   @@index([tenantId, projectId, deletedAt])
 }
@@ -580,6 +596,56 @@ model CapiAssignment {
 
   @@unique([surveyId, interviewerId])
   @@index([tenantId, interviewerId])
+}
+
+/// One person to call for a CATI survey (Milestone 9). The phone number is sealed with SecretBox.
+model CatiCase {
+  id              String         @id @default(cuid())
+  tenantId        String
+  surveyId        String
+  survey          Survey         @relation(fields: [surveyId], references: [id])
+  /// Respondent id from the sample; becomes the interview's UID.
+  code            String
+  phoneSealed     String
+  /// Last digits, for display without unsealing.
+  phoneHint       String
+  name            String?
+  /// Extra sample columns, available to the survey as entry parameters.
+  data            Json           @default("{}")
+  status          CatiCaseStatus @default(PENDING)
+  attempts        Int            @default(0)
+  maxAttempts     Int            @default(6)
+  nextCallAt      DateTime       @default(now())
+  /// Who has the case open, until when (a lease, so an abandoned screen frees the case).
+  lockedById      String?
+  lockedUntil     DateTime?
+  lastDisposition String?
+  closedReason    String?
+  responseId      String?        @unique
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  calls           CatiCall[]
+
+  @@unique([surveyId, code])
+  @@index([surveyId, status, nextCallAt])
+  @@index([tenantId, surveyId])
+}
+
+/// One call attempt on a case, with its disposition.
+model CatiCall {
+  id            String    @id @default(cuid())
+  tenantId      String
+  caseId        String
+  case          CatiCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  interviewerId String
+  disposition   String
+  note          String?
+  callbackAt    DateTime?
+  startedAt     DateTime
+  endedAt       DateTime  @default(now())
+
+  @@index([caseId])
+  @@index([tenantId, interviewerId, endedAt])
 }
 
 /// Organization API key (Milestone 6). Acts as the member who created it, with at most the key's

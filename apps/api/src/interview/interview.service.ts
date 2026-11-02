@@ -302,6 +302,52 @@ export class InterviewService {
     }
   }
 
+  /**
+   * Start or resume a telephone (CATI) interview for a call-list case (Milestone 9). The interviewer
+   * reads the questions from the same runtime respondents use; the response records mode CATI and
+   * the interviewer. Resuming an unfinished interview issues a new session token.
+   */
+  async startCati(input: { surveyId: string; uid: string; interviewerId: string; entryParams: Record<string, string> }) {
+    const survey = await this.prisma.survey.findFirst({ where: { id: input.surveyId, deletedAt: null } });
+    if (!survey?.liveVersionId || survey.status !== 'LIVE') throw new ConflictException('This survey is not live');
+    const existing = await this.prisma.response.findFirst({ where: { surveyId: survey.id, vendorId: null, uid: input.uid } });
+    const token = randomBytes(32).toString('base64url');
+    if (existing) {
+      if (existing.status !== 'IN_PROGRESS') throw new ConflictException('This person has already been interviewed');
+      const updated = await this.prisma.response.update({
+        where: { id: existing.id },
+        data: { sessionTokenHash: hashToken(token), pageShownAt: new Date(), interviewerId: input.interviewerId },
+      });
+      return { token, responseId: updated.id, resumed: true };
+    }
+    if (await this.plans.completesExhausted(survey.tenantId)) {
+      throw new ConflictException("Your organization has used this month's completes on its plan");
+    }
+    const version = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: survey.liveVersionId } });
+    const def = version.definition as unknown as SurveyDefinition;
+    const ctx = interviewContext(version, def.language);
+    const firstPage = nextPageIndex(def, {}, -1);
+    const response = await this.prisma.response.create({
+      data: {
+        tenantId: survey.tenantId,
+        surveyId: survey.id,
+        versionId: version.id,
+        uid: input.uid,
+        mode: 'CATI',
+        interviewerId: input.interviewerId,
+        currentPage: firstPage,
+        lastPageId: def.pages[firstPage]?.id ?? null,
+        pageShownAt: new Date(),
+        durationMs: 0,
+        entryParams: input.entryParams as Prisma.InputJsonValue,
+        sessionTokenHash: hashToken(token),
+        language: ctx.look.language,
+        device: 'desktop',
+      },
+    });
+    return { token, responseId: response.id, resumed: false };
+  }
+
   /** Same UID again: resume an unfinished interview, otherwise it is a duplicate. */
   private async reenter(existing: Response, vendor: Vendor | null) {
     if (existing.status === 'IN_PROGRESS') {

@@ -287,6 +287,7 @@ export class QualityService {
       modes: {
         cawi: rows.filter((r) => r.mode === 'CAWI').length,
         capi: rows.filter((r) => r.mode === 'CAPI').length,
+        cati: rows.filter((r) => r.mode === 'CATI').length,
       },
     };
   }

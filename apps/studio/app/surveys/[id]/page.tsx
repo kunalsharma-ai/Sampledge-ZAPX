@@ -20,6 +20,7 @@ import { DesignStudio } from '@/components/DesignStudio';
 import { Languages } from '@/components/Languages';
 import { Quality } from '@/components/Quality';
 import { CapiAssignments } from '@/components/CapiAssignments';
+import { CatiCalls } from '@/components/CatiCalls';
 import { ExportJobs } from '@/components/ExportJobs';
 
 interface SurveyDetail {
@@ -273,7 +274,12 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       {tab === 'assist' ? <Assist surveyId={id} language={def.language} readOnly={readOnly} dirty={unsaved} onApplied={load} /> : null}
       {tab === 'qa' ? <QaLab surveyId={id} readOnly={readOnly} dirty={dirty} hasLive={!!survey.liveVersionId} /> : null}
       {tab === 'distribute' ? <Distribute survey={survey} readOnly={readOnly} onChanged={load} /> : null}
-      {tab === 'capi' ? <CapiAssignments surveyId={id} readOnly={readOnly} hasLive={!!survey.liveVersionId} /> : null}
+      {tab === 'capi' ? (
+        <div className="stack">
+          <CapiAssignments surveyId={id} readOnly={readOnly} hasLive={!!survey.liveVersionId} />
+          <CatiCalls surveyId={id} readOnly={readOnly} />
+        </div>
+      ) : null}
       {tab === 'quality' ? <Quality surveyId={id} def={def} readOnly={readOnly} onChange={edit} /> : null}
       {tab === 'results' ? <Results surveyId={id} /> : null}
     </Shell>
@@ -550,7 +556,7 @@ interface ResponseRow {
   completedAt: string | null;
   vendor: { code: string } | null;
   version: { version: number };
-  mode: 'CAWI' | 'CAPI';
+  mode: 'CAWI' | 'CAPI' | 'CATI';
   qualityScore: number | null;
   reviewState: string;
   interviewer: { name: string } | null;
@@ -651,7 +657,7 @@ function Results({ surveyId }: { surveyId: string }) {
                   <td className="mono">
                     {r.uid} {r.isTest ? <span className="badge">test</span> : null}
                   </td>
-                  <td>{r.vendor?.code ?? (r.interviewer ? `CAPI · ${r.interviewer.name}` : '—')}</td>
+                  <td>{r.vendor?.code ?? (r.interviewer ? `${r.mode} · ${r.interviewer.name}` : '—')}</td>
                   <td>{[r.language, r.device].filter(Boolean).join(' · ') || '—'}</td>
                   <td>
                     <span className={`badge ${r.status.toLowerCase()}`}>{r.status.toLowerCase()}</span>

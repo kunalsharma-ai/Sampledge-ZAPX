@@ -19,5 +19,6 @@ they are accepted; a later record supersedes an earlier one.
 | [0012](0012-row-level-security.md)               | PostgreSQL row-level security on respondent data                       | Accepted                                               |
 | [0013](0013-background-jobs-and-file-storage.md) | Background jobs and file storage in PostgreSQL                         | Accepted                                               |
 | [0014](0014-sso-scim-and-plans.md)               | Single sign-on, SCIM provisioning and plan limits                      | Accepted                                               |
+| [0015](0015-cati-call-lists.md)                  | CATI call lists on the existing interview engine                       | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.
