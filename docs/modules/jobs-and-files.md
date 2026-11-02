@@ -72,8 +72,13 @@ a background export.
 
 ## Limits
 
-- Files live on a local disk. An S3 store is designed for (`FileStore`) but **not built or tested**;
-  until it is, the API and worker must share a disk.
+- With `FILE_STORE=local` files live on a disk the API and the worker must share. `FILE_STORE=s3`
+  (Milestone 13) keeps them in a private bucket instead: every object is written with SSE-KMS
+  (`S3_KMS_KEY_ID`) or SSE-S3, keys are `<S3_PREFIX>/<organization>/...`, credentials come from the
+  standard AWS chain (the ECS task role on AWS). It is tested with the real AWS SDK against a fake S3
+  server (`apps/api/test/support/mock-s3.ts`), **not yet against AWS S3 itself**. Moving from local
+  to S3 does not copy existing files; copy `FILES_DIR` into the bucket under the prefix first
+  (`aws s3 sync .data/files s3://bucket/prefix/`).
 - The worker runs one job at a time per process; run more processes for more throughput.
 - Cancelling a running export or AI draft takes effect at its next progress step; an AI call already
   sent to the model is not interrupted.

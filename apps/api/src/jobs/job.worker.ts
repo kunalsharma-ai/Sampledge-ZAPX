@@ -267,8 +267,12 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
       where: { state: { in: ['DELIVERED', 'FAILED', 'DEAD'] }, createdAt: { lt: hookCutoff } },
     });
     const captures = await this.captures.purgeExpired();
-    const out = { files, jobs: jobs.count, webhookDeliveries: deliveries.count, captures };
-    if (files || jobs.count || deliveries.count || captures) this.log.log(`Housekeeping removed ${JSON.stringify(out)}`);
+    // Unfinished SAML sign-ins (Milestone 13) and applied billing events older than 90 days.
+    const ssoRequests = await this.prisma.ssoRequest.deleteMany({ where: { expiresAt: { lt: new Date() } } });
+    await this.prisma.billingEvent.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 90 * 86_400_000) } } });
+    const out = { files, jobs: jobs.count, webhookDeliveries: deliveries.count, captures, ssoRequests: ssoRequests.count };
+    if (files || jobs.count || deliveries.count || captures || ssoRequests.count)
+      this.log.log(`Housekeeping removed ${JSON.stringify(out)}`);
     return out;
   }
 }

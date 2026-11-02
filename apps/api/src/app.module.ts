@@ -15,8 +15,11 @@ import { CatiController } from './cati/cati.controller';
 import { CatiService } from './cati/cati.service';
 import { SsoController } from './auth/sso.controller';
 import { SsoService } from './auth/sso.service';
+import { SamlService } from './auth/saml.service';
 import { ScimController } from './scim/scim.controller';
 import { ScimAdminController } from './scim/scim-admin.controller';
+import { BillingController } from './plans/billing.controller';
+import { BillingService } from './plans/billing.service';
 import { ScimGuard } from './scim/scim.guard';
 import { ProjectsController } from './projects/projects.controller';
 import { SurveysController } from './surveys/surveys.controller';
@@ -53,7 +56,7 @@ import { JobsController } from './jobs/jobs.controller';
 import { JobsService } from './jobs/jobs.service';
 import { JobWorker } from './jobs/job.worker';
 import { FilesService } from './jobs/files.service';
-import { FileStore, LocalFileStore } from './jobs/file-store';
+import { FileStore, fileStoreFromConfig } from './jobs/file-store';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -76,6 +79,7 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     SsoController,
     ScimController,
     ScimAdminController,
+    BillingController,
     ProjectsController,
     SurveysController,
     VendorsController,
@@ -99,6 +103,8 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     AnalysisService,
     MediaService,
     SsoService,
+    SamlService,
+    BillingService,
     ScimGuard,
     SurveysService,
     ExportService,
@@ -116,7 +122,7 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     JobsService,
     JobWorker,
     FilesService,
-    { provide: FileStore, useClass: LocalFileStore },
+    { provide: FileStore, useFactory: fileStoreFromConfig },
     {
       // Provider registry: AI_PROVIDER picks the implementation. Adding OpenAI or Gemini means
       // one more AiProvider subclass and one more case here (docs/modules/ai-gateway.md).

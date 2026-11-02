@@ -38,6 +38,13 @@ step "Unit and API tests";            pnpm test;          passed+=("tests")
 
 if [ "$quick" = 0 ]; then
   step "Dependency audit (high and critical)"; pnpm audit --prod --audit-level high; passed+=("audit")
+  if command -v terraform >/dev/null 2>&1; then
+    step "AWS infrastructure (terraform fmt, validate and mocked plan tests)"
+    ( cd infra/terraform && terraform fmt -check -recursive && terraform init -backend=false -input=false >/dev/null \
+      && terraform validate && terraform test ); passed+=("terraform")
+  else
+    echo "Terraform is not installed: skipped the infrastructure checks (infra/terraform/README.md)."
+  fi
   if [ "$e2e" = 1 ]; then
     step "End-to-end tests (starts API, studio, runtime and CAPI app)"; pnpm e2e; passed+=("e2e")
   fi

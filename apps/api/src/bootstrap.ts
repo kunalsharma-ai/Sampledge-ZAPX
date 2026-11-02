@@ -1,19 +1,67 @@
 import { type INestApplication, Logger } from '@nestjs/common';
+import { timingSafeEqual } from 'node:crypto';
+import { isIP } from 'node:net';
 import cookieParser from 'cookie-parser';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { config } from './config';
+
+type EdgeRequest = { headers: Record<string, string | string[] | undefined>; ip?: string };
+
+/** "198.51.100.7:443" or "2001:db8::1:443" (CloudFront-Viewer-Address) to the address alone. */
+export function addressOnly(v: string): string | null {
+  const a = v.trim().replace(/^\[(.*)\](:\d+)?$/, '$1');
+  if (isIP(a)) return a;
+  const cut = a.lastIndexOf(':');
+  const b = cut > 0 ? a.slice(0, cut) : a;
+  return isIP(b) ? b : null;
+}
+
+/**
+ * Edge trust (Milestone 13). Requests from the CDN carry the shared secret; for them the viewer's
+ * address and country come from the CDN's headers. On any other request those headers are dropped,
+ * so a respondent who reaches the API directly cannot choose their own address or country.
+ */
+export function edgeTrust(req: EdgeRequest) {
+  const c = config();
+  if (!c.EDGE_SHARED_SECRET) return;
+  const sent = req.headers['x-zapx-edge'];
+  delete req.headers['x-zapx-edge'];
+  const a = Buffer.from(typeof sent === 'string' ? sent : '');
+  const b = Buffer.from(c.EDGE_SHARED_SECRET);
+  const fromEdge = a.length === b.length && timingSafeEqual(a, b);
+  const addressHeader = c.EDGE_CLIENT_ADDRESS_HEADER;
+  if (!fromEdge) {
+    if (addressHeader) delete req.headers[addressHeader];
+    if (c.GEO_COUNTRY_HEADER) delete req.headers[c.GEO_COUNTRY_HEADER];
+    return;
+  }
+  const viewer = addressHeader ? req.headers[addressHeader] : undefined;
+  const ip = typeof viewer === 'string' ? addressOnly(viewer) : null;
+  if (ip) Object.defineProperty(req, 'ip', { value: ip, configurable: true });
+}
 
 /** Shared app setup used by main.ts and the integration tests. */
 export function configureApp(app: INestApplication) {
   app.use(cookieParser());
   // SCIM clients send application/scim+json (Milestone 8). Registering a JSON parser replaces Nest's
   // default one, so this parser reads both types (with the default 100 kB limit).
-  (app as NestExpressApplication).useBodyParser('json', { type: ['application/json', 'application/scim+json'] });
+  // The Stripe webhook (Milestone 13) is verified over the exact bytes received, so they are kept for that path.
+  (app as NestExpressApplication).useBodyParser('json', {
+    type: ['application/json', 'application/scim+json'],
+    verify: (req: { url?: string; rawBody?: Buffer }, _res: unknown, buf: Buffer) => {
+      if (req.url?.startsWith('/api/billing/webhook')) req.rawBody = buf;
+    },
+  });
   app.setGlobalPrefix('api');
   app.enableShutdownHooks();
   // The studio and runtime reach the API through same-origin proxies; no CORS is enabled.
   const http = app.getHttpAdapter().getInstance();
   http.disable('x-powered-by');
-  http.set('trust proxy', 1);
+  http.set('trust proxy', config().TRUST_PROXY_HOPS);
+  http.use((req: EdgeRequest, _res: unknown, next: () => void) => {
+    edgeTrust(req);
+    next();
+  });
   http.use((_req: unknown, res: { setHeader(k: string, v: string): void }, next: () => void) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');

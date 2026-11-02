@@ -24,7 +24,7 @@ RUN pnpm build
 FROM base AS api
 ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app /app
-# Local file store for exports (FILES_DIR). Shared with the worker through a volume; S3 is not implemented yet.
+# Local file store (FILES_DIR), shared with the worker through a volume. On AWS, FILE_STORE=s3 is used instead.
 ENV FILES_DIR=/data/files
 RUN mkdir -p /data/files && chown -R node:node /data
 USER node
@@ -35,7 +35,8 @@ CMD ["node", "apps/api/dist/main.js"]
 # One-off job: apply database migrations, then exit (an ECS task before each deployment).
 FROM api AS migrate
 HEALTHCHECK NONE
-CMD ["packages/db/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "packages/db/prisma/schema.prisma"]
+# Accepts DATABASE_URL or the DB_* parts (apps/api/src/database-url.ts), like the API.
+CMD ["node", "apps/api/dist/cli/migrate.js"]
 
 # Background worker: jobs (exports, large QA runs, AI drafts), vendor callbacks and webhooks.
 FROM api AS worker

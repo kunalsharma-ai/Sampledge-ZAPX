@@ -29,7 +29,7 @@ export class FilesService {
   async save(f: SaveFile): Promise<StoredFile> {
     // Unguessable key, grouped by tenant; never derived from the file name.
     const storageKey = `${f.tenantId}/${new Date().toISOString().slice(0, 10)}/${randomBytes(16).toString('hex')}`;
-    await this.store.put(storageKey, f.data);
+    await this.store.put(storageKey, f.data, f.contentType);
     return this.prisma.storedFile.create({
       data: {
         tenantId: f.tenantId,

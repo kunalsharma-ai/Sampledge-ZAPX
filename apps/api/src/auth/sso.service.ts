@@ -13,8 +13,10 @@ import { SecretBox } from '../platform/secret-box';
 import { isPrivateAddress } from '../integrations/http-delivery';
 import type { AuthUser } from './auth.types';
 
-/** A sign-in that cannot complete; the message is shown to the person on the login page. */
-export class SsoError extends Error {}
+import { SsoError } from './sso-error';
+import { normalizeCerts, SamlService, SsoVerifyError } from './saml.service';
+
+export { SsoError };
 
 interface Discovery {
   issuer: string;
@@ -25,6 +27,8 @@ interface Discovery {
 
 export interface SsoConfigInput {
   enabled: boolean;
+  protocol: 'OIDC' | 'SAML';
+  /** OIDC */
   issuer: string;
   clientId: string;
   /** Omitted to keep the stored secret. */
@@ -32,6 +36,10 @@ export interface SsoConfigInput {
   domains: string[];
   enforced: boolean;
   jitRole: Role | null;
+  /** SAML */
+  samlEntryPoint?: string | null;
+  samlIdpIssuer?: string | null;
+  samlCerts?: string[];
 }
 
 /** What the browser keeps (signed, in a short-lived cookie) between leaving for the IdP and returning. */
@@ -67,6 +75,7 @@ export class SsoService {
     private readonly secrets: SecretBox,
     private readonly plans: PlanService,
     private readonly audit: AuditService,
+    private readonly saml: SamlService,
   ) {}
 
   static callbackUrl() {
@@ -128,9 +137,14 @@ export class SsoService {
     return {
       available: plan.limits.sso,
       callbackUrl: SsoService.callbackUrl(),
+      saml: { entityId: SamlService.entityId(), acsUrl: SamlService.acsUrl(), metadataUrl: SamlService.entityId() },
       config: c
         ? {
             enabled: c.enabled,
+            protocol: c.protocol as 'OIDC' | 'SAML',
+            samlEntryPoint: c.samlEntryPoint,
+            samlIdpIssuer: c.samlIdpIssuer,
+            samlCerts: c.samlCerts,
             issuer: c.issuer,
             clientId: c.clientId,
             clientSecretSet: !!c.clientSecretSealed,
@@ -150,7 +164,10 @@ export class SsoService {
     const clash = await this.prisma.tenantSso.findFirst({ where: { tenantId: { not: user.tenantId }, domains: { hasSome: domains } } });
     if (clash) throw new ConflictException('One of these domains already signs in to another organization');
     const before = await this.prisma.tenantSso.findUnique({ where: { tenantId: user.tenantId } });
-    if (!before && !input.clientSecret) throw new BadRequestException('Enter the client secret');
+    if (input.protocol === 'SAML') return this.saveSaml(user, input, domains);
+    if (!input.issuer || !input.clientId) throw new BadRequestException('Enter the issuer and the client ID');
+    if (!(before?.protocol === 'OIDC' && before.clientSecretSealed) && !input.clientSecret)
+      throw new BadRequestException('Enter the client secret');
     const issuer = input.issuer.trim().replace(/\/$/, '');
     if (input.enabled) {
       // Check the provider now, so a typo is caught here rather than at everyone's next sign-in.
@@ -161,6 +178,10 @@ export class SsoService {
     }
     const data = {
       enabled: input.enabled,
+      protocol: 'OIDC',
+      samlEntryPoint: null,
+      samlIdpIssuer: null,
+      samlCerts: [],
       issuer,
       clientId: input.clientId.trim(),
       ...(input.clientSecret ? { clientSecretSealed: this.secrets.seal(input.clientSecret) } : {}),
@@ -186,6 +207,48 @@ export class SsoService {
     return this.getConfig(user.tenantId);
   }
 
+  private async saveSaml(user: AuthUser, input: SsoConfigInput, domains: string[]) {
+    const entryPoint = input.samlEntryPoint?.trim() ?? '';
+    const idpIssuer = input.samlIdpIssuer?.trim() ?? '';
+    if (!entryPoint || !idpIssuer || !input.samlCerts?.length) {
+      throw new BadRequestException('Enter the sign-in URL, the entity ID and the signing certificate of the identity provider');
+    }
+    let certs: string[];
+    try {
+      await this.checkUrl(entryPoint, 'sign-in URL');
+      certs = normalizeCerts(input.samlCerts);
+    } catch (e) {
+      throw new BadRequestException(e instanceof SsoError ? e.message : 'The SAML settings are not valid');
+    }
+    const data = {
+      enabled: input.enabled,
+      protocol: 'SAML',
+      samlEntryPoint: entryPoint,
+      samlIdpIssuer: idpIssuer,
+      samlCerts: certs,
+      // The OpenID Connect settings do not apply; the stored client secret is removed.
+      issuer: '',
+      clientId: '',
+      clientSecretSealed: '',
+      domains,
+      enforced: input.enforced,
+      jitRole: input.jitRole,
+      updatedById: user.id,
+    };
+    await this.prisma.tenantSso.upsert({ where: { tenantId: user.tenantId }, create: { tenantId: user.tenantId, ...data }, update: data });
+    await this.audit.record(user, 'sso.update', 'tenant', user.tenantId, {
+      enabled: data.enabled,
+      protocol: 'SAML',
+      entryPoint,
+      idpIssuer,
+      certificates: certs.length,
+      domains,
+      enforced: data.enforced,
+      jitRole: data.jitRole,
+    });
+    return this.getConfig(user.tenantId);
+  }
+
   /** True when the member's organization requires SSO for everyone but admins. */
   async passwordBlocked(tenantId: string, role: string) {
     if (role === 'ADMIN') return false;
@@ -204,8 +267,14 @@ export class SsoService {
   }
 
   /** Start a sign-in: returns the provider's authorization URL and the signed state for the cookie. */
-  async begin(email: string, next: unknown) {
+  async begin(email: string, next: unknown): Promise<{ url: string; cookie: string | null; maxAgeMs: number }> {
     const c = await this.providerFor(email.toLowerCase());
+    if (c.protocol === 'SAML') {
+      const url = await this.saml.begin(c, email, safeNext(next)).catch((e: unknown) => {
+        throw new BadRequestException(e instanceof SsoError ? e.message : 'Could not start the SAML sign-in');
+      });
+      return { url, cookie: null, maxAgeMs: 0 };
+    }
     const doc = await this.discover(c.issuer).catch((e: unknown) => {
       throw new BadRequestException(e instanceof SsoError ? e.message : 'Could not reach the identity provider');
     });
@@ -251,7 +320,7 @@ export class SsoService {
     if (!query.code || !query.state || query.state !== st.state) throw new SsoError('The sign-in response did not match. Try again.');
 
     const c = await this.prisma.tenantSso.findUnique({ where: { tenantId: st.tid } });
-    if (!c?.enabled) throw new SsoError('Single sign-on is turned off for this organization');
+    if (!c?.enabled || c.protocol !== 'OIDC') throw new SsoError('Single sign-on is turned off for this organization');
     const doc = await this.discover(c.issuer);
 
     const tokenRes = await fetch(doc.token_endpoint, {
@@ -297,6 +366,26 @@ export class SsoService {
     const user = await this.member(c.tenantId, sub, email, typeof claims.name === 'string' ? claims.name : '', c.jitRole);
     await this.audit.record(user, 'auth.sso_login', 'user', user.id, { issuer: doc.issuer });
     return { user, next: st.next };
+  }
+
+  /** Finish a SAML sign-in posted by the identity provider. */
+  async completeSaml(body: Record<string, unknown>) {
+    let login;
+    try {
+      login = await this.saml.complete(body);
+    } catch (e) {
+      if (e instanceof SsoVerifyError) this.log.warn(`SAML response rejected: ${e.detail}`);
+      throw e;
+    }
+    const c = await this.prisma.tenantSso.findUnique({ where: { tenantId: login.tenantId } });
+    if (!c || !c.domains.includes(emailDomain(login.email))) {
+      throw new SsoError(`${login.email} is not in a domain this organization signs in with`);
+    }
+    if (!(await this.plans.plan(login.tenantId)).limits.sso)
+      throw new SsoError("Single sign-on is not included in this organization's plan");
+    const user = await this.member(login.tenantId, login.subject, login.email, login.name, c.jitRole);
+    await this.audit.record(user, 'auth.sso_login', 'user', user.id, { protocol: 'SAML', issuer: c.samlIdpIssuer });
+    return { user, next: login.next };
   }
 
   private async member(tenantId: string, sub: string, email: string, name: string, jitRole: Role | null) {

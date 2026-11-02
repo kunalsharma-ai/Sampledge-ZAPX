@@ -125,6 +125,12 @@ model Tenant {
   redirectDefaults Json            @default("{}")
   /// Plan code (Milestone 8): free, team, business or enterprise. Limits live in code (plans.ts).
   plan             String          @default("enterprise")
+  /// Billing (Milestone 13): the Stripe customer and subscription behind the plan, when billing is on.
+  billingCustomerId     String?    @unique
+  billingSubscriptionId String?
+  /// Stripe subscription status (active, trialing, past_due, canceled, ...).
+  billingStatus         String?
+  billingPeriodEnd      DateTime?
   createdAt        DateTime        @default(now())
   users            User[]
   projects         Project[]
@@ -133,11 +139,19 @@ model Tenant {
   scim             TenantScim?
 }
 
-/// OpenID Connect single sign-on for one organization (Milestone 8).
+/// Single sign-on for one organization: OpenID Connect (Milestone 8) or SAML 2.0 (Milestone 13).
 model TenantSso {
   tenantId           String   @id
   tenant             Tenant   @relation(fields: [tenantId], references: [id])
   enabled            Boolean  @default(false)
+  /// OIDC or SAML. The OIDC fields are empty for SAML and the SAML fields null for OIDC.
+  protocol           String   @default("OIDC")
+  /// SAML: the identity provider's single sign-on URL (HTTP-Redirect binding).
+  samlEntryPoint     String?
+  /// SAML: the identity provider's entity ID (the Issuer of its responses).
+  samlIdpIssuer      String?
+  /// SAML: the identity provider's signing certificates (PEM, public). Several during a rotation.
+  samlCerts          String[] @default([])
   issuer             String
   clientId           String
   /// Client secret sealed with SecretBox.
@@ -150,6 +164,27 @@ model TenantSso {
   jitRole            Role?
   updatedById        String?
   updatedAt          DateTime @updatedAt
+}
+
+/// A SAML sign-in in progress (Milestone 13): the AuthnRequest ID, used once to check InResponseTo.
+model SsoRequest {
+  id        String   @id
+  tenantId  String
+  next      String   @default("/")
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+/// Stripe webhook events already applied (Milestone 13), so a redelivered event changes nothing.
+model BillingEvent {
+  id        String   @id
+  type      String
+  tenantId  String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 /// SCIM 2.0 provisioning token for one organization (Milestone 8). Stored hashed like API keys.
