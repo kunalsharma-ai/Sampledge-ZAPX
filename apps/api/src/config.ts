@@ -108,6 +108,16 @@ const schema = z
     IPINFO_TOKEN: z.string().default(''),
     IPINFO_API_BASE: z.string().url().default('https://ipinfo.io'),
     NETWORK_REPUTATION_TIMEOUT_MS: z.coerce.number().int().min(100).max(10_000).default(2_000),
+    /**
+     * Milestone 17: transcription of interview recordings. "deepgram" sends a recording to Deepgram when
+     * a reviewer asks for its transcript; "off" sends nothing. DEEPGRAM_MODEL names the Deepgram model
+     * to use (see Deepgram's model list); there is deliberately no default.
+     */
+    TRANSCRIPTION: z.enum(['off', 'deepgram']).default('off'),
+    DEEPGRAM_API_KEY: z.string().default(''),
+    DEEPGRAM_MODEL: z.string().max(100).default(''),
+    DEEPGRAM_API_BASE: z.string().url().default('https://api.deepgram.com'),
+    TRANSCRIPTION_TIMEOUT_S: z.coerce.number().int().min(10).max(3600).default(600),
     /** Largest interview recording (CAPI audio), in megabytes. Photos are capped at 15. */
     CAPTURE_MAX_MB: z.coerce.number().min(1).max(500).default(100),
     /** Delete photos and recordings this many days after they were uploaded. 0 keeps them until erased. */
@@ -196,6 +206,12 @@ const schema = z
       .transform((v) => v === 'true'),
   })
   .superRefine((c, ctx) => {
+    if (c.TRANSCRIPTION === 'deepgram' && (!c.DEEPGRAM_API_KEY || !c.DEEPGRAM_MODEL))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DEEPGRAM_API_KEY'],
+        message: 'TRANSCRIPTION=deepgram needs DEEPGRAM_API_KEY and DEEPGRAM_MODEL',
+      });
     if (c.NETWORK_REPUTATION === 'ipinfo' && !c.IPINFO_TOKEN)
       ctx.addIssue({ code: 'custom', path: ['IPINFO_TOKEN'], message: 'IPINFO_TOKEN is required when NETWORK_REPUTATION=ipinfo' });
     if (c.NODE_ENV === 'production' && !c.SECRETS_KEY)

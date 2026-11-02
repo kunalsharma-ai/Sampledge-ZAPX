@@ -60,6 +60,8 @@ export interface CaptureView {
   size: number;
   createdAt: Date;
   url: string;
+  /** Recordings: the transcript, once a reviewer asked for one (Milestone 17). */
+  transcript?: { text: string; language: string | null; at: Date } | null;
 }
 
 @Injectable()
@@ -188,10 +190,23 @@ export class CaptureService {
 
   private async drop(c: { id: string; storageKey: string }) {
     await this.store.delete(c.storageKey);
-    await this.prisma.capture.update({ where: { id: c.id }, data: { deletedAt: new Date() } });
+    await this.prisma.capture.update({
+      where: { id: c.id },
+      data: { deletedAt: new Date(), transcript: null, transcriptLanguage: null, transcribedAt: null },
+    });
   }
 
-  view(c: { id: string; kind: string; ref: string; contentType: string; size: number; createdAt: Date }): CaptureView {
+  view(c: {
+    id: string;
+    kind: string;
+    ref: string;
+    contentType: string;
+    size: number;
+    createdAt: Date;
+    transcript?: string | null;
+    transcriptLanguage?: string | null;
+    transcribedAt?: Date | null;
+  }): CaptureView {
     return {
       id: c.id,
       kind: c.kind as CaptureKind,
@@ -200,6 +215,9 @@ export class CaptureService {
       size: c.size,
       createdAt: c.createdAt,
       url: `/api/captures/${c.id}`,
+      ...(c.kind === 'audio'
+        ? { transcript: c.transcribedAt ? { text: c.transcript ?? '', language: c.transcriptLanguage ?? null, at: c.transcribedAt } : null }
+        : {}),
     };
   }
 
@@ -251,6 +269,12 @@ export class CaptureService {
       recordings: rows.find((r) => r.kind === 'audio')?._count ?? 0,
       bytes: rows.reduce((n, r) => n + (r._sum.size ?? 0), 0),
       retentionDays: config().CAPTURE_RETENTION_DAYS,
+      transcription: {
+        enabled: config().TRANSCRIPTION !== 'off',
+        transcribed: await this.prisma.capture.count({
+          where: { tenantId: user.tenantId, surveyId, kind: 'audio', deletedAt: null, transcribedAt: { not: null } },
+        }),
+      },
     };
   }
 

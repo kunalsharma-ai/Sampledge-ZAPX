@@ -62,6 +62,7 @@ interface Capture {
   kind: 'photo' | 'audio';
   url: string;
   size: number;
+  transcript?: { text: string; language: string | null; at: string } | null;
 }
 interface Point {
   lat: number;
@@ -94,13 +95,14 @@ export function Quality({
   readOnly: boolean;
   onChange: (d: SurveyDefinition) => void;
 }) {
+  const [reviewKey, setReviewKey] = useState(0);
   return (
     <div className="stack">
       <FieldworkPanel surveyId={surveyId} />
-      <ReviewQueue surveyId={surveyId} readOnly={readOnly} />
+      <ReviewQueue key={reviewKey} surveyId={surveyId} readOnly={readOnly} />
       <QualitySettingsEditor def={def} readOnly={readOnly} onChange={onChange} />
       <CaptureSettingsEditor def={def} readOnly={readOnly} onChange={onChange} />
-      <CapturesPanel surveyId={surveyId} />
+      <CapturesPanel surveyId={surveyId} onTranscribed={() => setReviewKey((k) => k + 1)} />
       <BlockList />
     </div>
   );
@@ -390,6 +392,15 @@ function Evidence({ item: i }: { item: Item }) {
           <audio controls preload="none" src={i.recording.url} aria-label={`Recording of interview ${i.uid}`} />
         </div>
       ) : null}
+      {i.recording?.transcript ? (
+        <details className="transcript" data-testid="transcript">
+          <summary>
+            Transcript{i.recording.transcript.language ? ` (${i.recording.transcript.language})` : ''}{' '}
+            <span className="muted">· machine transcription, check against the recording</span>
+          </summary>
+          <p style={{ whiteSpace: 'pre-wrap' }}>{i.recording.transcript.text || <em className="muted">No speech was recognised.</em>}</p>
+        </details>
+      ) : null}
       {i.photos.length ? (
         <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
           {i.photos.map((p) => (
@@ -460,9 +471,25 @@ function CaptureSettingsEditor({
   );
 }
 
-function CapturesPanel({ surveyId }: { surveyId: string }) {
+interface CaptureSummary {
+  photos: number;
+  recordings: number;
+  bytes: number;
+  retentionDays: number;
+  transcription: { enabled: boolean; transcribed: number };
+}
+interface JobState {
+  id: string;
+  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+  progressNote: string | null;
+  error: string | null;
+  result: { transcribed?: number; failed?: number; remaining?: boolean } | null;
+}
+
+function CapturesPanel({ surveyId, onTranscribed }: { surveyId: string; onTranscribed: () => void }) {
   const me = useMe();
-  const [s, setS] = useState<{ photos: number; recordings: number; bytes: number; retentionDays: number } | null>(null);
+  const [s, setS] = useState<CaptureSummary | null>(null);
+  const [job, setJob] = useState<JobState | null>(null);
   const [error, setError] = useState<unknown>(null);
   const load = useCallback(async () => {
     try {
@@ -474,7 +501,40 @@ function CapturesPanel({ surveyId }: { surveyId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+  // Follow a transcription job until it ends, then refresh the counts and the review queue.
+  useEffect(() => {
+    if (!job || job.status === 'SUCCEEDED' || job.status === 'FAILED' || job.status === 'CANCELLED') return;
+    const t = setTimeout(async () => {
+      try {
+        const next = await api<JobState>(`/jobs/${job.id}`);
+        setJob(next);
+        if (next.status === 'SUCCEEDED') {
+          await load();
+          onTranscribed();
+        }
+      } catch (e) {
+        setError(e);
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [job, load, onTranscribed]);
   if (!s || (s.photos === 0 && s.recordings === 0)) return null;
+  const untranscribed = s.recordings - s.transcription.transcribed;
+  const transcribe = async () => {
+    if (
+      !window.confirm(
+        `Send ${untranscribed} recording${untranscribed === 1 ? '' : 's'} to the transcription service? The recordings leave ZAPX for this.`,
+      )
+    )
+      return;
+    setError(null);
+    try {
+      setJob(await api<JobState>(`/surveys/${surveyId}/captures/transcribe`, { method: 'POST', body: {} }));
+    } catch (e) {
+      setError(e);
+    }
+  };
+  const running = job && (job.status === 'QUEUED' || job.status === 'RUNNING');
   const erase = async () => {
     if (!window.confirm(`Erase all ${s.photos} photos and ${s.recordings} recordings of this survey? This cannot be undone.`)) return;
     try {
@@ -498,6 +558,30 @@ function CapturesPanel({ surveyId }: { surveyId: string }) {
           them, and every view is recorded in the audit log.
         </span>
       </div>
+      {s.recordings ? (
+        <div className="small" data-testid="transcription">
+          {s.transcription.enabled ? (
+            <>
+              {s.transcription.transcribed} of {s.recordings} recording{s.recordings === 1 ? '' : 's'} transcribed.{' '}
+              {untranscribed > 0 && (me?.role === 'ADMIN' || me?.role === 'PROGRAMMER') ? (
+                <button disabled={!!running} onClick={() => void transcribe()}>
+                  {running ? (job?.progressNote ?? 'Transcribing…') : `Transcribe ${untranscribed}`}
+                </button>
+              ) : null}
+              {job?.status === 'SUCCEEDED' ? (
+                <span role="status" className="ok-text">
+                  {' '}
+                  Transcribed {job.result?.transcribed ?? 0}
+                  {job.result?.failed ? `; ${job.result.failed} could not be transcribed` : ''}.
+                </span>
+              ) : null}
+              {job?.status === 'FAILED' ? <span className="warn-text"> {job.error}</span> : null}
+            </>
+          ) : (
+            <span className="muted">Transcription is not turned on for this installation.</span>
+          )}
+        </div>
+      ) : null}
       {me?.role === 'ADMIN' ? (
         <button className="danger" onClick={erase}>
           Erase all

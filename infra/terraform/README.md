@@ -64,7 +64,8 @@ aws secretsmanager put-secret-value --secret-id "$(terraform output -raw app_sec
   "ANTHROPIC_API_KEY": "",
   "STRIPE_SECRET_KEY": "",
   "STRIPE_WEBHOOK_SECRET": "",
-  "IPINFO_TOKEN": ""
+  "IPINFO_TOKEN": "",
+  "DEEPGRAM_API_KEY": ""
 }'
 ```
 

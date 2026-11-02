@@ -46,7 +46,7 @@ The interviewer app downloads media with the survey, so interviews with media wo
 
 Design → Devices → **Offer "Read aloud" on every question** adds a button that reads the question
 and its answers with the voices installed on the respondent's device, in the survey language when
-one is available. Nothing is uploaded. Recorded voice-over and transcription of spoken answers are
+one is available. Nothing is uploaded. Recorded voice-over and transcription of spoken online answers are
 not built yet (they need a speech provider).
 
 ## Data and analysis

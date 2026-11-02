@@ -3,10 +3,30 @@
  * recording for face-to-face interviews; an online respondent answers with a photo; a bot that fills
  * the hidden field is flagged and rejected with its device blocked; an interviewer records an
  * interview offline with a photo and the respondent's consent, it syncs with its files, and the
- * reviewer sees the location, the recording and the photo.
+ * reviewer sees the location, the recording and the photo. Milestone 17: the reviewer asks for the
+ * recording's transcript (from a local stand-in for Deepgram, not the real service) and reads it.
  */
+import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+
+let deepgram: Server;
+const transcriptions: string[] = [];
+test.beforeAll(async () => {
+  deepgram = createServer((req, res) => {
+    transcriptions.push(req.url ?? '');
+    req.resume();
+    req.on('end', () =>
+      res
+        .writeHead(200, { 'Content-Type': 'application/json' })
+        .end(JSON.stringify({ results: { channels: [{ alternatives: [{ transcript: 'Do you agree to be recorded? Yes, I agree.' }] }] } })),
+    );
+  });
+  await new Promise<void>((r) => deepgram.listen(5191, '127.0.0.1', r));
+});
+test.afterAll(async () => {
+  await new Promise<void>((r) => (deepgram ? deepgram.close(() => r()) : r()));
+});
 
 const run = `m12${Date.now().toString(36)}`;
 const photo = join(__dirname, '../fixtures/pack-blue.png');
@@ -163,4 +183,16 @@ test('fraud signals, photo answers and face-to-face capture', async ({ page, bro
   await expect.poll(() => audio.evaluate((a: HTMLAudioElement) => a.readyState)).toBeGreaterThan(0);
   await expect(evidence.getByRole('img', { name: /Photo answer SHELF/ })).toHaveJSProperty('complete', true);
   await expect(page.getByTestId('captures')).toContainText('3 photos, 1 recording');
+
+  // Milestone 17: transcribe the recording and read it in the review card.
+  const transcription = page.getByTestId('transcription');
+  await expect(transcription).toContainText('0 of 1 recording transcribed.');
+  await transcription.getByRole('button', { name: 'Transcribe 1' }).click();
+  await expect(transcription.getByRole('status')).toHaveText('Transcribed 1.');
+  await expect(transcription).toContainText('1 of 1 recording transcribed.');
+  expect(transcriptions).toEqual(['/v1/listen?model=e2e-model&smart_format=true&punctuate=true&language=en']);
+  await queue.getByRole('tab', { name: 'All flagged' }).click();
+  const transcript = queue.getByTestId('review-item').filter({ hasText: 'Ana Field' }).getByTestId('transcript');
+  await transcript.getByText('Transcript').click();
+  await expect(transcript).toContainText('Do you agree to be recorded? Yes, I agree.');
 });
