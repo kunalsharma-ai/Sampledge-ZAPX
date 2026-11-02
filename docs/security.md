@@ -1,6 +1,9 @@
 # Security
 
-## Automated checks (CI)
+## Automated checks
+
+`pnpm check` runs the dependency audit with every other gate on your machine
+([ADR 0009](adr/0009-local-quality-gates.md)). When GitHub Actions is enabled, CI also runs:
 
 - CodeQL `security-extended` on every pull request and weekly.
 - `pnpm audit --prod --audit-level high` fails the build on high or critical advisories.

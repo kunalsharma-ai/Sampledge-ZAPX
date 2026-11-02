@@ -2,9 +2,7 @@
 
 ## How it was tested
 
-- [ ] `pnpm lint`, `pnpm format:check`, `pnpm typecheck`
-- [ ] `pnpm test`
-- [ ] `pnpm e2e` (if the UI or the respondent flow changed)
+- [ ] `pnpm check` passes on this branch's head commit (or `pnpm check --no-docker` with the reason)
 
 ## Checklist
 

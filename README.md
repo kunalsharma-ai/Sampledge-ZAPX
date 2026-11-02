@@ -127,17 +127,22 @@ the API. No model id is built into the code. Without a key the AI panel says AI 
 and every other feature, including template import and the QA lab, works as normal. Voice dictation
 uses the browser's speech recognition (Chrome, Edge, Safari).
 
-## Tests
+## Tests and quality checks
+
+Every check runs on your own machine with one command. GitHub Actions is not required:
 
 ```bash
-pnpm lint && pnpm format:check
-pnpm test     # packages, API integration tests (needs the database)
-pnpm e2e      # full-stack Playwright acceptance tests (starts the apps if not running)
+pnpm check              # install, format, lint, build, typecheck, migrations, tests, audit, e2e, Docker images
+pnpm check --quick      # format, lint, build, typecheck and unit/API tests only (a few minutes)
+pnpm check --no-docker  # everything except the Docker image build
 ```
 
-CI runs formatting, lint, build, type checks, migrations, all tests and the end-to-end tests on
-every pull request, plus a dependency audit, CodeQL, and a job that builds the Docker images and
-boots the whole stack. See [ADR 0006](docs/adr/0006-engineering-governance.md).
+It needs a database at `DATABASE_URL` (from `.env`) and, for the last step, Docker; without Docker
+the image build is skipped with a note. Run `pnpm check` before merging a pull request.
+
+The same steps are in [.github/workflows/ci.yml](.github/workflows/ci.yml) and run automatically on
+pull requests if GitHub Actions is enabled for the repository, together with CodeQL. Nothing depends
+on that. See [ADR 0006](docs/adr/0006-engineering-governance.md).
 
 ## Survey links and redirects
 
