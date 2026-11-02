@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "title": "Demo screener",
+  "welcome": "Thank you for taking part. This survey takes about 3 minutes.",
+  "thankYou": "Thank you, your answers have been recorded.",
+  "pages": [
+    {
+      "id": "P1",
+      "title": "About you",
+      "questions": [
+        { "id": "AGE", "type": "numeric", "text": "How old are you?", "min": 0, "max": 120, "unit": "years" },
+        {
+          "id": "GENDER",
+          "type": "single",
+          "text": "Which of these describes you?",
+          "options": [
+            { "code": 1, "label": "Man" },
+            { "code": 2, "label": "Woman" },
+            { "code": 3, "label": "Another identity" },
+            { "code": 99, "label": "Prefer not to say", "anchor": true }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "P2",
+      "title": "Brands",
+      "questions": [
+        {
+          "id": "AWARE",
+          "type": "multi",
+          "text": "Which of these brands have you heard of?",
+          "randomize": true,
+          "options": [
+            { "code": 1, "label": "Brand A" },
+            { "code": 2, "label": "Brand B" },
+            { "code": 3, "label": "Brand C" },
+            { "code": 98, "label": "Other", "anchor": true },
+            { "code": 99, "label": "None of these", "anchor": true, "exclusive": true }
+          ]
+        },
+        {
+          "id": "AWARE_OTHER",
+          "type": "open",
+          "text": "Which other brand?",
+          "condition": "selected(AWARE, 98)"
+        }
+      ]
+    },
+    {
+      "id": "P3",
+      "title": "Ratings",
+      "condition": "not selected(AWARE, 99)",
+      "questions": [
+        {
+          "id": "RATE",
+          "type": "grid",
+          "text": "You know {{AWARE}}. How would you rate each brand?",
+          "rows": [
+            { "id": "a", "label": "Brand A" },
+            { "id": "b", "label": "Brand B" },
+            { "id": "c", "label": "Brand C" }
+          ],
+          "columns": [
+            { "code": 1, "label": "Poor" },
+            { "code": 2, "label": "Fair" },
+            { "code": 3, "label": "Good" },
+            { "code": 4, "label": "Excellent" }
+          ],
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "P4",
+      "questions": [
+        { "id": "COMMENTS", "type": "open", "text": "Anything else you'd like to tell us?", "multiline": true, "required": false }
+      ]
+    }
+  ],
+  "terminations": [
+    { "id": "T_UNDERAGE", "condition": "AGE < 18", "label": "Under 18" }
+  ],
+  "quotas": [
+    { "id": "QT_MEN", "label": "Men", "condition": "GENDER == 1", "target": 1 },
+    { "id": "QT_WOMEN", "label": "Women", "condition": "GENDER == 2", "target": 50 }
+  ]
+}

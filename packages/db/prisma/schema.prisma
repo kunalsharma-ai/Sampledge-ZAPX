@@ -1,0 +1,205 @@
+// ZAPX relational model. The survey questionnaire itself is a versioned JSON document
+// (SurveyVersion.definition) validated by @zapx/survey-schema; everything that is queried
+// operationally (responses, quotas, vendors, audit) lives in tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  PROGRAMMER
+  VIEWER
+}
+
+enum SurveyStatus {
+  DRAFT
+  LIVE
+  PAUSED
+  CLOSED
+}
+
+enum VersionStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+}
+
+enum RedirectMode {
+  STATIC
+  DYNAMIC
+  HYBRID
+}
+
+enum ResponseStatus {
+  IN_PROGRESS
+  COMPLETE
+  TERMINATE
+  QUOTA_FULL
+  QUALITY_FAIL
+  SECURITY_REJECT
+  DUPLICATE
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  users     User[]
+  projects  Project[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(PROGRAMMER)
+  createdAt    DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  name      String
+  client    String?
+  createdAt DateTime @default(now())
+  surveys   Survey[]
+  vendors   Vendor[]
+
+  @@index([tenantId])
+}
+
+model Survey {
+  id            String          @id @default(cuid())
+  tenantId      String
+  projectId     String
+  project       Project         @relation(fields: [projectId], references: [id])
+  name          String
+  status        SurveyStatus    @default(DRAFT)
+  /// The published version respondents currently receive.
+  liveVersionId String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  versions      SurveyVersion[]
+  responses     Response[]
+  quotaCounts   QuotaCount[]
+
+  @@index([tenantId, projectId])
+}
+
+model SurveyVersion {
+  id          String        @id @default(cuid())
+  surveyId    String
+  survey      Survey        @relation(fields: [surveyId], references: [id])
+  version     Int
+  /// Canonical survey definition (see @zapx/survey-schema). Immutable once published.
+  definition  Json
+  status      VersionStatus @default(DRAFT)
+  /// Static logic analysis report captured at publish time.
+  checkReport Json?
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  publishedAt DateTime?
+  responses   Response[]
+
+  @@unique([surveyId, version])
+}
+
+model Vendor {
+  id                     String       @id @default(cuid())
+  tenantId               String
+  projectId              String
+  project                Project      @relation(fields: [projectId], references: [id])
+  name                   String
+  /// Vendor ID passed on survey links (vid=...). Unique within a project.
+  code                   String
+  redirectMode           RedirectMode @default(STATIC)
+  /// Static redirect URL per outcome status, e.g. {"complete": "https://...?uid=[UID]"}.
+  staticUrls             Json         @default("{}")
+  /// Words sent for [STATUS] per outcome, e.g. {"quota_full": "overquota"}.
+  statusWords            Json         @default("{}")
+  /// Hosts allowed for dynamic return URLs supplied at entry (protects against open redirects).
+  dynamicAllowedHosts    String[]     @default([])
+  /// Query parameter that carries the dynamic return URL on entry.
+  dynamicParam           String       @default("rurl")
+  /// Shared secret for signed entry links and signed redirects.
+  secret                 String
+  requireSignedEntry     Boolean      @default(false)
+  signRedirects          Boolean      @default(false)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  responses              Response[]
+
+  @@unique([projectId, code])
+  @@index([tenantId])
+}
+
+model Response {
+  id               String         @id @default(cuid())
+  tenantId         String
+  surveyId         String
+  survey           Survey         @relation(fields: [surveyId], references: [id])
+  /// The exact version this respondent answered.
+  versionId        String
+  version          SurveyVersion  @relation(fields: [versionId], references: [id])
+  vendorId         String?
+  vendor           Vendor?        @relation(fields: [vendorId], references: [id])
+  uid              String
+  country          String?
+  isTest           Boolean        @default(false)
+  status           ResponseStatus @default(IN_PROGRESS)
+  /// Termination rule or quota that ended the interview, if any.
+  outcomeReason    String?
+  answers          Json           @default("{}")
+  /// Index of the page currently shown; -1 once finished.
+  currentPage      Int            @default(0)
+  /// Extra entry parameters, available to redirects as [param:name].
+  entryParams      Json           @default("{}")
+  /// Validated dynamic return URL supplied at entry.
+  returnUrl        String?
+  /// SHA-256 of the respondent's session token; the token itself is never stored.
+  sessionTokenHash String         @unique
+  userAgent        String?
+  startedAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  completedAt      DateTime?
+
+  @@unique([surveyId, vendorId, uid])
+  @@index([tenantId, surveyId, status])
+}
+
+model QuotaCount {
+  id       String @id @default(cuid())
+  surveyId String
+  survey   Survey @relation(fields: [surveyId], references: [id])
+  quotaId  String
+  count    Int    @default(0)
+
+  @@unique([surveyId, quotaId])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  tenantId   String
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  data       Json     @default("{}")
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, entityType, entityId])
+  @@index([tenantId, createdAt])
+}
