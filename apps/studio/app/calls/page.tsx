@@ -172,7 +172,12 @@ export default function CallsPage() {
               {note}
             </p>
           ) : null}
-          {empty ? <p className="muted">Nobody is due to be called right now. Callbacks and retries come back when they are due.</p> : null}
+          {empty ? (
+            <p className="muted">
+              Nobody is due to be called right now. Callbacks and retries come back when they are due, and cases wait while it is outside
+              calling hours where the respondent lives.
+            </p>
+          ) : null}
           <ErrorNote error={error} />
         </section>
 

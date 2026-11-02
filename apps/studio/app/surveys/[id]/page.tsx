@@ -20,7 +20,7 @@ import { DesignStudio } from '@/components/DesignStudio';
 import { Languages } from '@/components/Languages';
 import { Quality } from '@/components/Quality';
 import { CapiAssignments } from '@/components/CapiAssignments';
-import { CatiCalls } from '@/components/CatiCalls';
+import { CatiCalls, DoNotCallList } from '@/components/CatiCalls';
 import { ExportJobs } from '@/components/ExportJobs';
 import { Analysis } from '@/components/Analysis';
 
@@ -292,6 +292,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         <div className="stack">
           <CapiAssignments surveyId={id} readOnly={readOnly} hasLive={!!survey.liveVersionId} />
           <CatiCalls surveyId={id} readOnly={readOnly} />
+          {!readOnly ? <DoNotCallList /> : null}
         </div>
       ) : null}
       {tab === 'quality' ? <Quality surveyId={id} def={def} readOnly={readOnly} onChange={edit} /> : null}

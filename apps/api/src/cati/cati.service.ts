@@ -7,6 +7,7 @@ import { SecretBox } from '../platform/secret-box';
 import { InterviewService } from '../interview/interview.service';
 import { config } from '../config';
 import type { AuthUser } from '../auth/auth.types';
+import { hhmm, isTimeZone, phoneHash, withinHours, type CallingHours } from './calling-rules';
 
 /** How long an interviewer holds a case before it goes back to the queue. */
 export const CASE_LEASE_MS = 30 * 60_000;
@@ -21,6 +22,8 @@ export const DISPOSITIONS = {
   wrong_number: { label: 'Wrong number', retryAfterMs: null },
   not_eligible: { label: 'Not eligible', retryAfterMs: null },
   interviewed: { label: 'Interviewed', retryAfterMs: null },
+  /** The respondent asked not to be called again: the number joins the organization's do-not-call list. */
+  do_not_call: { label: 'Do not call again', retryAfterMs: null },
 } as const;
 export type Disposition = keyof typeof DISPOSITIONS;
 
@@ -37,8 +40,12 @@ export interface CaseInput {
   code: string;
   phone: string;
   name?: string;
+  timeZone?: string;
   data?: Record<string, string>;
 }
+
+/** Calling hours until a survey has its own: 09:00 to 21:00, Monday to Saturday, UTC. */
+export const DEFAULT_HOURS: CallingHours = { timeZone: 'UTC', callFrom: 9 * 60, callUntil: 21 * 60, days: [1, 2, 3, 4, 5, 6] };
 
 /**
  * CATI call lists (Milestone 9). Programmers upload a sample; interviewers work a queue of due cases
@@ -75,6 +82,8 @@ export class CatiService {
         return skipped.push({ row: i + 1, code, reason: 'The id must be 1-64 letters, digits, dots, dashes or underscores' });
       if (!phone) return skipped.push({ row: i + 1, code, reason: 'The phone number is not valid' });
       if (seen.has(code)) return skipped.push({ row: i + 1, code, reason: 'This id appears twice in the file' });
+      const tz = c.timeZone?.trim();
+      if (tz && !isTimeZone(tz)) return skipped.push({ row: i + 1, code, reason: `Unknown time zone ${tz.slice(0, 64)}` });
       seen.add(code);
       const data: Record<string, string> = {};
       for (const [k, v] of Object.entries(c.data ?? {}).slice(0, 30))
@@ -85,6 +94,8 @@ export class CatiService {
         code,
         phoneSealed: this.secrets.seal(phone),
         phoneHint: phone.slice(-3),
+        phoneHash: phoneHash(user.tenantId, phone),
+        timeZone: tz || null,
         name: c.name?.trim().slice(0, 120) || null,
         data,
         maxAttempts,
@@ -127,9 +138,19 @@ export class CatiService {
       where: { id: { in: byInterviewer.map((r) => r.interviewerId) }, tenantId: user.tenantId },
       select: { id: true, name: true },
     });
+    const hours = await this.prisma.catiSettings.findUnique({ where: { surveyId } });
+    const [dnc] = await this.prisma.$queryRaw<Array<{ n: bigint }>>`
+      SELECT count(*) AS n FROM "CatiCase" c
+      WHERE c."surveyId" = ${surveyId} AND c.status IN ('PENDING', 'CALLBACK')
+        AND EXISTS (SELECT 1 FROM "DoNotCall" d WHERE d."tenantId" = c."tenantId" AND d."phoneHash" = c."phoneHash")`;
     return {
       cases: Object.fromEntries(byStatus.map((r) => [r.status, r._count])),
       dueNow: due,
+      /** Waiting cases whose number is on the do-not-call list (they are never offered). */
+      doNotCall: Number(dnc?.n ?? 0),
+      callingHours: hours ? { timeZone: hours.timeZone, from: hhmm(hours.callFrom), until: hhmm(hours.callUntil), days: hours.days } : null,
+      /** Whether it is inside calling hours now in the survey's own time zone (cases may have their own). */
+      withinHoursNow: hours ? withinHours(hours, new Date()) : true,
       dispositions: Object.fromEntries(byDisposition.map((r) => [r.disposition, r._count])),
       callsLast24h: byInterviewer.map((r) => ({
         interviewer: people.find((p) => p.id === r.interviewerId)?.name ?? 'Unknown',
@@ -249,17 +270,28 @@ export class CatiService {
       where: { surveyId, status: 'IN_CALL', lockedById: user.id, lockedUntil: { gte: new Date() } },
     });
     if (open) return this.opened(user, open);
+    await this.backfillHashes(survey.tenantId, surveyId);
     for (let i = 0; i < 10; i++) {
+      // Due cases, callbacks first. Numbers on the do-not-call list are never offered, and cases
+      // other than agreed callbacks only inside the survey's calling hours in the respondent's zone.
       const rows = await this.prisma.$queryRaw<Array<{ id: string }>>`
         UPDATE "CatiCase" SET status = 'IN_CALL', "lockedById" = ${user.id},
           "lockedUntil" = now() + make_interval(secs => ${CASE_LEASE_MS / 1000}), "updatedAt" = now()
         WHERE id = (
-          SELECT id FROM "CatiCase"
-          WHERE "surveyId" = ${surveyId} AND "phoneSealed" <> '' AND (
-            (status IN ('PENDING', 'CALLBACK') AND "nextCallAt" <= now())
-            OR (status = 'IN_CALL' AND "lockedUntil" < now()))
-          ORDER BY (status = 'CALLBACK') DESC, "nextCallAt" ASC
-          LIMIT 1 FOR UPDATE SKIP LOCKED)
+          SELECT c.id FROM "CatiCase" c
+          LEFT JOIN "CatiSettings" s ON s."surveyId" = c."surveyId"
+          WHERE c."surveyId" = ${surveyId} AND c."phoneSealed" <> '' AND (
+            (c.status IN ('PENDING', 'CALLBACK') AND c."nextCallAt" <= now())
+            OR (c.status = 'IN_CALL' AND c."lockedUntil" < now()))
+          AND NOT EXISTS (SELECT 1 FROM "DoNotCall" d WHERE d."tenantId" = c."tenantId" AND d."phoneHash" = c."phoneHash")
+          AND (c.status = 'CALLBACK' OR s."surveyId" IS NULL OR (
+            EXTRACT(ISODOW FROM now() AT TIME ZONE COALESCE(c."timeZone", s."timeZone"))::int = ANY(s.days)
+            AND (EXTRACT(HOUR FROM now() AT TIME ZONE COALESCE(c."timeZone", s."timeZone")) * 60
+              + EXTRACT(MINUTE FROM now() AT TIME ZONE COALESCE(c."timeZone", s."timeZone")))::int >= s."callFrom"
+            AND (EXTRACT(HOUR FROM now() AT TIME ZONE COALESCE(c."timeZone", s."timeZone")) * 60
+              + EXTRACT(MINUTE FROM now() AT TIME ZONE COALESCE(c."timeZone", s."timeZone")))::int < s."callUntil"))
+          ORDER BY (c.status = 'CALLBACK') DESC, c."nextCallAt" ASC
+          LIMIT 1 FOR UPDATE OF c SKIP LOCKED)
         RETURNING id`;
       if (!rows.length) return null;
       const c = await this.prisma.catiCase.findUniqueOrThrow({ where: { id: rows[0]!.id } });
@@ -274,6 +306,98 @@ export class CatiService {
       return this.opened(user, c);
     }
     return null;
+  }
+
+  /** Cases added before Milestone 18 have no number hash yet; compute it so the do-not-call list applies. */
+  private async backfillHashes(tenantId: string, surveyId: string) {
+    const rows = await this.prisma.catiCase.findMany({
+      where: { surveyId, phoneHash: null, phoneSealed: { not: '' } },
+      select: { id: true, phoneSealed: true },
+      take: 1000,
+    });
+    for (const r of rows)
+      await this.prisma.catiCase.update({
+        where: { id: r.id },
+        data: { phoneHash: phoneHash(tenantId, this.secrets.open(r.phoneSealed)) },
+      });
+  }
+
+  // ---- Calling hours (Milestone 18) ------------------------------------------------------------
+
+  async hours(user: AuthUser, surveyId: string) {
+    await this.survey(user, surveyId);
+    const s = await this.prisma.catiSettings.findUnique({ where: { surveyId } });
+    return s
+      ? { set: true, timeZone: s.timeZone, from: hhmm(s.callFrom), until: hhmm(s.callUntil), days: s.days }
+      : {
+          set: false,
+          timeZone: DEFAULT_HOURS.timeZone,
+          from: hhmm(DEFAULT_HOURS.callFrom),
+          until: hhmm(DEFAULT_HOURS.callUntil),
+          days: DEFAULT_HOURS.days,
+        };
+  }
+
+  async setHours(user: AuthUser, surveyId: string, h: { timeZone: string; from: string; until: string; days: number[] } | null) {
+    const survey = await this.survey(user, surveyId);
+    if (!h) {
+      await this.prisma.catiSettings.deleteMany({ where: { surveyId } });
+      await this.audit.record(user, 'cati.hours_clear', 'survey', surveyId, {});
+      return this.hours(user, surveyId);
+    }
+    if (!isTimeZone(h.timeZone)) throw new BadRequestException(`Unknown time zone ${h.timeZone}`);
+    const minutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+    const callFrom = minutes(h.from);
+    const callUntil = h.until === '24:00' ? 1440 : minutes(h.until);
+    if (callFrom >= callUntil) throw new BadRequestException('Calls must start before they end (overnight windows are not supported)');
+    const days = [...new Set(h.days)].sort((a, b) => a - b);
+    const data = { timeZone: h.timeZone, callFrom, callUntil, days };
+    await this.prisma.catiSettings.upsert({ where: { surveyId }, create: { surveyId, tenantId: survey.tenantId, ...data }, update: data });
+    await this.audit.record(user, 'cati.hours_set', 'survey', surveyId, { ...data });
+    return this.hours(user, surveyId);
+  }
+
+  // ---- Do-not-call list (Milestone 18) ---------------------------------------------------------
+
+  async doNotCall(user: AuthUser) {
+    const [count, latest] = await Promise.all([
+      this.prisma.doNotCall.count({ where: { tenantId: user.tenantId } }),
+      this.prisma.doNotCall.findMany({ where: { tenantId: user.tenantId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+    ]);
+    return { count, latest: latest.map((d) => ({ id: d.id, hint: `…${d.hint}`, source: d.source, note: d.note, createdAt: d.createdAt })) };
+  }
+
+  /** Add numbers (one or a whole file). Numbers already on the list are left as they are. */
+  async addDoNotCall(user: AuthUser, phones: string[], source: 'upload' | 'manual', note?: string) {
+    const invalid: string[] = [];
+    const rows = new Map<string, { hint: string }>();
+    for (const raw of phones) {
+      const p = normalizePhone(raw);
+      if (!p) {
+        if (raw.trim()) invalid.push(raw.slice(0, 40));
+        continue;
+      }
+      rows.set(phoneHash(user.tenantId, p), { hint: p.slice(-3) });
+    }
+    const { count } = await this.prisma.doNotCall.createMany({
+      data: [...rows].map(([hash, r]) => ({
+        tenantId: user.tenantId,
+        phoneHash: hash,
+        hint: r.hint,
+        source,
+        note: note?.trim().slice(0, 200) || null,
+        createdById: user.id,
+      })),
+      skipDuplicates: true,
+    });
+    await this.audit.record(user, 'cati.dnc_add', 'tenant', user.tenantId, { added: count, invalid: invalid.length, source });
+    return { added: count, alreadyListed: rows.size - count, invalid: invalid.slice(0, 20), invalidCount: invalid.length };
+  }
+
+  async removeDoNotCall(user: AuthUser, id: string) {
+    const { count } = await this.prisma.doNotCall.deleteMany({ where: { id, tenantId: user.tenantId } });
+    if (!count) throw new NotFoundException('Not on the list');
+    await this.audit.record(user, 'cati.dnc_remove', 'do_not_call', id, {});
   }
 
   private async opened(user: AuthUser, c: CatiCase) {
@@ -334,6 +458,16 @@ export class CatiService {
     else if (rule.retryAfterMs === null) data = { status: 'CLOSED', closedReason: disposition };
     else if (attempts >= c.maxAttempts) data = { status: 'CLOSED', closedReason: 'max_attempts' };
     else data = { status: 'PENDING', nextCallAt: new Date(Date.now() + rule.retryAfterMs) };
+    // The respondent asked not to be called again: every survey of the organization respects it.
+    if (disposition === 'do_not_call' && c.phoneSealed) {
+      const p = this.secrets.open(c.phoneSealed);
+      await this.prisma.doNotCall.createMany({
+        data: [
+          { tenantId: c.tenantId, phoneHash: phoneHash(c.tenantId, p), hint: p.slice(-3), source: 'respondent', createdById: user.id },
+        ],
+        skipDuplicates: true,
+      });
+    }
     const [, updated] = await this.prisma.$transaction([
       this.prisma.catiCall.create({
         data: {
