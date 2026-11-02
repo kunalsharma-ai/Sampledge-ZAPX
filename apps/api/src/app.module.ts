@@ -7,6 +7,7 @@ import { CommonModule } from './common/common.module';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { UsersController } from './users/users.controller';
+import { PreferencesController } from './users/preferences.controller';
 import { MediaController } from './media/media.controller';
 import { MediaService } from './media/media.service';
 import { AnalysisController } from './analysis/analysis.controller';
@@ -78,6 +79,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     TelephonyController,
     AuthController,
     UsersController,
+    PreferencesController,
     CatiController,
     AnalysisController,
     MediaController,

@@ -131,6 +131,8 @@ model Tenant {
   /// Stripe subscription status (active, trialing, past_due, canceled, ...).
   billingStatus         String?
   billingPeriodEnd      DateTime?
+  /// Quantum Design System: the organization's default appearance for members who have not chosen their own.
+  appearanceDefaults    Json            @default("{}")
   createdAt             DateTime        @default(now())
   users                 User[]
   projects              Project[]
@@ -209,6 +211,8 @@ model User {
   projectScope      ProjectScope     @default(ALL)
   /// Disabled members cannot sign in, and their sessions and API keys stop working at once.
   disabledAt        DateTime?
+  /// Personal preferences, e.g. {appearance: {...}} (Quantum Design System). Follows the member across devices.
+  preferences       Json             @default("{}")
   /// Subject from the organization's identity provider (OIDC `sub`), set on first SSO sign-in.
   ssoSubject        String?
   /// The identity provider's id for this member when provisioned through SCIM.

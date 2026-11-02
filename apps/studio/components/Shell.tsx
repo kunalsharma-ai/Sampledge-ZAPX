@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import { Palette, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
@@ -11,6 +12,9 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
     <>
       <header className="topbar">
         <Link href="/" className="brand" style={{ color: 'inherit' }}>
+          <span className="brand-mark" aria-hidden="true">
+            <Zap size={13} strokeWidth={2.6} />
+          </span>
           SAMPLEDGE <span>ZAPX</span>
         </Link>
         <nav className="muted">{crumbs}</nav>
@@ -29,6 +33,10 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
             API keys
           </Link>
         ) : null}
+        <Link href="/appearance" className="small" title="Theme, mode, density and motion" data-testid="appearance-link">
+          <Palette size={14} aria-hidden style={{ verticalAlign: -2, marginRight: 4 }} />
+          Appearance
+        </Link>
         {me ? (
           <span className="muted small">
             {me.name} · {me.role.toLowerCase()} · {me.tenant.name}

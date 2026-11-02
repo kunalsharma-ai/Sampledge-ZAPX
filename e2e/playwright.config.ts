@@ -12,6 +12,7 @@ const env = {
   ...process.env,
   ALLOW_SIGNUP: 'true',
   SIGNUP_RATE_PER_MINUTE: '50',
+  LOGIN_RATE_PER_MINUTE: '50',
   SSO_ALLOW_INSECURE_ISSUER: 'true',
   TRANSCRIPTION: 'deepgram',
   DEEPGRAM_API_KEY: 'e2e-key',

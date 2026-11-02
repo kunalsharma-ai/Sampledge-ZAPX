@@ -43,6 +43,8 @@ test('redirect rules, callbacks, vendor logs and AI settings', async ({ page, co
 
   // --- Project, survey ---
   await page.getByRole('link', { name: 'Projects' }).click();
+  // Wait for the projects page: "Name" also matches the settings page's "Member name" field.
+  await expect(page.getByRole('heading', { name: 'New project' })).toBeVisible();
   await page.getByLabel('Name').fill('Global panel');
   await page.getByRole('button', { name: 'Create project' }).click();
   await page.getByRole('link', { name: 'Global panel' }).click();
