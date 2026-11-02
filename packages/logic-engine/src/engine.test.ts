@@ -185,8 +185,7 @@ describe('static analysis', () => {
     expect(report.ok).toBe(true);
   });
 
-  const base = (pages: unknown[], extra: Record<string, unknown> = {}) =>
-    make({ schemaVersion: 1, title: 't', pages, ...extra });
+  const base = (pages: unknown[], extra: Record<string, unknown> = {}) => make({ schemaVersion: 1, title: 't', pages, ...extra });
   const codes = (def: SurveyDefinition) => analyzeSurvey(def).issues.map((i) => i.code);
 
   it('finds undefined variables, forward references and parse errors', () => {
@@ -207,7 +206,20 @@ describe('static analysis', () => {
 
   it('finds impossible conditions and unreachable pages', () => {
     const def = base([
-      { id: 'P1', questions: [{ id: 'Q1', type: 'single', text: 'a', options: [{ code: 1, label: 'x' }, { code: 2, label: 'y' }] }] },
+      {
+        id: 'P1',
+        questions: [
+          {
+            id: 'Q1',
+            type: 'single',
+            text: 'a',
+            options: [
+              { code: 1, label: 'x' },
+              { code: 2, label: 'y' },
+            ],
+          },
+        ],
+      },
       { id: 'P2', condition: 'Q1 == 1 and Q1 == 2', questions: [{ id: 'Q2', type: 'open', text: 'b' }] },
       { id: 'P3', questions: [{ id: 'Q3', type: 'open', text: 'c', condition: 'false' }] },
     ]);
@@ -222,7 +234,15 @@ describe('static analysis', () => {
         {
           id: 'P1',
           questions: [
-            { id: 'Q1', type: 'single', text: 'a', options: [{ code: 1, label: 'x' }, { code: 1, label: 'y' }] },
+            {
+              id: 'Q1',
+              type: 'single',
+              text: 'a',
+              options: [
+                { code: 1, label: 'x' },
+                { code: 1, label: 'y' },
+              ],
+            },
             { id: 'q1', type: 'numeric', text: 'b', min: 10, max: 5 },
           ],
         },

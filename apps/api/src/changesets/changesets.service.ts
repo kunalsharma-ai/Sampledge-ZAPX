@@ -51,7 +51,11 @@ export class ChangeSetsService {
         prompt: input.prompt?.slice(0, 20000),
         sourceFileName: input.sourceFileName?.slice(0, 200),
         proposedDefinition: input.proposed as unknown as Prisma.InputJsonValue,
-        diff: (diff ?? { items: [], counts: { added: 0, removed: 0, changed: 0, moved: 0 }, affectsData: false }) as unknown as Prisma.InputJsonValue,
+        diff: (diff ?? {
+          items: [],
+          counts: { added: 0, removed: 0, changed: 0, moved: 0 },
+          affectsData: false,
+        }) as unknown as Prisma.InputJsonValue,
         assumptions: (input.assumptions ?? []) as Prisma.InputJsonValue,
         confidence: (input.confidence ?? undefined) as Prisma.InputJsonValue | undefined,
         check: {
@@ -127,7 +131,14 @@ export class ChangeSetsService {
         data: { status: 'APPLIED', decidedById: user.id, decidedAt: new Date() },
       });
       if (decided.count !== 1) throw new ConflictException('This change set was decided by someone else.');
-      await this.audit.record(user, 'changeset.apply', 'survey', cs.surveyId, { changeSetId: id, source: cs.source, producer: cs.producer }, tx);
+      await this.audit.record(
+        user,
+        'changeset.apply',
+        'survey',
+        cs.surveyId,
+        { changeSetId: id, source: cs.source, producer: cs.producer },
+        tx,
+      );
       return tx.surveyVersion.findUniqueOrThrow({ where: { id: cs.baseVersionId } });
     });
     return { version: result, check: this.surveys.check(parsed.definition, result.presentation) };

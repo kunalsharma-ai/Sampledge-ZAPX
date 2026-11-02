@@ -130,7 +130,10 @@ function numericHints(def: SurveyDefinition): Map<string, number[]> {
     else if (node.kind === 'call' || node.kind === 'list') (node.kind === 'call' ? node.args : node.items).forEach(walk);
   };
   const exprs: string[] = [
-    ...def.pages.flatMap((p) => [p.condition, ...p.questions.flatMap((q) => [q.condition, ...(q.type === 'info' ? [] : q.validations.map((v) => v.expr))])]),
+    ...def.pages.flatMap((p) => [
+      p.condition,
+      ...p.questions.flatMap((q) => [q.condition, ...(q.type === 'info' ? [] : q.validations.map((v) => v.expr))]),
+    ]),
     ...def.terminations.map((t) => t.condition),
     ...def.quotas.map((q) => q.condition),
   ].filter((e): e is string => !!e);
@@ -235,7 +238,8 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
         item('condition_true', `q:${q.id}`, `${q.id} condition true`);
         item('condition_false', `q:${q.id}`, `${q.id} condition false`);
       }
-      if (q.type === 'single' || q.type === 'multi') for (const o of q.options) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" chosen`);
+      if (q.type === 'single' || q.type === 'multi')
+        for (const o of q.options) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" chosen`);
       if (q.type === 'grid') for (const o of q.columns) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" chosen in a row`);
     }
   }
@@ -330,7 +334,13 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
           const v = accepted[q.id];
           if (v !== undefined && v !== null && q.type !== 'info') {
             hit('question', q.id);
-            const codes = Array.isArray(v) ? v : typeof v === 'number' && (q.type === 'single') ? [v] : q.type === 'grid' && typeof v === 'object' ? Object.values(v as Record<string, number>) : [];
+            const codes = Array.isArray(v)
+              ? v
+              : typeof v === 'number' && q.type === 'single'
+                ? [v]
+                : q.type === 'grid' && typeof v === 'object'
+                  ? Object.values(v as Record<string, number>)
+                  : [];
             for (const c of codes) {
               const key = `${q.id}=${c}`;
               hit('option', key);
@@ -374,7 +384,13 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
       outcome = 'error';
       reason = e instanceof Error ? e.message : String(e);
       if (!defects.some((d) => d.code === 'ENGINE_ERROR'))
-        defects.push({ severity: 'error', code: 'ENGINE_ERROR', message: `The interview engine failed: ${reason}`, location: 'survey', example: { index: i, pages: visited, answers } });
+        defects.push({
+          severity: 'error',
+          code: 'ENGINE_ERROR',
+          message: `The interview engine failed: ${reason}`,
+          location: 'survey',
+          example: { index: i, pages: visited, answers },
+        });
     }
     outcomes[outcome]++;
     paths.add(visited.join('>'));
@@ -410,7 +426,12 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
         location: `terminations.${it.id}`,
       });
     else if (it.kind === 'quota')
-      defects.push({ severity: 'warning', code: 'QUOTA_NEVER_MATCHED', message: `No simulated complete matched quota ${it.id}.`, location: `quotas.${it.id}` });
+      defects.push({
+        severity: 'warning',
+        code: 'QUOTA_NEVER_MATCHED',
+        message: `No simulated complete matched quota ${it.id}.`,
+        location: `quotas.${it.id}`,
+      });
   }
   for (const [key, c] of condCounts) {
     if (c.t + c.f >= 20 && (c.t === 0 || c.f === 0)) {

@@ -43,12 +43,21 @@ let auth: Record<string, string>;
 let surveyId: string;
 
 async function newSurvey(name: string) {
-  const projectId = (await http.post('/api/projects').set(auth).send({ name: `P ${name}` }).expect(201)).body.id;
+  const projectId = (
+    await http
+      .post('/api/projects')
+      .set(auth)
+      .send({ name: `P ${name}` })
+      .expect(201)
+  ).body.id;
   return (await http.post(`/api/projects/${projectId}/surveys`).set(auth).send({ name }).expect(201)).body.id as string;
 }
 
 beforeAll(async () => {
-  const mod = await Test.createTestingModule({ imports: [AppModule] }).overrideProvider(AiProvider).useValue(fake).compile();
+  const mod = await Test.createTestingModule({ imports: [AppModule] })
+    .overrideProvider(AiProvider)
+    .useValue(fake)
+    .compile();
   app = configureApp(mod.createNestApplication());
   await app.init();
   http = request(app.getHttpServer());
@@ -134,7 +143,9 @@ describe('Template import and change sets', () => {
 
   it('turns an upload into a proposal without touching the draft', async () => {
     const before = (await http.get(`/api/surveys/${surveyId}/draft`).set(auth).expect(200)).body.version;
-    const cs = (await http.post(`/api/surveys/${surveyId}/import`).set(auth).attach('file', Buffer.from(CSV), 'questionnaire.csv').expect(201)).body;
+    const cs = (
+      await http.post(`/api/surveys/${surveyId}/import`).set(auth).attach('file', Buffer.from(CSV), 'questionnaire.csv').expect(201)
+    ).body;
     changeSetId = cs.id;
     expect(cs.source).toBe('IMPORT');
     expect(cs.status).toBe('PROPOSED');
@@ -150,12 +161,23 @@ describe('Template import and change sets', () => {
   });
 
   it('imports the XLSX template the same way', async () => {
-    const tpl = await http.get('/api/imports/template.xlsx').set(auth).buffer(true).parse((res, cb) => {
-      const chunks: Buffer[] = [];
-      res.on('data', (c: Buffer) => chunks.push(c));
-      res.on('end', () => cb(null, Buffer.concat(chunks)));
-    }).expect(200);
-    const cs = (await http.post(`/api/surveys/${surveyId}/import`).set(auth).attach('file', tpl.body as Buffer, 'template.xlsx').expect(201)).body;
+    const tpl = await http
+      .get('/api/imports/template.xlsx')
+      .set(auth)
+      .buffer(true)
+      .parse((res, cb) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (c: Buffer) => chunks.push(c));
+        res.on('end', () => cb(null, Buffer.concat(chunks)));
+      })
+      .expect(200);
+    const cs = (
+      await http
+        .post(`/api/surveys/${surveyId}/import`)
+        .set(auth)
+        .attach('file', tpl.body as Buffer, 'template.xlsx')
+        .expect(201)
+    ).body;
     const ids = cs.proposedDefinition.pages.flatMap((p: { questions: Array<{ id: string }> }) => p.questions.map((q) => q.id));
     expect(ids).toEqual(['AGE', 'GENDER', 'AWARE', 'RATE', 'WHY']);
     expect(cs.check.publishable).toBe(true);
@@ -174,7 +196,10 @@ describe('Template import and change sets', () => {
     const email = `viewer-${run}@test.zapx`;
     await http.post('/api/users').set(auth).send({ name: 'V', email, password: 'viewer-password-1', role: 'VIEWER' }).expect(201);
     const login = await http.post('/api/auth/login').send({ email, password: 'viewer-password-1' }).expect(200);
-    await http.post(`/api/changesets/${changeSetId}/apply`).set({ Authorization: `Bearer ${login.body.token}` }).expect(403);
+    await http
+      .post(`/api/changesets/${changeSetId}/apply`)
+      .set({ Authorization: `Bearer ${login.body.token}` })
+      .expect(403);
 
     const applied = (await http.post(`/api/changesets/${changeSetId}/apply`).set(auth).expect(201)).body;
     expect(applied.version.definition.pages[0].questions[1].id).toBe('GENDER');
@@ -184,7 +209,8 @@ describe('Template import and change sets', () => {
   });
 
   it('refuses to apply a proposal made against an older draft', async () => {
-    const cs = (await http.post(`/api/surveys/${surveyId}/changesets`).set(auth).send({ title: 'Paste', definition: demo }).expect(201)).body;
+    const cs = (await http.post(`/api/surveys/${surveyId}/changesets`).set(auth).send({ title: 'Paste', definition: demo }).expect(201))
+      .body;
     await http.put(`/api/surveys/${surveyId}/draft`).set(auth).send({ definition: demo }).expect(200);
     const fetched = (await http.get(`/api/changesets/${cs.id}`).set(auth).expect(200)).body;
     expect(fetched.stale).toBe(true);
@@ -194,19 +220,37 @@ describe('Template import and change sets', () => {
 
 describe('AI Survey Architect', () => {
   it('reports AI status', async () => {
-    expect((await http.get('/api/ai/status').set(auth).expect(200)).body).toEqual({ configured: true, model: 'fake-model' });
+    expect((await http.get('/api/ai/status').set(auth).expect(200)).body).toMatchObject({
+      configured: true,
+      model: 'fake-model',
+      tasks: { architect: { model: 'fake-model', permitted: true }, translate: { model: 'fake-model', permitted: true } },
+    });
   });
 
   it('repairs an invalid first answer and returns a change set for review', async () => {
     const proposed = structuredClone(demo);
-    proposed.pages[0].questions.push({ id: 'REGION', type: 'single', text: 'Where do you live?', options: [{ code: 1, label: 'North' }, { code: 2, label: 'South' }] });
+    proposed.pages[0].questions.push({
+      id: 'REGION',
+      type: 'single',
+      text: 'Where do you live?',
+      options: [
+        { code: 1, label: 'North' },
+        { code: 2, label: 'South' },
+      ],
+    });
     fake.queue = [
       { definitionJson: JSON.stringify({ ...proposed, pages: [] }) },
       { definitionJson: JSON.stringify(proposed), assumptions: ['Regions were not specified; used North and South.'] },
     ];
     fake.calls.length = 0;
     const draftBefore = (await http.get(`/api/surveys/${surveyId}/draft`).set(auth).expect(200)).body.version;
-    const cs = (await http.post(`/api/surveys/${surveyId}/ai/propose`).set(auth).send({ instruction: 'Add a region question after gender' }).expect(201)).body;
+    const cs = (
+      await http
+        .post(`/api/surveys/${surveyId}/ai/propose`)
+        .set(auth)
+        .send({ instruction: 'Add a region question after gender' })
+        .expect(201)
+    ).body;
     expect(fake.calls.length).toBe(2);
     expect(fake.calls[0]!.current?.title).toBe(demo.title);
     expect(fake.calls[1]!.feedback?.problems[0]).toContain('pages');
@@ -259,4 +303,3 @@ describe('Without an API key', () => {
     }
   });
 });
-

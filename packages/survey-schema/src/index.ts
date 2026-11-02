@@ -137,6 +137,7 @@ export const pageSchema = z.object({
 export type Page = z.infer<typeof pageSchema>;
 
 /** Final statuses a respondent can reach. Each maps to a vendor redirect. */
+/** The same eight statuses as PROJEXA. `partial` = abandoned; `technical_error` = ZAPX could not continue. */
 export const OUTCOME_STATUSES = [
   'complete',
   'terminate',
@@ -144,6 +145,8 @@ export const OUTCOME_STATUSES = [
   'quality_fail',
   'security_reject',
   'duplicate',
+  'partial',
+  'technical_error',
 ] as const;
 export type OutcomeStatus = (typeof OUTCOME_STATUSES)[number];
 
@@ -192,9 +195,7 @@ export interface SchemaIssue {
 }
 
 /** Validate and normalize (apply defaults to) an untrusted survey definition. */
-export function parseSurveyDefinition(
-  input: unknown,
-): { ok: true; definition: SurveyDefinition } | { ok: false; issues: SchemaIssue[] } {
+export function parseSurveyDefinition(input: unknown): { ok: true; definition: SurveyDefinition } | { ok: false; issues: SchemaIssue[] } {
   const result = surveyDefinitionSchema.safeParse(input);
   if (result.success) return { ok: true, definition: result.data };
   return {

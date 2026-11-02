@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 3)
+# ZAPX architecture (Milestones 1 to 4)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -84,14 +84,32 @@ It never contains logic.
    terminations and quota checks, and moves to the next visible page.
 4. On completion, quota counters are incremented atomically (`count < target` in the same
    transaction), so concurrent completes cannot overfill a quota.
-5. The vendor redirect is resolved by `RedirectService` (static, dynamic or hybrid).
+5. The vendor redirect is resolved by `RedirectService`, recorded in the redirect log, and the
+   vendor's callback (if any) is queued in the outbox.
 
-## Swappable redirect service
+## Redirect & Vendor Integration (Milestone 4)
 
-The interview flow depends on the abstract `RedirectService`
-(`apps/api/src/vendors/redirect.service.ts`). `LocalRedirectService` is today's implementation. If
-Sampledge builds a shared redirect service for PROJEXA and the marketplace, ZAPX switches by
-providing a different implementation; nothing else changes.
+Redirects, callbacks, the redirect log and the vendor API form one separable module: pure logic in
+`packages/redirect-core`, database access only in `RedirectRepository`, and the rest of ZAPX sees
+only the abstract `RedirectService`. Direct vendors are resolved by ZAPX with the precedence
+vendor + country > vendor > project + country > project > organization; PROJEXA vendors follow
+PROJEXA's documented survey-platform contract (not yet verified against a live PROJEXA). Outcome
+callbacks go through a PostgreSQL outbox with retries, a dead letter and manual replay. Details:
+[modules/redirects.md](modules/redirects.md), [ADR 0003](adr/0003-redirect-and-vendor-integration.md).
+
+## AI gateway (Milestone 4)
+
+Every AI call goes through `AiGateway`: model per task from configuration, tenant permissions, rate
+limits and a monthly budget, a circuit breaker, PII redaction for briefs and documents, and a usage
+and cost ledger with audit events. Details: [modules/ai-gateway.md](modules/ai-gateway.md),
+[ADR 0004](adr/0004-ai-gateway.md).
+
+## Decisions, contracts and operations
+
+- Architecture decisions: [adr/](adr/README.md)
+- Vendor API contract: [api/openapi.yaml](api/openapi.yaml)
+- Database operations (migrations, pooling, backups): [operations/database.md](operations/database.md)
+- Security checks and accepted exceptions: [security.md](security.md)
 
 ## Security notes
 
@@ -111,7 +129,6 @@ providing a different implementation; nothing else changes.
 - AI proposals return a full definition, so very long questionnaires may need to be imported in parts.
 - The Claude provider has been tested with a scripted fake; it needs an API key to be exercised live.
 - Grid questions are single choice per row; MaxDiff, conjoint, ranking and media questions come later.
-- One language per survey.
 - Back navigation is optional per survey and re-shows the previous visible page.
 - Exports are generated synchronously; background export jobs come with larger data volumes.
 - Re-entry with the same UID resumes an unfinished interview. With unsigned links, anyone who knows a

@@ -124,7 +124,10 @@ test('program, publish, respond, redirect, export', async ({ page, context }) =>
   await page.getByRole('tab', { name: 'Quotas & data' }).click();
   await expect(page.getByRole('cell', { name: 'E2E-1' })).toBeVisible();
   const csv = await (await page.request.get(page.url().replace(/\/surveys\/([^/?#]+).*/, '/api/surveys/$1/export?format=csv'))).text();
-  const [header, ...rows] = csv.replace(/^﻿/, '').trim().split('\r\n');
+  const [header, ...rows] = csv
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .split('\r\n');
   const cols = header!.split(',');
   expect(rows).toHaveLength(2);
   const row1 = rows.map((r) => r.split(',')).find((r) => r[cols.indexOf('uid')] === 'E2E-1')!;

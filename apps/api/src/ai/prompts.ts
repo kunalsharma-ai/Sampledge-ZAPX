@@ -103,7 +103,6 @@ Answer with JSON matching the given schema:
 - "definition_json": the complete survey definition, serialized as a JSON string.
 `.trim();
 
-
 export const TRANSLATOR_SYSTEM = `
 You are a professional survey translator for market research. You translate questionnaire text so
 that respondents in the target language understand exactly what the source asks, in natural,

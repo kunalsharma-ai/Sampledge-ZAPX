@@ -1,0 +1,45 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '23 4 * * 1'
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    env:
+      # Code scanning (the Security tab) needs GitHub Advanced Security on a private repository.
+      # Until the repository variable CODE_SCANNING_ENABLED is 'true', results are not uploaded to
+      # the Security tab; they are kept as a SARIF artifact and errors still fail this job.
+      UPLOAD: ${{ vars.CODE_SCANNING_ENABLED == 'true' && 'always' || 'never' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v4
+        with:
+          upload: ${{ env.UPLOAD }}
+          output: sarif-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeql-sarif
+          path: sarif-results
+          if-no-files-found: ignore
+      - name: Fail on error-level findings
+        run: |
+          total=$(jq '[.runs[].results[]] | length' sarif-results/*.sarif)
+          errors=$(jq '[.runs[].results[] | select(.level == "error")] | length' sarif-results/*.sarif)
+          echo "CodeQL findings: $total total, $errors at error level" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -r '.runs[].results[] | "- [\(.level)] \(.ruleId): \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine) \(.message.text)"' sarif-results/*.sarif | tee -a "$GITHUB_STEP_SUMMARY"
+          test "$errors" -eq 0

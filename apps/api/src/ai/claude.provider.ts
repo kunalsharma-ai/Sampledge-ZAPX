@@ -1,6 +1,13 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { BetaContentBlockParam, BetaMessage } from '@anthropic-ai/sdk/resources/beta/messages/messages';
-import { AiError, AiProvider, type ArchitectRequest, type ArchitectResult, type TranslateRequest, type TranslateResult } from './ai-provider';
+import {
+  AiError,
+  AiProvider,
+  type ArchitectRequest,
+  type ArchitectResult,
+  type TranslateRequest,
+  type TranslateResult,
+} from './ai-provider';
 import { ARCHITECT_SYSTEM, TRANSLATOR_SYSTEM } from './prompts';
 
 /** JSON schema the model's answer must follow (structured outputs). */
@@ -73,16 +80,18 @@ export class ClaudeAiProvider extends AiProvider {
   constructor(
     apiKey: string,
     readonly model: string,
+    opts: { maxRetries: number; timeoutMs: number },
   ) {
     super();
-    this.client = new Anthropic({ apiKey, maxRetries: 2, timeout: 10 * 60 * 1000 });
+    // The SDK retries 408/409/429/5xx and connection errors with backoff.
+    this.client = new Anthropic({ apiKey, maxRetries: opts.maxRetries, timeout: opts.timeoutMs });
   }
 
-  async architect(req: ArchitectRequest): Promise<ArchitectResult> {
+  async architect(req: ArchitectRequest, model = this.model): Promise<ArchitectResult> {
     let message: BetaMessage;
     try {
       const stream = this.client.beta.messages.stream({
-        model: this.model,
+        model,
         max_tokens: 64000,
         betas: ['server-side-fallback-2026-07-01'],
         fallbacks: 'default',
@@ -100,7 +109,11 @@ export class ClaudeAiProvider extends AiProvider {
       throw new AiError('The AI declined this request. Rephrase the instruction or edit the survey manually.', 422, 'REFUSED');
     }
     if (message.stop_reason === 'max_tokens') {
-      throw new AiError('The survey is too long to generate in one request. Split the questionnaire and import it in parts.', 422, 'TOO_LONG');
+      throw new AiError(
+        'The survey is too long to generate in one request. Split the questionnaire and import it in parts.',
+        422,
+        'TOO_LONG',
+      );
     }
     const text = message.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
     let parsed: { summary?: unknown; assumptions?: unknown; definition_json?: unknown };
@@ -113,25 +126,24 @@ export class ClaudeAiProvider extends AiProvider {
       throw new AiError('The AI answer did not include a survey definition. Try again.', 502, 'BAD_OUTPUT');
     }
     const servedByFallback =
-      message.content.some((b) => b.type === 'fallback') ||
-      (message.usage.iterations ?? []).some((i) => i.type === 'fallback_message');
+      message.content.some((b) => b.type === 'fallback') || (message.usage.iterations ?? []).some((i) => i.type === 'fallback_message');
     return {
       summary: typeof parsed.summary === 'string' ? parsed.summary : '',
       assumptions: Array.isArray(parsed.assumptions) ? parsed.assumptions.filter((a): a is string => typeof a === 'string') : [],
       definitionJson: parsed.definition_json,
       model: message.model,
       servedByFallback,
-      usage: { inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens },
+      usage: usageOf(message),
     };
   }
 
-  async translate(req: TranslateRequest): Promise<TranslateResult> {
+  async translate(req: TranslateRequest, model = this.model): Promise<TranslateResult> {
     let message: BetaMessage;
     const payload = JSON.stringify(req.items.map((i) => ({ key: i.key, context: i.context, text: i.text })));
     try {
       message = await this.client.beta.messages
         .stream({
-          model: this.model,
+          model,
           max_tokens: 32000,
           betas: ['server-side-fallback-2026-07-01'],
           fallbacks: 'default',
@@ -160,8 +172,17 @@ export class ClaudeAiProvider extends AiProvider {
     }
     const translations: Record<string, string> = {};
     for (const t of parsed.translations ?? []) if (typeof t.key === 'string' && typeof t.text === 'string') translations[t.key] = t.text;
-    return { translations, model: message.model };
+    return { translations, model: message.model, usage: usageOf(message) };
   }
+}
+
+function usageOf(message: BetaMessage) {
+  return {
+    inputTokens: message.usage.input_tokens,
+    outputTokens: message.usage.output_tokens,
+    cacheReadTokens: message.usage.cache_read_input_tokens ?? 0,
+    cacheWriteTokens: message.usage.cache_creation_input_tokens ?? 0,
+  };
 }
 
 function finalText(message: BetaMessage): string {
@@ -183,24 +204,26 @@ function mapError(err: unknown): AiError {
   if (err instanceof Anthropic.BadRequestError) {
     return new AiError(`The AI service rejected the request: ${err.message}`, 422, 'BAD_OUTPUT');
   }
-  if (err instanceof Anthropic.APIError) return new AiError('The AI service is unavailable right now. Try again shortly.', 503, 'UNAVAILABLE');
+  if (err instanceof Anthropic.APIError)
+    return new AiError('The AI service is unavailable right now. Try again shortly.', 503, 'UNAVAILABLE');
   return new AiError('The AI service could not be reached. Try again shortly.', 503, 'UNAVAILABLE');
 }
 
-/** Used when no API key is configured: every call explains how to enable AI. */
+/** Used when no API key or model is configured: every call explains how to enable AI. */
 export class UnconfiguredAiProvider extends AiProvider {
   readonly configured = false;
-  constructor(readonly model: string) {
+  readonly model = '';
+  constructor(private readonly reason = 'An administrator needs to set ANTHROPIC_API_KEY and AI_MODEL.') {
     super();
   }
   architect(): Promise<ArchitectResult> {
-    return Promise.reject(notConfigured());
+    return Promise.reject(notConfigured(this.reason));
   }
   translate(): Promise<TranslateResult> {
-    return Promise.reject(notConfigured());
+    return Promise.reject(notConfigured(this.reason));
   }
 }
 
-export function notConfigured(): AiError {
-  return new AiError('AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED');
+export function notConfigured(reason = 'An administrator needs to set ANTHROPIC_API_KEY and AI_MODEL.'): AiError {
+  return new AiError(`AI is not configured on this server. ${reason}`, 503, 'NOT_CONFIGURED');
 }

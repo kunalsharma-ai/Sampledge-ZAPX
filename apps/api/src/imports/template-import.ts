@@ -6,7 +6,21 @@
 import ExcelJS from 'exceljs';
 import { parseSurveyDefinition, VARIABLE_NAME, type SurveyDefinition } from '@zapx/survey-schema';
 
-export const TEMPLATE_COLUMNS = ['Page', 'ID', 'Type', 'Question', 'Options', 'Rows', 'Condition', 'Required', 'Help', 'Min', 'Max', 'Target', 'Notes'] as const;
+export const TEMPLATE_COLUMNS = [
+  'Page',
+  'ID',
+  'Type',
+  'Question',
+  'Options',
+  'Rows',
+  'Condition',
+  'Required',
+  'Help',
+  'Min',
+  'Max',
+  'Target',
+  'Notes',
+] as const;
 type Column = (typeof TEMPLATE_COLUMNS)[number];
 
 export interface RowReport {
@@ -30,14 +44,44 @@ export interface TemplateImportResult {
 }
 
 const TYPE_SYNONYMS: Record<string, string> = {
-  single: 'single', sa: 'single', 'single choice': 'single', 'single select': 'single', radio: 'single',
-  multi: 'multi', ma: 'multi', multiple: 'multi', 'multi choice': 'multi', 'multiple choice': 'multi', 'multi select': 'multi', checkbox: 'multi',
-  open: 'open', oe: 'open', text: 'open', 'open end': 'open', 'open ended': 'open', verbatim: 'open',
-  numeric: 'numeric', number: 'numeric', num: 'numeric', integer: 'numeric',
-  grid: 'grid', matrix: 'grid', scale: 'grid',
-  info: 'info', 'text block': 'info', intro: 'info', instruction: 'info', note: 'info',
-  terminate: 'terminate', term: 'terminate', 'screen out': 'terminate', screenout: 'terminate', close: 'terminate',
-  quality: 'quality_fail', 'quality fail': 'quality_fail', quality_fail: 'quality_fail',
+  single: 'single',
+  sa: 'single',
+  'single choice': 'single',
+  'single select': 'single',
+  radio: 'single',
+  multi: 'multi',
+  ma: 'multi',
+  multiple: 'multi',
+  'multi choice': 'multi',
+  'multiple choice': 'multi',
+  'multi select': 'multi',
+  checkbox: 'multi',
+  open: 'open',
+  oe: 'open',
+  text: 'open',
+  'open end': 'open',
+  'open ended': 'open',
+  verbatim: 'open',
+  numeric: 'numeric',
+  number: 'numeric',
+  num: 'numeric',
+  integer: 'numeric',
+  grid: 'grid',
+  matrix: 'grid',
+  scale: 'grid',
+  info: 'info',
+  'text block': 'info',
+  intro: 'info',
+  instruction: 'info',
+  note: 'info',
+  terminate: 'terminate',
+  term: 'terminate',
+  'screen out': 'terminate',
+  screenout: 'terminate',
+  close: 'terminate',
+  quality: 'quality_fail',
+  'quality fail': 'quality_fail',
+  quality_fail: 'quality_fail',
   quota: 'quota',
 };
 
@@ -61,10 +105,12 @@ export function parseOptions(cell: string, issues: string[]): { options: ParsedO
   for (const part of parts) {
     let text = part;
     const flags = new Set<string>();
-    text = text.replace(/\[(exclusive|anchor|excl|fixed)\]/gi, (_m, f: string) => {
-      flags.add(f.toLowerCase().startsWith('excl') ? 'exclusive' : 'anchor');
-      return '';
-    }).trim();
+    text = text
+      .replace(/\[(exclusive|anchor|excl|fixed)\]/gi, (_m, f: string) => {
+        flags.add(f.toLowerCase().startsWith('excl') ? 'exclusive' : 'anchor');
+        return '';
+      })
+      .trim();
     const m = OPTION_PATTERN.exec(text);
     let code: number;
     let label: string;
@@ -124,7 +170,13 @@ export function importTemplateRows(table: string[][], title: string): TemplateIm
   const reports: RowReport[] = [];
   const headerIndex = table.findIndex((r) => r.some((c) => /^question$/i.test(c.trim())) && r.some((c) => /^type$/i.test(c.trim())));
   if (headerIndex < 0) {
-    return { definition: null, rows: [], confidence: 0, errors: ['No header row found. The template needs at least "Type" and "Question" columns.'], assumptions };
+    return {
+      definition: null,
+      rows: [],
+      confidence: 0,
+      errors: ['No header row found. The template needs at least "Type" and "Question" columns.'],
+      assumptions,
+    };
   }
   const header = table[headerIndex]!.map((h) => h.trim().toLowerCase());
   const col = (name: Column) => header.indexOf(name.toLowerCase());
@@ -176,7 +228,13 @@ export function importTemplateRows(table: string[][], title: string): TemplateIm
     let type = TYPE_SYNONYMS[rawType];
     if (!type) {
       if (rawType) {
-        reports.push({ row: rowNo, id: get(row, 'ID') || null, kind: 'skipped', confidence: 0, issues: [`Unknown type "${get(row, 'Type')}"; row skipped`] });
+        reports.push({
+          row: rowNo,
+          id: get(row, 'ID') || null,
+          kind: 'skipped',
+          confidence: 0,
+          issues: [`Unknown type "${get(row, 'Type')}"; row skipped`],
+        });
         continue;
       }
       type = optionsCell ? 'single' : text ? 'open' : '';
@@ -187,12 +245,23 @@ export function importTemplateRows(table: string[][], title: string): TemplateIm
 
     if (type === 'terminate' || type === 'quality_fail') {
       if (!condition) {
-        reports.push({ row: rowNo, id: get(row, 'ID') || null, kind: 'skipped', confidence: 0, issues: ['Termination without a condition; row skipped'] });
+        reports.push({
+          row: rowNo,
+          id: get(row, 'ID') || null,
+          kind: 'skipped',
+          confidence: 0,
+          issues: ['Termination without a condition; row skipped'],
+        });
         continue;
       }
       const { id, generated } = uniqueId(get(row, 'ID'), () => `T${++autoT}`, issues);
       if (generated) confidence -= 0.1;
-      terminations.push({ id, condition, status: type === 'quality_fail' ? 'quality_fail' : 'terminate', ...(text ? { label: text } : {}) });
+      terminations.push({
+        id,
+        condition,
+        status: type === 'quality_fail' ? 'quality_fail' : 'terminate',
+        ...(text ? { label: text } : {}),
+      });
       reports.push({ row: rowNo, id, kind: 'termination', confidence: Math.max(0, confidence), issues });
       continue;
     }
@@ -200,7 +269,13 @@ export function importTemplateRows(table: string[][], title: string): TemplateIm
     if (type === 'quota') {
       const target = num(get(row, 'Target') || get(row, 'Max'), 'Target', issues);
       if (!condition || target === undefined) {
-        reports.push({ row: rowNo, id: get(row, 'ID') || null, kind: 'skipped', confidence: 0, issues: ['A quota needs a condition and a target; row skipped'] });
+        reports.push({
+          row: rowNo,
+          id: get(row, 'ID') || null,
+          kind: 'skipped',
+          confidence: 0,
+          issues: ['A quota needs a condition and a target; row skipped'],
+        });
         continue;
       }
       const { id, generated } = uniqueId(get(row, 'ID'), () => `QT${++autoQt}`, issues);
@@ -302,7 +377,7 @@ export function parseCsv(text: string): string[][] {
   let row: string[] = [];
   let field = '';
   let quoted = false;
-  const src = text.replace(/^﻿/, '');
+  const src = text.replace(/^\uFEFF/, '');
   for (let i = 0; i < src.length; i++) {
     const ch = src[i]!;
     if (quoted) {
@@ -366,10 +441,52 @@ export async function buildTemplateWorkbook(): Promise<Buffer> {
   ws.getRow(1).font = { bold: true };
   const examples: string[][] = [
     ['P1', 'AGE', 'numeric', 'How old are you?', '', '', '', 'yes', '', '0', '120', '', ''],
-    ['P1', 'GENDER', 'single', 'Are you…', '1=Male\n2=Female\n3=Another identity\n99=Prefer not to say [anchor]', '', '', '', '', '', '', '', ''],
+    [
+      'P1',
+      'GENDER',
+      'single',
+      'Are you…',
+      '1=Male\n2=Female\n3=Another identity\n99=Prefer not to say [anchor]',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ],
     ['', 'T_UNDERAGE', 'terminate', 'Under 18', '', '', 'AGE < 18', '', '', '', '', '', ''],
-    ['P2', 'AWARE', 'multi', 'Which of these brands have you heard of?', '1=Brand A\n2=Brand B\n3=Brand C\n99=None of these [exclusive] [anchor]', '', '', '', 'Select all that apply', '', '', '', 'randomize'],
-    ['P3', 'RATE', 'grid', 'How would you rate each brand?', '1=Poor\n2=Fair\n3=Good\n4=Very good\n5=Excellent', 'r1=Brand A\nr2=Brand B', 'not selected(AWARE, 99)', '', '', '', '', '', ''],
+    [
+      'P2',
+      'AWARE',
+      'multi',
+      'Which of these brands have you heard of?',
+      '1=Brand A\n2=Brand B\n3=Brand C\n99=None of these [exclusive] [anchor]',
+      '',
+      '',
+      '',
+      'Select all that apply',
+      '',
+      '',
+      '',
+      'randomize',
+    ],
+    [
+      'P3',
+      'RATE',
+      'grid',
+      'How would you rate each brand?',
+      '1=Poor\n2=Fair\n3=Good\n4=Very good\n5=Excellent',
+      'r1=Brand A\nr2=Brand B',
+      'not selected(AWARE, 99)',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+    ],
     ['P4', 'WHY', 'open', 'Why do you say that?', '', '', '', 'no', '', '', '1000', '', 'multiline'],
     ['', 'QT_WOMEN', 'quota', 'Women', '', '', 'GENDER == 2', '', '', '', '', '200', ''],
   ];

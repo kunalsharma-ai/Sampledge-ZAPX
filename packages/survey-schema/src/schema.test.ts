@@ -15,7 +15,16 @@ describe('survey definition schema', () => {
     const bad = parseSurveyDefinition({
       schemaVersion: 1,
       title: 't',
-      pages: [{ id: 'P1', questions: [{ id: '1Q', type: 'open', text: 'x' }, { id: 'and', type: 'open', text: 'y' }, { id: 'Q3', type: 'slider', text: 'z' }] }],
+      pages: [
+        {
+          id: 'P1',
+          questions: [
+            { id: '1Q', type: 'open', text: 'x' },
+            { id: 'and', type: 'open', text: 'y' },
+            { id: 'Q3', type: 'slider', text: 'z' },
+          ],
+        },
+      ],
     });
     expect(bad.ok).toBe(false);
     if (!bad.ok) {
@@ -27,7 +36,11 @@ describe('survey definition schema', () => {
   it('requires at least one page and one option', () => {
     expect(parseSurveyDefinition({ schemaVersion: 1, title: 't', pages: [] }).ok).toBe(false);
     expect(
-      parseSurveyDefinition({ schemaVersion: 1, title: 't', pages: [{ id: 'P1', questions: [{ id: 'Q1', type: 'single', text: 'x', options: [] }] }] }).ok,
+      parseSurveyDefinition({
+        schemaVersion: 1,
+        title: 't',
+        pages: [{ id: 'P1', questions: [{ id: 'Q1', type: 'single', text: 'x', options: [] }] }],
+      }).ok,
     ).toBe(false);
   });
 });

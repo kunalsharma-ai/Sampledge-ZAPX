@@ -1,6 +1,6 @@
 import { Body, ConflictException, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
-import { OUTCOME_STATUSES } from '@zapx/survey-schema';
+import { REDIRECT_PRESETS, REDIRECT_STATUSES, isAllowedReturnUrl } from '@zapx/redirect-core';
 import { z } from 'zod';
 import type { Prisma, Vendor } from '@zapx/db';
 import { PrismaService } from '../common/prisma.service';
@@ -8,62 +8,108 @@ import { AuditService } from '../common/audit.service';
 import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
-import { REDIRECT_PRESETS, isAllowedReturnUrl, resolveRedirect } from './redirects';
-import { toRedirectConfig } from './redirect.service';
+import { RedirectService } from '../integrations/redirect.service';
+import { SecretBox } from '../platform/secret-box';
+import { URL_TEMPLATE, countryRulesSchema, statusMap } from '../integrations/integration-config';
 
-const statusMap = (value: z.ZodTypeAny) =>
-  z.object(Object.fromEntries(OUTCOME_STATUSES.map((s) => [s, value.optional()])) as Record<string, z.ZodTypeAny>).strict();
-
-const urlTemplate = z
+const httpsBase = z
   .string()
-  .max(2000)
-  .refine((v) => /^https?:\/\//i.test(v), 'Must start with http:// or https://');
+  .max(500)
+  .url()
+  .refine((v) => /^https:\/\//i.test(v) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(v), 'Use an https:// URL')
+  .transform((v) => v.replace(/\/+$/, ''));
 
-const vendorSchema = z.object({
-  name: z.string().min(1).max(120),
-  code: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Letters, digits, _ or - only'),
-  redirectMode: z.enum(['STATIC', 'DYNAMIC', 'HYBRID']).default('STATIC'),
-  staticUrls: statusMap(urlTemplate).default({}),
-  statusWords: statusMap(z.string().min(1).max(60)).default({}),
-  dynamicAllowedHosts: z.array(z.string().regex(/^[A-Za-z0-9.-]{1,253}$/, 'Host names only, e.g. example.com')).max(20).default([]),
-  dynamicParam: z.string().regex(/^[A-Za-z0-9_]{1,40}$/).default('rurl'),
-  requireSignedEntry: z.boolean().default(false),
-  signRedirects: z.boolean().default(false),
-  presetId: z.string().optional(),
-});
+const vendorSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    code: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Letters, digits, _ or - only'),
+    integration: z.enum(['DIRECT', 'PROJEXA']).default('DIRECT'),
+    redirectMode: z.enum(['STATIC', 'DYNAMIC', 'HYBRID']).default('STATIC'),
+    staticUrls: statusMap(URL_TEMPLATE).default({}),
+    statusWords: statusMap(z.string().min(1).max(60)).default({}),
+    countryRedirects: countryRulesSchema.default({}),
+    dynamicAllowedHosts: z
+      .array(z.string().regex(/^[A-Za-z0-9.-]{1,253}$/, 'Host names only, e.g. example.com'))
+      .max(20)
+      .default([]),
+    dynamicParam: z
+      .string()
+      .regex(/^[A-Za-z0-9_]{1,40}$/)
+      .default('rurl'),
+    requireSignedEntry: z.boolean().default(false),
+    signRedirects: z.boolean().default(false),
+    callbackUrl: URL_TEMPLATE.nullable().default(null),
+    callbackStatuses: z.array(z.enum(REDIRECT_STATUSES)).max(8).default([]),
+    callbackMaxAttempts: z.number().int().min(1).max(10).default(6),
+    partnerBaseUrl: httpsBase.nullable().default(null),
+    /** Write-only. Omit to keep the stored secret, null to remove it. */
+    partnerSecret: z.string().min(8).max(500).nullable().optional(),
+    partnerS2s: z.boolean().default(true),
+    presetId: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.integration === 'PROJEXA' && !v.partnerBaseUrl)
+      ctx.addIssue({ code: 'custom', path: ['partnerBaseUrl'], message: 'PROJEXA needs its base URL' });
+  });
 
 const previewSchema = z.object({
-  status: z.enum(OUTCOME_STATUSES),
+  status: z.enum(REDIRECT_STATUSES),
   uid: z.string().max(200).default('TEST123'),
   country: z.string().max(10).optional(),
   returnUrl: z.string().max(2000).optional(),
 });
 
-const RESERVED_PARAMS = ['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig'];
+const RESERVED_PARAMS = ['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig', 'lang'];
 
-/** Sample vendors, their redirect configuration and redirect QA (preview). */
+/** What the studio sees: never the encrypted partner secret, only whether one is set. */
+export function presentVendor(v: Vendor) {
+  const { partnerSecretEnc, ...rest } = v;
+  return { ...rest, partnerSecretSet: !!partnerSecretEnc };
+}
+
+/** Sample vendors, their redirect and callback configuration and redirect QA (preview). */
 @Controller()
 export class VendorsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly redirects: RedirectService,
+    private readonly box: SecretBox,
   ) {}
 
   private async own(user: AuthUser, id: string): Promise<Vendor> {
-    const v = await this.prisma.vendor.findFirst({ where: { id, tenantId: user.tenantId } });
+    const v = await this.prisma.vendor.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
     if (!v) throw new NotFoundException('Vendor not found');
     return v;
   }
 
-  private withPreset(input: z.infer<typeof vendorSchema>) {
+  private toData(input: z.infer<typeof vendorSchema>) {
     const preset = REDIRECT_PRESETS.find((p) => p.id === input.presetId);
-    const { presetId: _presetId, ...rest } = input;
-    if (!preset) return rest;
+    const { presetId: _presetId, partnerSecret, ...rest } = input;
+    const merged = preset
+      ? { ...rest, staticUrls: { ...preset.staticUrls, ...input.staticUrls }, statusWords: { ...preset.statusWords, ...input.statusWords } }
+      : rest;
+    if (RESERVED_PARAMS.includes(merged.dynamicParam)) merged.dynamicParam = 'rurl';
     return {
-      ...rest,
-      redirectMode: input.redirectMode ?? preset.redirectMode,
-      staticUrls: { ...preset.staticUrls, ...input.staticUrls },
-      statusWords: { ...preset.statusWords, ...input.statusWords },
+      ...merged,
+      staticUrls: merged.staticUrls as Prisma.InputJsonValue,
+      statusWords: merged.statusWords as Prisma.InputJsonValue,
+      countryRedirects: merged.countryRedirects as Prisma.InputJsonValue,
+      ...(partnerSecret === undefined ? {} : { partnerSecretEnc: partnerSecret === null ? null : this.box.seal(partnerSecret) }),
+    };
+  }
+
+  private static summary(v: Vendor) {
+    return {
+      integration: v.integration,
+      mode: v.redirectMode,
+      staticUrls: v.staticUrls,
+      statusWords: v.statusWords,
+      countryRedirects: v.countryRedirects,
+      callbackUrl: v.callbackUrl,
+      callbackStatuses: v.callbackStatuses,
+      partnerBaseUrl: v.partnerBaseUrl,
+      partnerSecretSet: !!v.partnerSecretEnc,
     };
   }
 
@@ -74,64 +120,63 @@ export class VendorsController {
 
   @Get('projects/:projectId/vendors')
   async list(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string) {
-    return this.prisma.vendor.findMany({ where: { projectId, tenantId: user.tenantId }, orderBy: { createdAt: 'asc' } });
+    const rows = await this.prisma.vendor.findMany({
+      where: { projectId, tenantId: user.tenantId, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map(presentVendor);
   }
 
   @Post('projects/:projectId/vendors')
   @Roles(...CAN_EDIT)
   async create(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string, @Body() body: unknown) {
-    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId } });
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId, deletedAt: null } });
     if (!project) throw new NotFoundException('Project not found');
-    const input = this.withPreset(parseBody(vendorSchema, body));
-    if (RESERVED_PARAMS.includes(input.dynamicParam)) input.dynamicParam = 'rurl';
+    const data = this.toData(parseBody(vendorSchema, body));
+    const taken = await this.prisma.vendor.findUnique({ where: { projectId_code: { projectId, code: data.code } } });
+    if (taken) {
+      throw new ConflictException(
+        taken.deletedAt
+          ? 'That vendor ID belonged to a deleted vendor and cannot be reused'
+          : 'That vendor ID is already used in this project',
+      );
+    }
     const vendor = await this.prisma.vendor.create({
-      data: {
-        ...input,
-        staticUrls: input.staticUrls as Prisma.InputJsonValue,
-        statusWords: input.statusWords as Prisma.InputJsonValue,
-        tenantId: user.tenantId,
-        projectId,
-        secret: randomBytes(32).toString('hex'),
-      },
+      data: { ...data, tenantId: user.tenantId, projectId, secret: randomBytes(32).toString('hex') },
     });
-    await this.audit.record(user, 'vendor.create', 'vendor', vendor.id, { code: vendor.code, mode: vendor.redirectMode });
-    return vendor;
+    await this.audit.record(user, 'vendor.create', 'vendor', vendor.id, { code: vendor.code, ...VendorsController.summary(vendor) });
+    return presentVendor(vendor);
   }
 
   @Get('vendors/:id')
-  get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return this.own(user, id);
+  async get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return presentVendor(await this.own(user, id));
   }
 
   @Put('vendors/:id')
   @Roles(...CAN_EDIT)
   async update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     const before = await this.own(user, id);
-    const input = this.withPreset(parseBody(vendorSchema, body));
-    if (RESERVED_PARAMS.includes(input.dynamicParam)) input.dynamicParam = 'rurl';
-    const vendor = await this.prisma.vendor.update({
-      where: { id },
-      data: {
-        ...input,
-        staticUrls: input.staticUrls as Prisma.InputJsonValue,
-        statusWords: input.statusWords as Prisma.InputJsonValue,
-      },
-    });
+    const data = this.toData(parseBody(vendorSchema, body));
+    if (data.code !== before.code) {
+      const taken = await this.prisma.vendor.findUnique({ where: { projectId_code: { projectId: before.projectId, code: data.code } } });
+      if (taken) throw new ConflictException('That vendor ID is already used in this project');
+    }
+    const vendor = await this.prisma.vendor.update({ where: { id }, data });
     await this.audit.record(user, 'vendor.update', 'vendor', id, {
-      before: { mode: before.redirectMode, staticUrls: before.staticUrls, statusWords: before.statusWords },
-      after: { mode: vendor.redirectMode, staticUrls: vendor.staticUrls, statusWords: vendor.statusWords },
+      before: VendorsController.summary(before),
+      after: VendorsController.summary(vendor),
     });
-    return vendor;
+    return presentVendor(vendor);
   }
 
+  /** Soft delete: links stop working, history (responses, redirects, callbacks) is kept. */
   @Delete('vendors/:id')
   @Roles(...CAN_EDIT)
   @HttpCode(204)
   async remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     await this.own(user, id);
-    const used = await this.prisma.response.count({ where: { vendorId: id } });
-    if (used > 0) throw new ConflictException('This vendor already has respondents and cannot be deleted');
-    await this.prisma.vendor.delete({ where: { id } });
+    await this.prisma.vendor.update({ where: { id }, data: { deletedAt: new Date() } });
     await this.audit.record(user, 'vendor.delete', 'vendor', id);
   }
 
@@ -141,7 +186,7 @@ export class VendorsController {
     await this.own(user, id);
     const vendor = await this.prisma.vendor.update({ where: { id }, data: { secret: randomBytes(32).toString('hex') } });
     await this.audit.record(user, 'vendor.rotate_secret', 'vendor', id);
-    return vendor;
+    return presentVendor(vendor);
   }
 
   /** Redirect QA: show exactly where a respondent would be sent for each status. */
@@ -150,14 +195,11 @@ export class VendorsController {
     const vendor = await this.own(user, id);
     const input = parseBody(previewSchema, body);
     const returnUrl = input.returnUrl ?? null;
-    const resolved = resolveRedirect(
-      toRedirectConfig(vendor),
+    const resolved = await this.redirects.preview(
+      vendor,
       { responseId: 'PREVIEW', uid: input.uid, country: input.country ?? null, returnUrl, entryParams: {} },
       input.status,
     );
-    return {
-      ...resolved,
-      returnUrlAccepted: returnUrl ? isAllowedReturnUrl(returnUrl, vendor.dynamicAllowedHosts) : null,
-    };
+    return { ...resolved, returnUrlAccepted: returnUrl ? isAllowedReturnUrl(returnUrl, vendor.dynamicAllowedHosts) : null };
   }
 }

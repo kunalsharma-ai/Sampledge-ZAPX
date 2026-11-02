@@ -1,9 +1,7 @@
 import type { SurveyDefinition } from '@zapx/survey-schema';
 
 /** Material the architect reads. PDFs go to the model as documents; other files are text. */
-export type AiDocument =
-  | { name: string; kind: 'text'; text: string }
-  | { name: string; kind: 'pdf'; base64: string };
+export type AiDocument = { name: string; kind: 'text'; text: string } | { name: string; kind: 'pdf'; base64: string };
 
 export interface ArchitectRequest {
   /** What the programmer asked for, typed or dictated. */
@@ -24,7 +22,14 @@ export interface ArchitectResult {
   model: string;
   /** Set when the primary model declined and a fallback model answered. */
   servedByFallback: boolean;
-  usage?: { inputTokens: number; outputTokens: number };
+  usage?: AiTokenUsage;
+}
+
+export interface AiTokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
 }
 
 export interface TranslateRequest {
@@ -39,6 +44,7 @@ export interface TranslateRequest {
 export interface TranslateResult {
   translations: Record<string, string>;
   model: string;
+  usage?: AiTokenUsage;
 }
 
 /** Errors a provider can raise; the controller maps `status` to the HTTP response. */
@@ -46,19 +52,31 @@ export class AiError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly code: 'NOT_CONFIGURED' | 'REFUSED' | 'RATE_LIMITED' | 'UNAVAILABLE' | 'BAD_OUTPUT' | 'TOO_LONG',
+    readonly code:
+      | 'NOT_CONFIGURED'
+      | 'NOT_PERMITTED'
+      | 'REFUSED'
+      | 'RATE_LIMITED'
+      | 'BUDGET_EXCEEDED'
+      | 'UNAVAILABLE'
+      | 'CIRCUIT_OPEN'
+      | 'BAD_OUTPUT'
+      | 'TOO_LONG',
   ) {
     super(message);
   }
 }
 
 /**
- * The model behind the AI Survey Architect. Swappable (Claude today; a fake in tests), so no
- * other code depends on a specific vendor SDK.
+ * One AI provider (Anthropic today; a fake in tests). Only the AI gateway calls providers, so
+ * no other code depends on a vendor SDK. `model` is the configured default; the gateway passes
+ * the model chosen for each task.
  */
 export abstract class AiProvider {
+  /** Registry name, e.g. "anthropic". */
+  readonly name: string = 'anthropic';
   abstract readonly configured: boolean;
   abstract readonly model: string;
-  abstract architect(req: ArchitectRequest): Promise<ArchitectResult>;
-  abstract translate(req: TranslateRequest): Promise<TranslateResult>;
+  abstract architect(req: ArchitectRequest, model?: string): Promise<ArchitectResult>;
+  abstract translate(req: TranslateRequest, model?: string): Promise<TranslateResult>;
 }

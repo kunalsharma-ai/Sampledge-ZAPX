@@ -5,7 +5,15 @@
  * The server decides routing; this app renders the page it is given and posts answers back.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { SurveyHeader, SurveyPage, answersToSubmit, defaultThemeCss, themeCss, type DisplayQuestion, type FieldErrors } from '@zapx/survey-renderer';
+import {
+  SurveyHeader,
+  SurveyPage,
+  answersToSubmit,
+  defaultThemeCss,
+  themeCss,
+  type DisplayQuestion,
+  type FieldErrors,
+} from '@zapx/survey-renderer';
 import type { AnswerValue, Answers, Theme } from '@zapx/survey-schema';
 
 interface Look {
@@ -190,7 +198,12 @@ export function App() {
           >
             {view.look.languages.length > 1 ? (
               <div className="zx-lang">
-                <select aria-label={view.look.ui.language} value={view.look.language} onChange={(e) => void switchLanguage(e.target.value)} disabled={busy}>
+                <select
+                  aria-label={view.look.ui.language}
+                  value={view.look.language}
+                  onChange={(e) => void switchLanguage(e.target.value)}
+                  disabled={busy}
+                >
                   {view.look.languages.map((l) => (
                     <option key={l.tag} value={l.tag} lang={l.tag}>
                       {l.name}
@@ -199,11 +212,24 @@ export function App() {
                 </select>
               </div>
             ) : null}
-            {view.isTest ? <p className="zx-test-banner">Test mode: this response is flagged as a test and does not count toward quotas.</p> : null}
-            <SurveyHeader theme={view.look.theme} progress={view.survey.showProgress ? view.progress : undefined} progressLabel="Progress" />
+            {view.isTest ? (
+              <p className="zx-test-banner">Test mode: this response is flagged as a test and does not count toward quotas.</p>
+            ) : null}
+            <SurveyHeader
+              theme={view.look.theme}
+              progress={view.survey.showProgress ? view.progress : undefined}
+              progressLabel="Progress"
+            />
             {view.survey.welcome ? <p className="zx-welcome">{view.survey.welcome}</p> : null}
             {view.page.title ? <h1 className="zx-title">{view.page.title}</h1> : null}
-            <SurveyPage questions={view.page.questions} answers={answers} context={view.context} errors={errors} disabled={busy} onChange={onChange} />
+            <SurveyPage
+              questions={view.page.questions}
+              answers={answers}
+              context={view.context}
+              errors={errors}
+              disabled={busy}
+              onChange={onChange}
+            />
             <div className="zx-actions">
               {view.survey.allowBack && !view.isFirstPage ? (
                 <button type="button" className="zx-button zx-secondary" onClick={() => void back()} disabled={busy}>

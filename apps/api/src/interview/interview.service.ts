@@ -3,7 +3,7 @@
  * next, validates every answer, applies terminations and quotas, and resolves vendor redirects.
  * The browser only renders what it is given.
  */
-import { ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { ConflictException, HttpException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Prisma, Response, Survey, Vendor } from '@zapx/db';
 import {
@@ -26,12 +26,22 @@ import {
   type FieldError,
   type SystemMessages,
 } from '@zapx/logic-engine';
-import { defaultPresentation, parsePresentation, type Answers, type DeviceType, type OutcomeStatus, type Presentation, type Question, type SurveyDefinition, type Theme } from '@zapx/survey-schema';
+import {
+  defaultPresentation,
+  parsePresentation,
+  type Answers,
+  type DeviceType,
+  type OutcomeStatus,
+  type Presentation,
+  type Question,
+  type SurveyDefinition,
+  type Theme,
+} from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
-import { RedirectService } from '../vendors/redirect.service';
-import { isAllowedReturnUrl, verifySignedParams } from '../vendors/redirects';
+import { isAllowedReturnUrl, verifySignedParams } from '@zapx/redirect-core';
+import { RedirectService } from '../integrations/redirect.service';
 
 const MAX_PARAMS = 30;
 const MAX_PARAM_LENGTH = 2000;
@@ -88,6 +98,8 @@ const OUTCOME_MESSAGE: Record<OutcomeStatus, keyof SystemMessages> = {
   quality_fail: 'outcomeQualityFail',
   security_reject: 'outcomeSecurityReject',
   duplicate: 'outcomeDuplicate',
+  partial: 'outcomePartial',
+  technical_error: 'outcomeTechnicalError',
 };
 
 /** A survey version as one respondent sees it: localized definition, messages and look. */
@@ -115,7 +127,10 @@ export function interviewContext(version: { definition: unknown; presentation: u
       gridOnMobile: presentation.devices.gridOnMobile,
       language: lang?.tag ?? source.language,
       languages: offered.length
-        ? [{ tag: source.language, name: presentation.sourceLanguageName ?? source.language }, ...offered.map((l) => ({ tag: l.tag, name: l.name }))]
+        ? [
+            { tag: source.language, name: presentation.sourceLanguageName ?? source.language },
+            ...offered.map((l) => ({ tag: l.tag, name: l.name })),
+          ]
         : [],
       ui: { next: msg.next, back: msg.back, saving: msg.saving, language: msg.language, fixErrors: msg.fixErrors },
     },
@@ -148,6 +163,8 @@ class QuotaFull extends Error {
 
 @Injectable()
 export class InterviewService {
+  private readonly log = new Logger('Interview');
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -157,7 +174,7 @@ export class InterviewService {
   // ---- Entry --------------------------------------------------------------------------------
 
   async start(surveyId: string, rawQuery: Record<string, unknown>, meta: EntryMeta = {}): Promise<InterviewState & { token?: string }> {
-    const survey = await this.prisma.survey.findUnique({ where: { id: surveyId } });
+    const survey = await this.prisma.survey.findFirst({ where: { id: surveyId, deletedAt: null } });
     if (!survey || !survey.liveVersionId) return { state: 'unavailable', message: 'This survey is not available.' };
 
     const params: Record<string, string> = {};
@@ -177,6 +194,7 @@ export class InterviewService {
     let vendor: Vendor | null = null;
     if (params.vid) {
       vendor = await this.prisma.vendor.findUnique({ where: { projectId_code: { projectId: survey.projectId, code: params.vid } } });
+      if (vendor?.deletedAt) vendor = null;
       if (!vendor) return { state: 'unavailable', message: ctx.msg.outcomeSecurityReject };
     } else if (!isTest) {
       return { state: 'unavailable', message: ctx.msg.outcomeSecurityReject };
@@ -198,7 +216,7 @@ export class InterviewService {
 
     // Dynamic return URL (only stored when it points at an allowed host).
     let returnUrl: string | null = null;
-    if (vendor && vendor.redirectMode !== 'STATIC') {
+    if (vendor && vendor.integration === 'DIRECT' && vendor.redirectMode !== 'STATIC') {
       const candidate = params[vendor.dynamicParam];
       if (candidate && isAllowedReturnUrl(candidate, vendor.dynamicAllowedHosts)) returnUrl = candidate;
     }
@@ -218,7 +236,16 @@ export class InterviewService {
     if (!ctx.presentation.devices.allowed.includes(device)) {
       const preferred = ctx.presentation.devices.allowed[0]!;
       const deviceWord = { desktop: ctx.msg.deviceDesktop, tablet: ctx.msg.deviceTablet, mobile: ctx.msg.deviceMobile }[preferred];
-      return this.rejectWithoutRecord(survey, vendor, uid, params, 'terminate', `device_not_allowed:${device}`, ctx, fillMessage(ctx.msg.deviceNotAllowed, { device: deviceWord }));
+      return this.rejectWithoutRecord(
+        survey,
+        vendor,
+        uid,
+        params,
+        'terminate',
+        `device_not_allowed:${device}`,
+        ctx,
+        fillMessage(ctx.msg.deviceNotAllowed, { device: deviceWord }),
+      );
     }
 
     const def = sourceDef;
@@ -260,7 +287,7 @@ export class InterviewService {
       const updated = await this.prisma.response.update({ where: { id: existing.id }, data: { sessionTokenHash: hashToken(token) } });
       return { ...(await this.stateOf(updated, await this.ctxOf(updated), vendor)), token };
     }
-    return this.outcomeState(vendor, existing, 'duplicate', await this.ctxOf(existing));
+    return this.outcomeState(vendor, existing, 'duplicate', await this.ctxOf(existing), undefined, 'reentry');
   }
 
   private async rejectWithoutRecord(
@@ -278,8 +305,17 @@ export class InterviewService {
       vid: vendor?.code ?? null,
       uid: uid.slice(0, 200),
     });
-    const pseudo = { id: 'none', uid, country: params.cc ?? null, returnUrl: null, entryParams: {}, isTest: false } as unknown as Response;
-    return this.outcomeState(vendor, pseudo, status, ctx, message);
+    const pseudo = {
+      id: 'none',
+      tenantId: survey.tenantId,
+      surveyId: survey.id,
+      uid,
+      country: params.cc ?? null,
+      returnUrl: null,
+      entryParams: {},
+      isTest: false,
+    } as unknown as Response;
+    return this.outcomeState(vendor, pseudo, status, ctx, message, reason);
   }
 
   // ---- Session ------------------------------------------------------------------------------
@@ -314,7 +350,14 @@ export class InterviewService {
     return this.stateOf(updated, await this.ctxOf(updated), await this.vendorOf(updated));
   }
 
-  private async outcomeState(vendor: Vendor | null, r: Response, status: OutcomeStatus, ctx: Ctx, message?: string): Promise<InterviewState> {
+  private async outcomeState(
+    vendor: Vendor | null,
+    r: Response,
+    status: OutcomeStatus,
+    ctx: Ctx,
+    message?: string,
+    reason?: string,
+  ): Promise<InterviewState> {
     const redirect = vendor
       ? await this.redirects.resolve(
           vendor,
@@ -326,6 +369,7 @@ export class InterviewService {
             entryParams: (r.entryParams ?? {}) as Record<string, string>,
           },
           status,
+          { tenantId: r.tenantId, surveyId: r.surveyId, isTest: r.isTest, reason: reason ?? r.outcomeReason },
         )
       : { url: null };
     let text = message ?? ctx.msg[OUTCOME_MESSAGE[status]];
@@ -384,6 +428,36 @@ export class InterviewService {
 
   async submit(token: string, pageId: string, submitted: Record<string, unknown>): Promise<InterviewState> {
     const r = await this.byToken(token);
+    try {
+      return await this.submitFor(r, pageId, submitted);
+    } catch (e) {
+      if (e instanceof HttpException) throw e;
+      return this.technicalError(r, e as Error);
+    }
+  }
+
+  /**
+   * An unexpected server error while answering: the interview ends as technical_error, the
+   * respondent is sent back to the vendor (who can compensate them) and the vendor is told.
+   * If even that fails (e.g. the database is down), the original error is rethrown.
+   */
+  private async technicalError(r: Response, error: Error): Promise<InterviewState> {
+    const errorId = randomBytes(6).toString('hex');
+    this.log.error(`Interview ${r.id} failed (error ${errorId}): ${error.message}`, error.stack);
+    try {
+      const n = await this.prisma.response.updateMany({
+        where: { id: r.id, status: 'IN_PROGRESS' },
+        data: { status: 'TECHNICAL_ERROR', outcomeReason: `error:${errorId}`, currentPage: -1, completedAt: new Date() },
+      });
+      if (n.count === 1) await this.redirects.outcomeRecorded(r, 'technical_error');
+      const fresh = await this.prisma.response.findUniqueOrThrow({ where: { id: r.id } });
+      return await this.stateOf(fresh, await this.ctxOf(fresh), await this.vendorOf(fresh));
+    } catch {
+      throw error;
+    }
+  }
+
+  private async submitFor(r: Response, pageId: string, submitted: Record<string, unknown>): Promise<InterviewState> {
     const ctx = await this.ctxOf(r);
     const def = ctx.def;
     const vendor = await this.vendorOf(r);
@@ -466,6 +540,7 @@ export class InterviewService {
       if (e instanceof QuotaFull) return this.finish(r, ctx, vendor, answers, 'quota_full', e.quotaId);
       throw e;
     }
+    await this.redirects.outcomeRecorded(r, 'complete');
     return this.outcomeState(vendor, r, 'complete', ctx);
   }
 
@@ -477,10 +552,17 @@ export class InterviewService {
     status: OutcomeStatus,
     reason: string,
   ): Promise<InterviewState> {
-    await this.prisma.response.updateMany({
+    const changed = await this.prisma.response.updateMany({
       where: { id: r.id, status: 'IN_PROGRESS' },
-      data: { status: toEnum(status), outcomeReason: reason, answers: answers as Prisma.InputJsonValue, currentPage: -1, completedAt: new Date() },
+      data: {
+        status: toEnum(status),
+        outcomeReason: reason,
+        answers: answers as Prisma.InputJsonValue,
+        currentPage: -1,
+        completedAt: new Date(),
+      },
     });
+    if (changed.count === 1) await this.redirects.outcomeRecorded(r, status);
     const fresh = await this.prisma.response.findUniqueOrThrow({ where: { id: r.id } });
     return this.stateOf(fresh, ctx, vendor);
   }

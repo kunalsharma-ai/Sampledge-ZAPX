@@ -23,6 +23,8 @@ import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { SurveysService } from '../surveys/surveys.service';
 import { ChangeSetsService } from './changesets.service';
 import { ArchitectService } from '../ai/architect.service';
+import { AiGateway } from '../ai/ai-gateway';
+import { notConfigured } from '../ai/claude.provider';
 import { AiError } from '../ai/ai-provider';
 import { classifyFile, toAiDocument, type UploadedFile } from '../imports/documents';
 import { buildTemplateWorkbook, importTemplateRows, parseCsv, readXlsxTable } from '../imports/template-import';
@@ -30,8 +32,7 @@ import { buildTemplateWorkbook, importTemplateRows, parseCsv, readXlsxTable } fr
 const proposeSchema = z.object({ instruction: z.string().max(20000).default('') });
 const manualSchema = z.object({ title: z.string().min(1).max(200).default('Pasted definition'), definition: z.unknown() });
 
-const upload = () =>
-  FileInterceptor('file', { limits: { fileSize: config().UPLOAD_MAX_MB * 1024 * 1024, files: 1, fields: 10 } });
+const upload = () => FileInterceptor('file', { limits: { fileSize: config().UPLOAD_MAX_MB * 1024 * 1024, files: 1, fields: 10 } });
 
 function aiHttpError(err: unknown): never {
   if (err instanceof AiError) throw new HttpException({ message: err.message, code: err.code }, err.status);
@@ -44,11 +45,12 @@ export class ChangeSetsController {
     private readonly changeSets: ChangeSetsService,
     private readonly surveys: SurveysService,
     private readonly architect: ArchitectService,
+    private readonly gateway: AiGateway,
   ) {}
 
   @Get('ai/status')
-  aiStatus() {
-    return this.architect.status;
+  aiStatus(@CurrentUser() user: AuthUser) {
+    return this.gateway.status(user.tenantId);
   }
 
   @Get('imports/template.xlsx')
@@ -69,7 +71,7 @@ export class ChangeSetsController {
   async propose(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown, @UploadedFileParam() file?: UploadedFile) {
     const { instruction } = parseBody(proposeSchema, body ?? {});
     if (!instruction.trim() && !file) throw new BadRequestException('Describe what to build or change, or attach a questionnaire.');
-    if (!this.architect.status.configured) aiHttpError(new AiError('AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED'));
+    if (!this.architect.configured) aiHttpError(notConfigured());
     const draft = await this.surveys.draft(user, id);
     const current = parseSurveyDefinition(draft.definition);
     const documents = [];
@@ -78,7 +80,12 @@ export class ChangeSetsController {
       if (kind === 'xlsx') throw new BadRequestException('Excel files are imported with the template importer. Use Import file instead.');
       documents.push(await toAiDocument(file, kind));
     }
-    const outcome = await this.architect.propose(instruction, current.ok ? current.definition : null, documents).catch(aiHttpError);
+    const outcome = await this.architect
+      .propose(
+        { tenantId: user.tenantId, userId: user.id },
+        { instruction, current: current.ok ? current.definition : null, documents, surveyId: id },
+      )
+      .catch(aiHttpError);
     const assumptions = [...outcome.assumptions];
     if (outcome.servedByFallback) assumptions.unshift(`The primary model declined; this proposal was written by ${outcome.model}.`);
     if (outcome.remainingProblems.length) assumptions.push(`Logic problems the AI did not fix: ${outcome.remainingProblems.join('; ')}`);
@@ -89,7 +96,7 @@ export class ChangeSetsController {
       sourceFileName: file?.originalname,
       proposed: outcome.definition,
       assumptions,
-      confidence: { summary: outcome.summary, attempts: outcome.attempts },
+      confidence: { summary: outcome.summary, attempts: outcome.attempts, redactions: outcome.redactions },
       producer: outcome.model,
     });
   }
@@ -107,7 +114,12 @@ export class ChangeSetsController {
     const kind = classifyFile(file);
     if (kind === 'xlsx' || kind === 'csv') {
       const survey = await this.surveys.getSurvey(user, id);
-      const table = kind === 'xlsx' ? await readXlsxTable(file.buffer).catch(() => { throw new BadRequestException('The Excel file could not be read.'); }) : parseCsv(file.buffer.toString('utf8'));
+      const table =
+        kind === 'xlsx'
+          ? await readXlsxTable(file.buffer).catch(() => {
+              throw new BadRequestException('The Excel file could not be read.');
+            })
+          : parseCsv(file.buffer.toString('utf8'));
       const result = importTemplateRows(table, survey.name);
       if (!result.definition) {
         throw new UnprocessableEntityException({ message: 'The file could not be imported', errors: result.errors, rows: result.rows });
@@ -122,7 +134,15 @@ export class ChangeSetsController {
         producer: 'zapx-template-v1',
       });
     }
-    return this.propose(user, id, { instruction: parseBody(proposeSchema, body ?? {}).instruction || 'Program this questionnaire as a new survey, replacing the current draft.' }, file);
+    return this.propose(
+      user,
+      id,
+      {
+        instruction:
+          parseBody(proposeSchema, body ?? {}).instruction || 'Program this questionnaire as a new survey, replacing the current draft.',
+      },
+      file,
+    );
   }
 
   /** Propose a pasted definition (e.g. from another tool) for review like any other change. */

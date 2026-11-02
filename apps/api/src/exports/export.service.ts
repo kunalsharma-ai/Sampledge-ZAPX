@@ -14,7 +14,10 @@ interface Column {
   get(r: ExportRow): string | number | null;
 }
 
-type ExportRow = Pick<Response, 'id' | 'uid' | 'country' | 'language' | 'device' | 'status' | 'outcomeReason' | 'isTest' | 'startedAt' | 'completedAt' | 'answers'> & {
+type ExportRow = Pick<
+  Response,
+  'id' | 'uid' | 'country' | 'language' | 'device' | 'status' | 'outcomeReason' | 'isTest' | 'startedAt' | 'completedAt' | 'answers'
+> & {
   vendor: { code: string } | null;
   version: { version: number };
 };
@@ -111,10 +114,14 @@ export class ExportService {
     const data = wb.addWorksheet('Responses');
     data.columns = columns.map((c) => ({ header: c.key, key: c.key, width: Math.min(40, Math.max(10, c.key.length + 2)) }));
     for (const r of rows) {
-      data.addRow(Object.fromEntries(columns.map((c) => {
-        const v = c.get(r);
-        return [c.key, typeof v === 'string' ? safeCell(v) : v];
-      })));
+      data.addRow(
+        Object.fromEntries(
+          columns.map((c) => {
+            const v = c.get(r);
+            return [c.key, typeof v === 'string' ? safeCell(v) : v];
+          }),
+        ),
+      );
     }
     data.getRow(1).font = { bold: true };
     data.views = [{ state: 'frozen', ySplit: 1 }];

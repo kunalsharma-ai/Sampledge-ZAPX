@@ -53,7 +53,15 @@ function move<T>(arr: T[], from: number, to: number): T[] {
   return copy;
 }
 
-export function VisualEditor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: (d: SurveyDefinition) => void; readOnly?: boolean }) {
+export function VisualEditor({
+  def,
+  onChange,
+  readOnly,
+}: {
+  def: SurveyDefinition;
+  onChange: (d: SurveyDefinition) => void;
+  readOnly?: boolean;
+}) {
   const [sel, setSel] = useState<Selection>({ kind: 'survey' });
   const [newType, setNewType] = useState<QuestionType>('single');
 
@@ -75,8 +83,7 @@ export function VisualEditor({ def, onChange, readOnly }: { def: SurveyDefinitio
     setSel({ kind: 'question', page: pi, q: page.questions.length });
   };
 
-  const selected =
-    sel.kind === 'question' ? def.pages[sel.page]?.questions[sel.q] : sel.kind === 'page' ? def.pages[sel.page] : undefined;
+  const selected = sel.kind === 'question' ? def.pages[sel.page]?.questions[sel.q] : sel.kind === 'page' ? def.pages[sel.page] : undefined;
 
   return (
     <div className="editor" style={{ gridTemplateColumns: '260px minmax(0,1fr)' }}>
@@ -86,7 +93,10 @@ export function VisualEditor({ def, onChange, readOnly }: { def: SurveyDefinitio
         </button>
         {def.pages.map((p, pi) => (
           <div key={pi}>
-            <button className={`item page ${sel.kind === 'page' && sel.page === pi ? 'selected' : ''}`} onClick={() => setSel({ kind: 'page', page: pi })}>
+            <button
+              className={`item page ${sel.kind === 'page' && sel.page === pi ? 'selected' : ''}`}
+              onClick={() => setSel({ kind: 'page', page: pi })}
+            >
               {p.id}
               {p.title ? ` · ${p.title}` : ''}
               {p.condition ? <span className="type">if</span> : null}
@@ -172,14 +182,39 @@ export function VisualEditor({ def, onChange, readOnly }: { def: SurveyDefinitio
   );
 }
 
-function Text({ label, value, onChange, mono, placeholder, area }: { label: string; value: string | undefined; onChange: (v: string | undefined) => void; mono?: boolean; placeholder?: string; area?: boolean }) {
+function Text({
+  label,
+  value,
+  onChange,
+  mono,
+  placeholder,
+  area,
+}: {
+  label: string;
+  value: string | undefined;
+  onChange: (v: string | undefined) => void;
+  mono?: boolean;
+  placeholder?: string;
+  area?: boolean;
+}) {
   return (
     <label className="field">
       {label}
       {area ? (
-        <textarea rows={3} value={value ?? ''} placeholder={placeholder} style={mono ? undefined : { fontFamily: 'inherit', fontSize: 14 }} onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)} />
+        <textarea
+          rows={3}
+          value={value ?? ''}
+          placeholder={placeholder}
+          style={mono ? undefined : { fontFamily: 'inherit', fontSize: 14 }}
+          onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
+        />
       ) : (
-        <input className={mono ? 'mono' : undefined} value={value ?? ''} placeholder={placeholder} onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)} />
+        <input
+          className={mono ? 'mono' : undefined}
+          value={value ?? ''}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value === '' ? undefined : e.target.value)}
+        />
       )}
     </label>
   );
@@ -189,7 +224,12 @@ function Num({ label, value, onChange }: { label: string; value: number | undefi
   return (
     <label className="field">
       {label}
-      <input type="number" value={value ?? ''} onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))} style={{ width: 120 }} />
+      <input
+        type="number"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+        style={{ width: 120 }}
+      />
     </label>
   );
 }
@@ -212,8 +252,16 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
       <Text label="Welcome text (first page)" area value={def.welcome} onChange={(v) => onChange({ ...def, welcome: v })} />
       <Text label="Thank-you text (completes)" area value={def.thankYou} onChange={(v) => onChange({ ...def, thankYou: v })} />
       <div className="row">
-        <Check label="Allow respondents to go back" value={def.settings.allowBack} onChange={(v) => onChange({ ...def, settings: { ...def.settings, allowBack: v } })} />
-        <Check label="Show progress bar" value={def.settings.showProgress} onChange={(v) => onChange({ ...def, settings: { ...def.settings, showProgress: v } })} />
+        <Check
+          label="Allow respondents to go back"
+          value={def.settings.allowBack}
+          onChange={(v) => onChange({ ...def, settings: { ...def.settings, allowBack: v } })}
+        />
+        <Check
+          label="Show progress bar"
+          value={def.settings.showProgress}
+          onChange={(v) => onChange({ ...def, settings: { ...def.settings, showProgress: v } })}
+        />
       </div>
       <h2 style={{ marginTop: 12 }}>Terminations</h2>
       <p className="muted small">Checked after every page. The first matching rule ends the interview. {CONDITION_HELP}</p>
@@ -231,22 +279,53 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
           {def.terminations.map((t, i) => (
             <tr key={i}>
               <td>
-                <input className="mono" value={t.id} onChange={(e) => onChange({ ...def, terminations: def.terminations.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })} />
+                <input
+                  className="mono"
+                  value={t.id}
+                  onChange={(e) =>
+                    onChange({ ...def, terminations: def.terminations.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })
+                  }
+                />
               </td>
               <td>
-                <input className="mono" value={t.condition} onChange={(e) => onChange({ ...def, terminations: def.terminations.map((x, j) => (j === i ? { ...x, condition: e.target.value } : x)) })} />
+                <input
+                  className="mono"
+                  value={t.condition}
+                  onChange={(e) =>
+                    onChange({ ...def, terminations: def.terminations.map((x, j) => (j === i ? { ...x, condition: e.target.value } : x)) })
+                  }
+                />
               </td>
               <td>
-                <select value={t.status} onChange={(e) => onChange({ ...def, terminations: def.terminations.map((x, j) => (j === i ? { ...x, status: e.target.value as 'terminate' } : x)) })}>
+                <select
+                  value={t.status}
+                  onChange={(e) =>
+                    onChange({
+                      ...def,
+                      terminations: def.terminations.map((x, j) => (j === i ? { ...x, status: e.target.value as 'terminate' } : x)),
+                    })
+                  }
+                >
                   <option value="terminate">terminate</option>
                   <option value="quality_fail">quality fail</option>
                 </select>
               </td>
               <td>
-                <input value={t.label ?? ''} onChange={(e) => onChange({ ...def, terminations: def.terminations.map((x, j) => (j === i ? { ...x, label: e.target.value || undefined } : x)) })} />
+                <input
+                  value={t.label ?? ''}
+                  onChange={(e) =>
+                    onChange({
+                      ...def,
+                      terminations: def.terminations.map((x, j) => (j === i ? { ...x, label: e.target.value || undefined } : x)),
+                    })
+                  }
+                />
               </td>
               <td>
-                <button className="link danger" onClick={() => onChange({ ...def, terminations: def.terminations.filter((_, j) => j !== i) })}>
+                <button
+                  className="link danger"
+                  onClick={() => onChange({ ...def, terminations: def.terminations.filter((_, j) => j !== i) })}
+                >
                   Remove
                 </button>
               </td>
@@ -255,10 +334,21 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
         </tbody>
       </table>
       <div>
-        <button onClick={() => onChange({ ...def, terminations: [...def.terminations, { id: `T${def.terminations.length + 1}`, condition: 'Q1 == 1', status: 'terminate' }] })}>+ Termination</button>
+        <button
+          onClick={() =>
+            onChange({
+              ...def,
+              terminations: [...def.terminations, { id: `T${def.terminations.length + 1}`, condition: 'Q1 == 1', status: 'terminate' }],
+            })
+          }
+        >
+          + Termination
+        </button>
       </div>
       <h2 style={{ marginTop: 12 }}>Quotas</h2>
-      <p className="muted small">Respondents matching the condition count toward the target when they complete. Over-target respondents get the quota-full redirect.</p>
+      <p className="muted small">
+        Respondents matching the condition count toward the target when they complete. Over-target respondents get the quota-full redirect.
+      </p>
       <table className="data list-editor">
         <thead>
           <tr>
@@ -273,16 +363,39 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
           {def.quotas.map((q, i) => (
             <tr key={i}>
               <td>
-                <input className="mono" value={q.id} onChange={(e) => onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })} />
+                <input
+                  className="mono"
+                  value={q.id}
+                  onChange={(e) => onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })}
+                />
               </td>
               <td>
-                <input value={q.label ?? ''} onChange={(e) => onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, label: e.target.value || undefined } : x)) })} />
+                <input
+                  value={q.label ?? ''}
+                  onChange={(e) =>
+                    onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, label: e.target.value || undefined } : x)) })
+                  }
+                />
               </td>
               <td>
-                <input className="mono" value={q.condition} onChange={(e) => onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, condition: e.target.value } : x)) })} />
+                <input
+                  className="mono"
+                  value={q.condition}
+                  onChange={(e) =>
+                    onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, condition: e.target.value } : x)) })
+                  }
+                />
               </td>
               <td>
-                <input type="number" min={0} value={q.target} style={{ width: 90 }} onChange={(e) => onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, target: Number(e.target.value) } : x)) })} />
+                <input
+                  type="number"
+                  min={0}
+                  value={q.target}
+                  style={{ width: 90 }}
+                  onChange={(e) =>
+                    onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, target: Number(e.target.value) } : x)) })
+                  }
+                />
               </td>
               <td>
                 <button className="link danger" onClick={() => onChange({ ...def, quotas: def.quotas.filter((_, j) => j !== i) })}>
@@ -294,20 +407,40 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
         </tbody>
       </table>
       <div>
-        <button onClick={() => onChange({ ...def, quotas: [...def.quotas, { id: `QT${def.quotas.length + 1}`, condition: 'Q1 == 1', target: 100 }] })}>+ Quota</button>
+        <button
+          onClick={() =>
+            onChange({ ...def, quotas: [...def.quotas, { id: `QT${def.quotas.length + 1}`, condition: 'Q1 == 1', target: 100 }] })
+          }
+        >
+          + Quota
+        </button>
       </div>
     </>
   );
 }
 
-function PageForm({ page, onChange, onMove, onDelete }: { page: Page; onChange: (p: Page) => void; onMove: (d: number) => void; onDelete?: () => void }) {
+function PageForm({
+  page,
+  onChange,
+  onMove,
+  onDelete,
+}: {
+  page: Page;
+  onChange: (p: Page) => void;
+  onMove: (d: number) => void;
+  onDelete?: () => void;
+}) {
   return (
     <>
       <div className="row">
         <h2 style={{ margin: 0 }}>Page {page.id}</h2>
         <div style={{ flex: 1 }} />
-        <button onClick={() => onMove(-1)} aria-label="Move page up">↑</button>
-        <button onClick={() => onMove(1)} aria-label="Move page down">↓</button>
+        <button onClick={() => onMove(-1)} aria-label="Move page up">
+          ↑
+        </button>
+        <button onClick={() => onMove(1)} aria-label="Move page down">
+          ↓
+        </button>
         {onDelete ? (
           <button className="danger" onClick={onDelete}>
             Delete page
@@ -316,7 +449,13 @@ function PageForm({ page, onChange, onMove, onDelete }: { page: Page; onChange: 
       </div>
       <Text label="Page ID" mono value={page.id} onChange={(v) => onChange({ ...page, id: v ?? '' })} />
       <Text label="Title (optional)" value={page.title} onChange={(v) => onChange({ ...page, title: v })} />
-      <Text label="Show this page only if (optional)" mono value={page.condition} placeholder="e.g. Q1 == 1" onChange={(v) => onChange({ ...page, condition: v })} />
+      <Text
+        label="Show this page only if (optional)"
+        mono
+        value={page.condition}
+        placeholder="e.g. Q1 == 1"
+        onChange={(v) => onChange({ ...page, condition: v })}
+      />
       <p className="muted small">{CONDITION_HELP}. Page conditions can only use questions from earlier pages.</p>
     </>
   );
@@ -339,17 +478,33 @@ function OptionsEditor({ options, onChange, multi }: { options: Option[]; onChan
         {options.map((o, i) => (
           <tr key={i}>
             <td>
-              <input type="number" value={o.code} style={{ width: 70 }} onChange={(e) => set(i, { ...o, code: Number(e.target.value) })} aria-label="Answer code" />
+              <input
+                type="number"
+                value={o.code}
+                style={{ width: 70 }}
+                onChange={(e) => set(i, { ...o, code: Number(e.target.value) })}
+                aria-label="Answer code"
+              />
             </td>
             <td>
               <input value={o.label} onChange={(e) => set(i, { ...o, label: e.target.value })} aria-label="Answer label" />
             </td>
             <td>
-              <input type="checkbox" checked={!!o.anchor} onChange={(e) => set(i, { ...o, anchor: e.target.checked || undefined })} aria-label="Keep in place when randomizing" />
+              <input
+                type="checkbox"
+                checked={!!o.anchor}
+                onChange={(e) => set(i, { ...o, anchor: e.target.checked || undefined })}
+                aria-label="Keep in place when randomizing"
+              />
             </td>
             {multi ? (
               <td>
-                <input type="checkbox" checked={!!o.exclusive} onChange={(e) => set(i, { ...o, exclusive: e.target.checked || undefined })} aria-label="Exclusive" />
+                <input
+                  type="checkbox"
+                  checked={!!o.exclusive}
+                  onChange={(e) => set(i, { ...o, exclusive: e.target.checked || undefined })}
+                  aria-label="Exclusive"
+                />
               </td>
             ) : null}
             <td>
@@ -376,7 +531,17 @@ function OptionsEditor({ options, onChange, multi }: { options: Option[]; onChan
   );
 }
 
-function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange: (q: Question) => void; onMove: (d: number) => void; onDelete?: () => void }) {
+function QuestionForm({
+  q,
+  onChange,
+  onMove,
+  onDelete,
+}: {
+  q: Question;
+  onChange: (q: Question) => void;
+  onMove: (d: number) => void;
+  onDelete?: () => void;
+}) {
   return (
     <>
       <div className="row">
@@ -384,8 +549,12 @@ function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange
           <span className="mono">{q.id}</span> <span className="badge">{TYPE_LABELS[q.type]}</span>
         </h2>
         <div style={{ flex: 1 }} />
-        <button onClick={() => onMove(-1)} aria-label="Move question up">↑</button>
-        <button onClick={() => onMove(1)} aria-label="Move question down">↓</button>
+        <button onClick={() => onMove(-1)} aria-label="Move question up">
+          ↑
+        </button>
+        <button onClick={() => onMove(1)} aria-label="Move question down">
+          ↓
+        </button>
         {onDelete ? (
           <button className="danger" onClick={onDelete}>
             Delete
@@ -393,8 +562,19 @@ function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange
         ) : null}
       </div>
       <Text label="Variable name" mono value={q.id} onChange={(v) => onChange({ ...q, id: v ?? '' })} />
-      <Text label="Question text (use {{VAR}} to pipe an earlier answer)" area value={q.text} onChange={(v) => onChange({ ...q, text: v ?? '' })} />
-      <Text label="Show only if (optional)" mono value={q.condition} placeholder="e.g. selected(Q2, 98)" onChange={(v) => onChange({ ...q, condition: v })} />
+      <Text
+        label="Question text (use {{VAR}} to pipe an earlier answer)"
+        area
+        value={q.text}
+        onChange={(v) => onChange({ ...q, text: v ?? '' })}
+      />
+      <Text
+        label="Show only if (optional)"
+        mono
+        value={q.condition}
+        placeholder="e.g. selected(Q2, 98)"
+        onChange={(v) => onChange({ ...q, condition: v })}
+      />
       {q.type !== 'info' ? (
         <>
           <Text label="Help text (optional)" value={q.help} onChange={(v) => onChange({ ...q, help: v })} />
@@ -405,7 +585,11 @@ function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange
         <>
           <h3>Answer options</h3>
           <OptionsEditor options={q.options} multi={q.type === 'multi'} onChange={(options) => onChange({ ...q, options })} />
-          <Check label="Randomize order (anchored options stay in place)" value={q.randomize} onChange={(v) => onChange({ ...q, randomize: v })} />
+          <Check
+            label="Randomize order (anchored options stay in place)"
+            value={q.randomize}
+            onChange={(v) => onChange({ ...q, randomize: v })}
+          />
         </>
       ) : null}
       {q.type === 'multi' ? (
@@ -436,13 +620,26 @@ function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange
               {q.rows.map((r, i) => (
                 <tr key={i}>
                   <td style={{ width: 100 }}>
-                    <input className="mono" value={r.id} aria-label="Row id" onChange={(e) => onChange({ ...q, rows: q.rows.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })} />
+                    <input
+                      className="mono"
+                      value={r.id}
+                      aria-label="Row id"
+                      onChange={(e) => onChange({ ...q, rows: q.rows.map((x, j) => (j === i ? { ...x, id: e.target.value } : x)) })}
+                    />
                   </td>
                   <td>
-                    <input value={r.label} aria-label="Row label" onChange={(e) => onChange({ ...q, rows: q.rows.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />
+                    <input
+                      value={r.label}
+                      aria-label="Row label"
+                      onChange={(e) => onChange({ ...q, rows: q.rows.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })}
+                    />
                   </td>
                   <td>
-                    <button className="link danger" disabled={q.rows.length <= 1} onClick={() => onChange({ ...q, rows: q.rows.filter((_, j) => j !== i) })}>
+                    <button
+                      className="link danger"
+                      disabled={q.rows.length <= 1}
+                      onClick={() => onChange({ ...q, rows: q.rows.filter((_, j) => j !== i) })}
+                    >
                       Remove
                     </button>
                   </td>
@@ -451,7 +648,11 @@ function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange
             </tbody>
           </table>
           <div>
-            <button onClick={() => onChange({ ...q, rows: [...q.rows, { id: `r${q.rows.length + 1}`, label: `Item ${q.rows.length + 1}` }] })}>+ Row</button>
+            <button
+              onClick={() => onChange({ ...q, rows: [...q.rows, { id: `r${q.rows.length + 1}`, label: `Item ${q.rows.length + 1}` }] })}
+            >
+              + Row
+            </button>
           </div>
           <Check label="Randomize rows" value={q.randomizeRows} onChange={(v) => onChange({ ...q, randomizeRows: v })} />
           <h3>Scale columns</h3>
@@ -467,13 +668,29 @@ function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange
               {q.validations.map((v, i) => (
                 <tr key={i}>
                   <td>
-                    <input className="mono" value={v.expr} aria-label="Rule" onChange={(e) => onChange({ ...q, validations: q.validations.map((x, j) => (j === i ? { ...x, expr: e.target.value } : x)) })} />
+                    <input
+                      className="mono"
+                      value={v.expr}
+                      aria-label="Rule"
+                      onChange={(e) =>
+                        onChange({ ...q, validations: q.validations.map((x, j) => (j === i ? { ...x, expr: e.target.value } : x)) })
+                      }
+                    />
                   </td>
                   <td>
-                    <input value={v.message} aria-label="Message" onChange={(e) => onChange({ ...q, validations: q.validations.map((x, j) => (j === i ? { ...x, message: e.target.value } : x)) })} />
+                    <input
+                      value={v.message}
+                      aria-label="Message"
+                      onChange={(e) =>
+                        onChange({ ...q, validations: q.validations.map((x, j) => (j === i ? { ...x, message: e.target.value } : x)) })
+                      }
+                    />
                   </td>
                   <td>
-                    <button className="link danger" onClick={() => onChange({ ...q, validations: q.validations.filter((_, j) => j !== i) })}>
+                    <button
+                      className="link danger"
+                      onClick={() => onChange({ ...q, validations: q.validations.filter((_, j) => j !== i) })}
+                    >
                       Remove
                     </button>
                   </td>
@@ -482,7 +699,13 @@ function QuestionForm({ q, onChange, onMove, onDelete }: { q: Question; onChange
             </tbody>
           </table>
           <div>
-            <button onClick={() => onChange({ ...q, validations: [...q.validations, { expr: `${q.id} > 0`, message: 'Please check your answer.' }] })}>+ Validation</button>
+            <button
+              onClick={() =>
+                onChange({ ...q, validations: [...q.validations, { expr: `${q.id} > 0`, message: 'Please check your answer.' }] })
+              }
+            >
+              + Validation
+            </button>
           </div>
         </>
       ) : null}

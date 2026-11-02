@@ -2,7 +2,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parsePresentation, parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
-import { chooseLanguage, classifyDevice, localizeDefinition, localizeMessages, renderQuestion, textKeys, translationStatus, validatePage } from './index.js';
+import {
+  chooseLanguage,
+  classifyDevice,
+  localizeDefinition,
+  localizeMessages,
+  renderQuestion,
+  textKeys,
+  translationStatus,
+  validatePage,
+} from './index.js';
 
 const r = parseSurveyDefinition(JSON.parse(readFileSync(join(__dirname, '../../../docs/examples/demo-screener.json'), 'utf8')));
 if (!r.ok) throw new Error('demo invalid');
@@ -30,7 +39,9 @@ describe('localization', () => {
     const q = loc.pages[1]!.questions[0] as { id: string; text: string; options: Array<{ code: number; label: string }> };
     expect(q.id).toBe('AWARE');
     expect(q.text.startsWith('FR ')).toBe(true);
-    expect(q.options.map((o) => o.code)).toEqual((demo.pages[1]!.questions[0] as { options: Array<{ code: number }> }).options.map((o) => o.code));
+    expect(q.options.map((o) => o.code)).toEqual(
+      (demo.pages[1]!.questions[0] as { options: Array<{ code: number }> }).options.map((o) => o.code),
+    );
     expect(loc.terminations).toEqual(demo.terminations);
     // Piping uses translated labels.
     const grid = renderQuestion(loc.pages[2]!.questions[0]!, loc, { AWARE: [1] }, 'x');

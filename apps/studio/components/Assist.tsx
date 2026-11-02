@@ -28,8 +28,17 @@ interface ChangeSet extends ChangeSetSummary {
   check: {
     schemaOk: boolean;
     publishable: boolean;
-    analysis: { errors: number; warnings: number; issues: Array<{ severity: string; code: string; message: string; location: string }> } | null;
-    qa: { passed: boolean; coverage: { percent: number }; outcomes: Record<string, number>; defects: Array<{ severity: string; code: string; message: string; location: string }> } | null;
+    analysis: {
+      errors: number;
+      warnings: number;
+      issues: Array<{ severity: string; code: string; message: string; location: string }>;
+    } | null;
+    qa: {
+      passed: boolean;
+      coverage: { percent: number };
+      outcomes: Record<string, number>;
+      defects: Array<{ severity: string; code: string; message: string; location: string }>;
+    } | null;
   };
   stale: boolean;
 }
@@ -47,7 +56,10 @@ interface SpeechRecognitionLike {
 }
 function speechRecognition(): (new () => SpeechRecognitionLike) | null {
   if (typeof window === 'undefined') return null;
-  const w = window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike; webkitSpeechRecognition?: new () => SpeechRecognitionLike };
+  const w = window as unknown as {
+    SpeechRecognition?: new () => SpeechRecognitionLike;
+    webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+  };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
@@ -55,7 +67,19 @@ function speechRecognition(): (new () => SpeechRecognitionLike) | null {
  * AI Survey Architect and file import. Everything here produces a change set; the draft only
  * changes when a programmer applies one.
  */
-export function Assist({ surveyId, language, readOnly, dirty, onApplied }: { surveyId: string; language: string; readOnly: boolean; dirty: boolean; onApplied: () => Promise<void> }) {
+export function Assist({
+  surveyId,
+  language,
+  readOnly,
+  dirty,
+  onApplied,
+}: {
+  surveyId: string;
+  language: string;
+  readOnly: boolean;
+  dirty: boolean;
+  onApplied: () => Promise<void>;
+}) {
   const [ai, setAi] = useState<{ configured: boolean; model: string } | null>(null);
   const [instruction, setInstruction] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -209,7 +233,13 @@ export function Assist({ surveyId, language, readOnly, dirty, onApplied }: { sur
                     {listening ? '■ Stop dictation' : '🎙 Dictate'}
                   </button>
                 ) : null}
-                <input ref={fileInput} type="file" accept=".docx,.pdf,.txt,.md" aria-label="Attach brief or questionnaire" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".docx,.pdf,.txt,.md"
+                  aria-label="Attach brief or questionnaire"
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                />
               </div>
               {listening ? <p className="muted small">Listening… your browser's speech service converts speech to text.</p> : null}
               <div>
@@ -221,13 +251,19 @@ export function Assist({ surveyId, language, readOnly, dirty, onApplied }: { sur
             <div className="panel stack" data-testid="import-panel">
               <h2>Import a questionnaire</h2>
               <p className="muted small">
-                Excel or CSV in the ZAPX template is imported exactly, with a confidence score per row. Word, PDF and text
-                questionnaires are read by the AI.
+                Excel or CSV in the ZAPX template is imported exactly, with a confidence score per row. Word, PDF and text questionnaires
+                are read by the AI.
               </p>
               <a href="/api/imports/template.xlsx" className="small">
                 Download the Excel template
               </a>
-              <input ref={importInput} type="file" accept=".xlsx,.csv,.docx,.pdf,.txt,.md" aria-label="Questionnaire file" onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} />
+              <input
+                ref={importInput}
+                type="file"
+                accept=".xlsx,.csv,.docx,.pdf,.txt,.md"
+                aria-label="Questionnaire file"
+                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+              />
               <div>
                 <button className="primary" onClick={importNow} disabled={!importFile || busy !== null}>
                   {busy === 'import' ? 'Importing…' : 'Import file'}
@@ -237,15 +273,26 @@ export function Assist({ surveyId, language, readOnly, dirty, onApplied }: { sur
           </div>
         ) : null}
         <ErrorNote error={error} />
-        {selected ? <Review cs={selected} readOnly={readOnly} dirty={dirty} busy={busy} onDecide={decide} /> : <p className="muted">Select a proposal to review it.</p>}
+        {selected ? (
+          <Review cs={selected} readOnly={readOnly} dirty={dirty} busy={busy} onDecide={decide} />
+        ) : (
+          <p className="muted">Select a proposal to review it.</p>
+        )}
       </div>
       <aside className="panel">
         <h2>Proposals</h2>
         {list.length === 0 ? <p className="muted small">No proposals yet.</p> : null}
         <div className="stack" style={{ gap: 6 }}>
           {list.map((c) => (
-            <button key={c.id} style={{ textAlign: 'left', fontWeight: 400 }} onClick={() => open(c.id)} aria-current={selected?.id === c.id}>
-              <span className={`badge ${c.status === 'APPLIED' ? 'good' : c.status === 'REJECTED' ? 'bad' : 'warn'}`}>{c.status.toLowerCase()}</span>{' '}
+            <button
+              key={c.id}
+              style={{ textAlign: 'left', fontWeight: 400 }}
+              onClick={() => open(c.id)}
+              aria-current={selected?.id === c.id}
+            >
+              <span className={`badge ${c.status === 'APPLIED' ? 'good' : c.status === 'REJECTED' ? 'bad' : 'warn'}`}>
+                {c.status.toLowerCase()}
+              </span>{' '}
               <span className="badge">{c.source === 'AI' ? 'AI' : c.source === 'IMPORT' ? 'import' : 'pasted'}</span> {c.title}
               <div className="muted small">{new Date(c.createdAt).toLocaleString()}</div>
             </button>
@@ -258,14 +305,28 @@ export function Assist({ surveyId, language, readOnly, dirty, onApplied }: { sur
 
 const CHANGE_LABEL: Record<DiffItem['change'], string> = { added: 'Added', removed: 'Removed', changed: 'Changed', moved: 'Moved' };
 
-function Review({ cs, readOnly, dirty, busy, onDecide }: { cs: ChangeSet; readOnly: boolean; dirty: boolean; busy: string | null; onDecide: (a: 'apply' | 'reject') => void }) {
+function Review({
+  cs,
+  readOnly,
+  dirty,
+  busy,
+  onDecide,
+}: {
+  cs: ChangeSet;
+  readOnly: boolean;
+  dirty: boolean;
+  busy: string | null;
+  onDecide: (a: 'apply' | 'reject') => void;
+}) {
   const lowRows = (cs.confidence?.rows ?? []).filter((r) => r.confidence < 1 || r.issues.length);
   const canDecide = !readOnly && cs.status === 'PROPOSED';
   return (
     <div className="panel stack" data-testid="changeset-review">
       <div className="row">
         <h2 style={{ margin: 0 }}>{cs.title}</h2>
-        <span className={`badge ${cs.status === 'APPLIED' ? 'good' : cs.status === 'REJECTED' ? 'bad' : 'warn'}`}>{cs.status.toLowerCase()}</span>
+        <span className={`badge ${cs.status === 'APPLIED' ? 'good' : cs.status === 'REJECTED' ? 'bad' : 'warn'}`}>
+          {cs.status.toLowerCase()}
+        </span>
       </div>
       <div className="muted small">
         {cs.source === 'AI' ? `Written by ${cs.producer}` : cs.source === 'IMPORT' ? `Imported with ${cs.producer}` : 'Pasted definition'}
@@ -324,7 +385,8 @@ function Review({ cs, readOnly, dirty, busy, onDecide }: { cs: ChangeSet; readOn
 
       <div>
         <h3>
-          Changes: {cs.diff.counts.added} added, {cs.diff.counts.changed} changed, {cs.diff.counts.removed} removed, {cs.diff.counts.moved} moved
+          Changes: {cs.diff.counts.added} added, {cs.diff.counts.changed} changed, {cs.diff.counts.removed} removed, {cs.diff.counts.moved}{' '}
+          moved
         </h3>
         {cs.diff.affectsData ? (
           <p className="small" style={{ color: 'var(--warn)' }}>
@@ -336,7 +398,9 @@ function Review({ cs, readOnly, dirty, busy, onDecide }: { cs: ChangeSet; readOn
             {cs.diff.items.map((i, n) => (
               <tr key={n}>
                 <td>
-                  <span className={`badge ${i.change === 'removed' ? 'bad' : i.change === 'added' ? 'good' : 'warn'}`}>{CHANGE_LABEL[i.change]}</span>
+                  <span className={`badge ${i.change === 'removed' ? 'bad' : i.change === 'added' ? 'good' : 'warn'}`}>
+                    {CHANGE_LABEL[i.change]}
+                  </span>
                 </td>
                 <td className="mono">{i.entity}</td>
                 <td>
@@ -345,8 +409,12 @@ function Review({ cs, readOnly, dirty, busy, onDecide }: { cs: ChangeSet; readOn
                     <details>
                       <summary>Before / after</summary>
                       <div className="grid2">
-                        <pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(i.before, null, 1)}</pre>
-                        <pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>{JSON.stringify(i.after, null, 1)}</pre>
+                        <pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>
+                          {JSON.stringify(i.before, null, 1)}
+                        </pre>
+                        <pre className="mono" style={{ whiteSpace: 'pre-wrap' }}>
+                          {JSON.stringify(i.after, null, 1)}
+                        </pre>
                       </div>
                     </details>
                   ) : null}
@@ -365,8 +433,11 @@ function Review({ cs, readOnly, dirty, busy, onDecide }: { cs: ChangeSet; readOn
       <div>
         <h3>Checks on the proposal</h3>
         <p className={cs.check.publishable ? 'ok-text' : 'error-text'}>
-          Logic check: {cs.check.analysis ? `${cs.check.analysis.errors} error(s), ${cs.check.analysis.warnings} warning(s)` : 'definition invalid'}
-          {cs.check.qa ? ` · QA (${cs.check.qa.outcomes ? Object.values(cs.check.qa.outcomes).reduce((a, b) => a + b, 0) : 0} simulated): ${cs.check.qa.passed ? 'passed' : 'failed'}, ${cs.check.qa.coverage.percent}% coverage` : ''}
+          Logic check:{' '}
+          {cs.check.analysis ? `${cs.check.analysis.errors} error(s), ${cs.check.analysis.warnings} warning(s)` : 'definition invalid'}
+          {cs.check.qa
+            ? ` · QA (${cs.check.qa.outcomes ? Object.values(cs.check.qa.outcomes).reduce((a, b) => a + b, 0) : 0} simulated): ${cs.check.qa.passed ? 'passed' : 'failed'}, ${cs.check.qa.coverage.percent}% coverage`
+            : ''}
         </p>
         {[...(cs.check.analysis?.issues ?? []), ...(cs.check.qa?.defects ?? [])].slice(0, 30).map((i, n) => (
           <div key={n} className={`issue ${i.severity}`}>
@@ -380,8 +451,16 @@ function Review({ cs, readOnly, dirty, busy, onDecide }: { cs: ChangeSet; readOn
 
       {canDecide ? (
         <div className="stack">
-          {cs.stale ? <p className="error-text small">The draft has changed since this proposal was made, so it can no longer be applied. Create a new proposal.</p> : null}
-          {dirty ? <p className="small" style={{ color: 'var(--warn)' }}>Save or discard your unsaved edits before applying a proposal.</p> : null}
+          {cs.stale ? (
+            <p className="error-text small">
+              The draft has changed since this proposal was made, so it can no longer be applied. Create a new proposal.
+            </p>
+          ) : null}
+          {dirty ? (
+            <p className="small" style={{ color: 'var(--warn)' }}>
+              Save or discard your unsaved edits before applying a proposal.
+            </p>
+          ) : null}
           <div className="row">
             <button className="primary" onClick={() => onDecide('apply')} disabled={busy !== null || cs.stale || dirty}>
               {busy === 'apply' ? 'Applying…' : 'Apply to draft'}

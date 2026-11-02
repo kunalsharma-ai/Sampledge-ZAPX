@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: ZAPX Vendor API
+  version: 1.0.0
+  description: |
+    Partner-facing API for sample vendors. Every request is authenticated with the vendor id and an
+    HMAC-SHA256 signature made with the vendor's shared secret (shown in the ZAPX studio):
+
+        signature = hex(HMAC_SHA256(secret, timestamp + "." + METHOD + "." + pathWithQuery))
+
+    `pathWithQuery` is the request path including `/api` and the query string exactly as sent,
+    e.g. `/api/v1/vendor/outcomes?since=2026-11-01T00:00:00.000Z`. The timestamp is unix seconds and
+    must be within 5 minutes of server time. Invalid credentials always return 401.
+
+    Outbound callbacks and redirects are described in docs/modules/redirects.md.
+servers:
+  - url: https://{host}/api
+    variables:
+      host: { default: zapx.example.com }
+security:
+  - vendorId: []
+    timestamp: []
+    signature: []
+paths:
+  /v1/vendor/outcomes:
+    get:
+      summary: Outcomes recorded for this vendor's respondents, oldest first
+      parameters:
+        - {
+            name: since,
+            in: query,
+            schema: { type: string, format: date-time },
+            description: Only outcomes completed after this time (use `next` from the previous page).,
+          }
+        - { name: surveyId, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200':
+          description: A page of outcomes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Outcome' } }
+                  next:
+                    { type: [string, 'null'], format: date-time, description: Pass as `since` for the next page; null on the last page. }
+        '400': { description: Invalid parameter }
+        '401': { description: Invalid vendor credentials or timestamp }
+        '429': { description: Too many requests (120 per minute) }
+  /v1/vendor/outcomes/{uid}:
+    get:
+      summary: Outcomes for one respondent id (one per survey)
+      parameters:
+        - { name: uid, in: path, required: true, schema: { type: string, maxLength: 200 } }
+        - { name: surveyId, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: Outcomes for this respondent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Outcome' } }
+        '401': { description: Invalid vendor credentials or timestamp }
+components:
+  securitySchemes:
+    vendorId: { type: apiKey, in: header, name: X-Zapx-Vendor }
+    timestamp: { type: apiKey, in: header, name: X-Zapx-Timestamp }
+    signature: { type: apiKey, in: header, name: X-Zapx-Signature }
+  schemas:
+    Outcome:
+      type: object
+      required: [responseId, surveyId, uid, status, startedAt]
+      properties:
+        responseId: { type: string }
+        surveyId: { type: string }
+        uid: { type: string }
+        status:
+          type: string
+          enum: [complete, terminate, quota_full, quality_fail, security_reject, duplicate, partial, technical_error]
+        country: { type: [string, 'null'] }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }

@@ -32,7 +32,11 @@ export class InterviewController {
     const b = (body && typeof body === 'object' ? body : {}) as { query?: unknown; client?: unknown };
     const query = (b.query && typeof b.query === 'object' ? b.query : {}) as Record<string, unknown>;
     const client = clientSchema.safeParse(b.client ?? {});
-    return this.interview.start(surveyId, query, { userAgent, acceptLanguage: acceptLanguage?.slice(0, 200), client: client.success ? client.data : {} });
+    return this.interview.start(surveyId, query, {
+      userAgent,
+      acceptLanguage: acceptLanguage?.slice(0, 200),
+      client: client.success ? client.data : {},
+    });
   }
 
   @Post('r/:token/language')
@@ -59,4 +63,3 @@ export class InterviewController {
     return this.interview.back(token);
   }
 }
-

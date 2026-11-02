@@ -1,0 +1,6 @@
+# Every change is owned by the maintainer until module owners are added.
+# When more maintainers join, add owners per module, e.g.:
+#   /packages/redirect-core/  @owner-a
+#   /apps/api/src/integrations/  @owner-a
+#   /apps/api/src/ai/  @owner-b
+* @kunalsharma-ai

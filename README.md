@@ -12,32 +12,46 @@ reviewable change sets, and the QA Laboratory.
 **Milestone 3 (experience, languages, devices)** adds the Experience Studio (themes), the Global
 Language Studio (translations with AI assistance and human review) and device rules.
 
+**Milestone 4 (foundation hardening)** adds the separable Redirect & Vendor Integration module
+(eight outcomes, vendor/country/project/organization rules, signed callbacks with retries, redirect
+and delivery logs, an authenticated vendor API), a PROJEXA adapter built on PROJEXA's documented
+contract (not yet tested against a live PROJEXA), the AI gateway (per-task models, permissions,
+limits, cost tracking, redaction), soft delete, Docker images and a full `docker compose` stack,
+and the governance set: ESLint, Prettier, ADRs, CodeQL, Dependabot and a dependency audit in CI.
+
 ## What works today
 
-| Area | What you can do |
-| --- | --- |
-| Accounts | Sign up an organization, sign in, add team members as admin, programmer or viewer |
-| Projects | Create projects; each holds surveys and sample vendors |
-| Survey Studio | Build surveys in a structured editor or as JSON; live logic check; in-browser preview on desktop or mobile width |
-| Question types | Single choice, multiple choice (exclusive and anchored options), open text, numeric, single-choice grid, information screens |
-| Logic | Page and question conditions (including same-page "Other, specify"), custom validations, piping `{{Q1}}`, option and row randomization with anchors, terminations, quotas |
-| Logic check | Undefined variables, forward references, impossible conditions, unreachable pages, unknown answer codes, duplicate ids and codes, bad ranges, broken piping |
-| Publishing | Immutable published versions; every response records the exact version answered |
-| Vendors and redirects | Static, dynamic and hybrid redirects per vendor; status words; placeholders; Sampledge platform preset; redirect preview (QA) |
-| Link security | Optional HMAC-signed entry links with expiry; duplicate UID protection; signed redirects; dynamic return URLs limited to allowed hosts |
-| Fieldwork control | Live, paused and closed status; test links that never count toward quotas |
-| Quotas | Atomic counting at completion, so quotas cannot overfill under concurrent traffic |
-| Data | CSV and Excel export (codes, one column per option or grid row, codebook sheet, spreadsheet formula-injection protection) |
-| Audit | Append-only audit trail of logins, edits, publishes, vendor changes, links, exports, QA runs and change-set decisions |
-| AI Survey Architect | Build or edit a survey from a typed or dictated instruction plus an optional brief or questionnaire (Word, PDF, text). The AI's answer is validated by the same schema and logic check as a manual edit, with one automatic repair round, and lists the assumptions a programmer should confirm. Needs `ANTHROPIC_API_KEY` |
-| File import | The ZAPX Excel/CSV template is imported deterministically with a confidence score and issues per row (download it from the studio). Word, PDF and text questionnaires are read by the AI. Files are checked by content, not just extension, and limited in size |
-| Change sets | AI output, imports and pasted definitions become proposals with a structured diff, data-impact warning, logic check and a 200-respondent QA preview. A programmer applies or rejects them; applying fails if the draft changed since the proposal was made |
-| QA Laboratory | Simulate up to 2,000 synthetic respondents per run on the draft or live version: outcome mix, coverage of pages, questions, options, branches and outcomes, and defects (never shown, constant conditions, impossible completes, stuck pages) with an example respondent. Runs are deterministic per seed, saved, and never touch responses or quotas |
-
-| Experience Studio | Theme presets, brand colours, logo, font, corner radius, spacing, progress style, button labels and motion (always off for respondents who ask for reduced motion), with contrast warnings and a live preview at desktop, tablet and phone width. Presentation only: it cannot change questions, codes or logic |
-| Languages | Add any number of languages; translate by hand or with AI (marked "AI, to review"); every text shows missing, outdated, AI or reviewed status, and broken `{{piping}}` is flagged. A language is offered to respondents only when enabled, and publishing is blocked until every enabled language is complete and reviewed. Validation messages, buttons and end messages are translated too |
-| Respondent language | Chosen from the link (`&lang=fr`), else the browser's language, else the source; respondents can switch mid-survey without losing answers. Answer codes are identical in every language |
-| Devices | Each interview records desktop, tablet or phone. Surveys can exclude device types (screened out before a response is created, redirected as terminate). Grids show as cards or a scrolling table on narrow screens. Language and device are in the exports |
+| Area                  | What you can do                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accounts              | Sign up an organization, sign in, add team members as admin, programmer or viewer                                                                                                                                                                                                                                                                                                            |
+| Projects              | Create projects; each holds surveys and sample vendors                                                                                                                                                                                                                                                                                                                                       |
+| Survey Studio         | Build surveys in a structured editor or as JSON; live logic check; in-browser preview on desktop or mobile width                                                                                                                                                                                                                                                                             |
+| Question types        | Single choice, multiple choice (exclusive and anchored options), open text, numeric, single-choice grid, information screens                                                                                                                                                                                                                                                                 |
+| Logic                 | Page and question conditions (including same-page "Other, specify"), custom validations, piping `{{Q1}}`, option and row randomization with anchors, terminations, quotas                                                                                                                                                                                                                    |
+| Logic check           | Undefined variables, forward references, impossible conditions, unreachable pages, unknown answer codes, duplicate ids and codes, bad ranges, broken piping                                                                                                                                                                                                                                  |
+| Publishing            | Immutable published versions; every response records the exact version answered                                                                                                                                                                                                                                                                                                              |
+| Vendors and redirects | Static, dynamic and hybrid redirects per vendor; status words; placeholders; Sampledge platform preset; redirect preview (QA)                                                                                                                                                                                                                                                                |
+| Link security         | Optional HMAC-signed entry links with expiry; duplicate UID protection; signed redirects; dynamic return URLs limited to allowed hosts                                                                                                                                                                                                                                                       |
+| Fieldwork control     | Live, paused and closed status; test links that never count toward quotas                                                                                                                                                                                                                                                                                                                    |
+| Quotas                | Atomic counting at completion, so quotas cannot overfill under concurrent traffic                                                                                                                                                                                                                                                                                                            |
+| Data                  | CSV and Excel export (codes, one column per option or grid row, codebook sheet, spreadsheet formula-injection protection)                                                                                                                                                                                                                                                                    |
+| Audit                 | Append-only audit trail of logins, edits, publishes, vendor changes, links, exports, QA runs and change-set decisions                                                                                                                                                                                                                                                                        |
+| AI Survey Architect   | Build or edit a survey from a typed or dictated instruction plus an optional brief or questionnaire (Word, PDF, text). The AI's answer is validated by the same schema and logic check as a manual edit, with one automatic repair round, and lists the assumptions a programmer should confirm. Needs `ANTHROPIC_API_KEY`                                                                   |
+| File import           | The ZAPX Excel/CSV template is imported deterministically with a confidence score and issues per row (download it from the studio). Word, PDF and text questionnaires are read by the AI. Files are checked by content, not just extension, and limited in size                                                                                                                              |
+| Change sets           | AI output, imports and pasted definitions become proposals with a structured diff, data-impact warning, logic check and a 200-respondent QA preview. A programmer applies or rejects them; applying fails if the draft changed since the proposal was made                                                                                                                                   |
+| QA Laboratory         | Simulate up to 2,000 synthetic respondents per run on the draft or live version: outcome mix, coverage of pages, questions, options, branches and outcomes, and defects (never shown, constant conditions, impossible completes, stuck pages) with an example respondent. Runs are deterministic per seed, saved, and never touch responses or quotas                                        |
+| Experience Studio     | Theme presets, brand colours, logo, font, corner radius, spacing, progress style, button labels and motion (always off for respondents who ask for reduced motion), with contrast warnings and a live preview at desktop, tablet and phone width. Presentation only: it cannot change questions, codes or logic                                                                              |
+| Languages             | Add any number of languages; translate by hand or with AI (marked "AI, to review"); every text shows missing, outdated, AI or reviewed status, and broken `{{piping}}` is flagged. A language is offered to respondents only when enabled, and publishing is blocked until every enabled language is complete and reviewed. Validation messages, buttons and end messages are translated too |
+| Respondent language   | Chosen from the link (`&lang=fr`), else the browser's language, else the source; respondents can switch mid-survey without losing answers. Answer codes are identical in every language                                                                                                                                                                                                      |
+| Devices               | Each interview records desktop, tablet or phone. Surveys can exclude device types (screened out before a response is created, redirected as terminate). Grids show as cards or a scrolling table on narrow screens. Language and device are in the exports                                                                                                                                   |
+| Outcomes              | Eight outcomes shared with PROJEXA: complete, terminate, quota full, quality fail, security reject, duplicate, partial (abandoned, after 24 h by default) and technical error                                                                                                                                                                                                                |
+| Redirect rules        | Per vendor, per vendor and country, per project, per project and country, and per organization; the most specific wins. Redirect QA by country shows which rule applies                                                                                                                                                                                                                      |
+| Callbacks             | Signed server-to-server callbacks per vendor and outcome, queued in an outbox: retried with backoff, dead-lettered, retried by hand from the studio, never sent twice and never for test respondents                                                                                                                                                                                         |
+| Logs                  | Redirect log (every outcome redirect and the rule that produced it) and callback delivery log per vendor                                                                                                                                                                                                                                                                                     |
+| Vendor API            | `GET /api/v1/vendor/outcomes` for reconciliation, authenticated with HMAC signatures ([contract](docs/api/openapi.yaml))                                                                                                                                                                                                                                                                     |
+| PROJEXA               | PROJEXA vendors: respondents return to PROJEXA's `/r/{status}?token=` and outcomes are confirmed with PROJEXA's signed S2S call. Built from PROJEXA's documentation and tested against a mock, **not yet against a live PROJEXA**                                                                                                                                                            |
+| AI governance         | Organization AI settings: on/off per task, requests per minute and day, monthly budget, PII redaction; usage and estimated cost per task and model; circuit breaker; every call audited                                                                                                                                                                                                      |
+| Deletion              | Projects, surveys and vendors are soft-deleted: they disappear and their links stop working, history is kept                                                                                                                                                                                                                                                                                 |
 
 Not yet built (later milestones): voice-over and transcription, rich media and custom animations, CAPI and CATI apps, fraud scoring, analytics dashboards, SSO and billing. See
 [docs/architecture.md](docs/architecture.md).
@@ -53,19 +67,26 @@ packages/
   survey-schema/    Canonical survey definition (Zod) – the single source of truth
   logic-engine/     Expression language, routing, validation, static analysis
   survey-renderer/  Question components shared by runtime and studio preview
+  redirect-core/    Redirect & Vendor Integration core (no framework; extractable)
   db/               Prisma schema, migrations and seed
-e2e/          Playwright acceptance test through the real UI
-docs/         Architecture notes and example surveys
+e2e/          Playwright acceptance tests through the real UI
+docs/         Architecture, ADRs, module docs, API contract, operations, examples
+infra/        nginx config, backup and restore scripts
 ```
 
 ## Running locally
 
 Requirements: Node 22, pnpm 10, PostgreSQL 16 (or Docker).
 
+**Everything in containers** (no Node needed): `docker compose up --build`, then open
+http://localhost:3000 (studio) and http://localhost:5173 (respondent runtime).
+
+**For development:**
+
 ```bash
 pnpm install
 cp .env.example .env
-docker compose -f infra/docker-compose.yml up -d   # or point DATABASE_URL at your own Postgres
+docker compose up -d postgres   # or point DATABASE_URL at your own Postgres
 pnpm build
 pnpm db:migrate
 pnpm db:seed          # creates admin@zapx.local / zapx-admin-123
@@ -84,20 +105,23 @@ Open http://localhost:3000, sign in, create a project, add a vendor (try **+ Sam
 create a survey, paste [docs/examples/demo-screener.json](docs/examples/demo-screener.json) into the
 JSON tab, publish, and generate a link under **Links & status**.
 
-To enable the AI Survey Architect, set `ANTHROPIC_API_KEY` in `.env` (and optionally `AI_MODEL`,
-default `claude-opus-5-5`) and restart the API. Without a key the AI panel says AI is not configured
+To enable AI, set `ANTHROPIC_API_KEY` and `AI_MODEL` in `.env` (`.env.example` suggests
+`claude-opus-5-5`; `AI_MODEL_ARCHITECT` and `AI_MODEL_TRANSLATE` override it per task) and restart
+the API. No model id is built into the code. Without a key the AI panel says AI is not configured
 and every other feature, including template import and the QA lab, works as normal. Voice dictation
 uses the browser's speech recognition (Chrome, Edge, Safari).
 
 ## Tests
 
 ```bash
-pnpm test     # schema, logic engine, API integration tests (needs the database)
-pnpm e2e      # full-stack Playwright acceptance test (starts the apps if not running)
+pnpm lint && pnpm format:check
+pnpm test     # packages, API integration tests (needs the database)
+pnpm e2e      # full-stack Playwright acceptance tests (starts the apps if not running)
 ```
 
-CI (`.github/workflows/ci.yml`) runs build, type checks, migrations, all tests and the end-to-end test
-against a PostgreSQL service on every pull request.
+CI runs formatting, lint, build, type checks, migrations, all tests and the end-to-end tests on
+every pull request, plus a dependency audit, CodeQL, and a job that builds the Docker images and
+boots the whole stack. See [ADR 0006](docs/adr/0006-engineering-governance.md).
 
 ## Survey links and redirects
 
@@ -117,5 +141,6 @@ At the end ZAPX redirects according to the vendor's mode:
 - **Hybrid** – dynamic when a valid return URL was passed, otherwise static.
 
 Placeholders: `[UID] [VID] [CC] [STATUS] [RID] [param:name]`. Signed entry links use
-`sig = HMAC-SHA256(secret, sorted query string without sig)`; see
-[apps/api/src/vendors/redirects.ts](apps/api/src/vendors/redirects.ts).
+`sig = HMAC-SHA256(secret, sorted query string without sig)`. Rule precedence, callbacks, signing,
+the vendor API and the PROJEXA adapter are documented in
+[docs/modules/redirects.md](docs/modules/redirects.md).

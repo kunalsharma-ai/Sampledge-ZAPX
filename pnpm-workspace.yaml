@@ -1,11 +1,25 @@
 packages:
-  - "apps/*"
-  - "packages/*"
-  - "e2e"
+  - 'apps/*'
+  - 'packages/*'
+  - 'e2e'
 onlyBuiltDependencies:
-  - "@prisma/client"
-  - "@prisma/engines"
+  - '@prisma/client'
+  - '@prisma/engines'
   - prisma
   - esbuild
-  - "@nestjs/core"
+  - '@nestjs/core'
   - bcrypt
+  - sharp
+
+# Security floors for transitive dependencies (see docs/security.md).
+overrides:
+  postcss@<8.5.18: '>=8.5.18'
+  sharp@<0.35.5: '^0.35.5'
+  path-to-regexp@>=8.0.0 <8.4.0: '^8.4.0'
+  multer@<2.5.0: '^2.5.0'
+
+auditConfig:
+  # Accepted until the zod 4 migration (tracked in docs/security.md): request bodies are size-limited
+  # before validation, which bounds the memory a crafted collection can use.
+  ignoreGhsas:
+    - GHSA-mrhx-c7xc-m3w5

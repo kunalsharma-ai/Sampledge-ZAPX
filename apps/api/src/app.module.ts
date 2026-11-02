@@ -12,7 +12,7 @@ import { SurveysController } from './surveys/surveys.controller';
 import { SurveysService } from './surveys/surveys.service';
 import { ExportService } from './exports/export.service';
 import { VendorsController } from './vendors/vendors.controller';
-import { LocalRedirectService, RedirectService } from './vendors/redirect.service';
+import { IntegrationsModule } from './integrations/integrations.module';
 import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
 import { HealthController } from './health.controller';
@@ -23,6 +23,9 @@ import { ChangeSetsService } from './changesets/changesets.service';
 import { ArchitectService } from './ai/architect.service';
 import { AiProvider } from './ai/ai-provider';
 import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
+import { AiGateway } from './ai/ai-gateway';
+import { AiUsageRepository } from './ai/ai-usage.repository';
+import { AiSettingsController } from './ai/ai-settings.controller';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -31,6 +34,7 @@ import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
 @Module({
   imports: [
     CommonModule,
+    IntegrationsModule,
     JwtModule.register({ global: true, secret: config().JWT_SECRET }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 600 }]),
   ],
@@ -45,6 +49,7 @@ import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
     QaController,
     ChangeSetsController,
     TranslateController,
+    AiSettingsController,
   ],
   providers: [
     SurveysService,
@@ -52,14 +57,25 @@ import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
     InterviewService,
     ChangeSetsService,
     ArchitectService,
+    AiGateway,
+    AiUsageRepository,
     {
+      // Provider registry: AI_PROVIDER picks the implementation. Adding OpenAI or Gemini means
+      // one more AiProvider subclass and one more case here (docs/modules/ai-gateway.md).
       provide: AiProvider,
       useFactory: (): AiProvider => {
-        const { ANTHROPIC_API_KEY, AI_MODEL } = config();
-        return ANTHROPIC_API_KEY ? new ClaudeAiProvider(ANTHROPIC_API_KEY, AI_MODEL) : new UnconfiguredAiProvider(AI_MODEL);
+        const cfg = config();
+        switch (cfg.AI_PROVIDER) {
+          case 'anthropic':
+            if (!cfg.ANTHROPIC_API_KEY) return new UnconfiguredAiProvider('An administrator needs to set ANTHROPIC_API_KEY.');
+            if (!cfg.AI_MODEL) return new UnconfiguredAiProvider('An administrator needs to set AI_MODEL.');
+            return new ClaudeAiProvider(cfg.ANTHROPIC_API_KEY, cfg.AI_MODEL, {
+              maxRetries: cfg.AI_MAX_RETRIES,
+              timeoutMs: cfg.AI_TIMEOUT_MS,
+            });
+        }
       },
     },
-    { provide: RedirectService, useClass: LocalRedirectService },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
   ],

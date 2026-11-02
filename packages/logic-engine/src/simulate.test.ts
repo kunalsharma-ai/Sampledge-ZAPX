@@ -43,7 +43,9 @@ describe('synthetic respondent QA', () => {
       pages: [
         {
           id: 'P1',
-          questions: [{ id: 'N', type: 'numeric', text: 'n', min: 1, max: 10, validations: [{ expr: 'N > 20', message: 'Must exceed 20' }] }],
+          questions: [
+            { id: 'N', type: 'numeric', text: 'n', min: 1, max: 10, validations: [{ expr: 'N > 20', message: 'Must exceed 20' }] },
+          ],
         },
         { id: 'P2', questions: [{ id: 'X', type: 'open', text: 'x' }] },
       ],

@@ -4,16 +4,7 @@
  * Errors block publishing. Warnings are shown to the programmer but do not block.
  */
 import type { Question, SurveyDefinition } from '@zapx/survey-schema';
-import {
-  ExpressionError,
-  FUNCTIONS,
-  evaluate,
-  parse,
-  references,
-  truthy,
-  type Node,
-  type Value,
-} from './expression.js';
+import { ExpressionError, FUNCTIONS, evaluate, parse, references, truthy, type Node, type Value } from './expression.js';
 import { PIPE_PATTERN } from './interview.js';
 
 export type IssueSeverity = 'error' | 'warning';
@@ -166,12 +157,7 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
           );
       } else if (role.kind === 'question') {
         if (s.pageIndex > role.pageIndex || (s.pageIndex === role.pageIndex && s.questionIndex >= role.questionIndex))
-          add(
-            'error',
-            'FORWARD_REFERENCE',
-            `"${ref.name}" is asked later, so it has no answer when this condition is checked.`,
-            location,
-          );
+          add('error', 'FORWARD_REFERENCE', `"${ref.name}" is asked later, so it has no answer when this condition is checked.`, location);
       } else if (role.kind === 'validation' && s.pageIndex > role.pageIndex) {
         add('error', 'FORWARD_REFERENCE', `"${ref.name}" is asked on a later page.`, location);
       }
@@ -245,9 +231,7 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
       }
       anyVisible ||= qVisible;
       if (q.type !== 'info') {
-        q.validations.forEach((v, i) =>
-          checkExpr(v.expr, { kind: 'validation', pageIndex: pi }, `${qloc}.validations.${i}`),
-        );
+        q.validations.forEach((v, i) => checkExpr(v.expr, { kind: 'validation', pageIndex: pi }, `${qloc}.validations.${i}`));
       }
       const texts = [q.text, ...('help' in q && q.help ? [q.help] : [])];
       for (const t of texts) {
@@ -256,13 +240,11 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
           const s = symbols.get(ref);
           if (!s || s.question.type === 'info')
             add('error', 'PIPING_UNDEFINED', `{{${ref}}} in ${q.id} does not refer to a question.`, qloc);
-          else if (s.pageIndex >= pi)
-            add('error', 'PIPING_UNDEFINED', `{{${ref}}} in ${q.id} is not answered before this page.`, qloc);
+          else if (s.pageIndex >= pi) add('error', 'PIPING_UNDEFINED', `{{${ref}}} in ${q.id} is not answered before this page.`, qloc);
         }
       }
     });
-    if (!anyVisible)
-      add('error', 'UNREACHABLE', `Page ${page.id} has no question that can ever be shown.`, ploc);
+    if (!anyVisible) add('error', 'UNREACHABLE', `Page ${page.id} has no question that can ever be shown.`, ploc);
   });
 
   // Terminations and quotas are evaluated after every page and may reference any question.
@@ -272,8 +254,7 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
     if (!ast) return;
     if (references(ast).length === 0 && truthy(evaluate(ast, { lookup: () => null })))
       add('error', 'ALWAYS_TERMINATES', `Termination ${t.id} is always true: every respondent would be terminated.`, loc);
-    else if (!satisfiable(ast))
-      add('warning', 'IMPOSSIBLE_CONDITION', `Termination ${t.id} can never trigger.`, loc);
+    else if (!satisfiable(ast)) add('warning', 'IMPOSSIBLE_CONDITION', `Termination ${t.id} can never trigger.`, loc);
   });
   def.quotas.forEach((q) => {
     const loc = `quotas.${q.id}.condition`;
@@ -300,8 +281,7 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
         // every subset of the options
         const subsets: Value[] = [];
         const n = q.options.length;
-        for (let mask = 0; mask < 1 << n; mask++)
-          subsets.push(q.options.filter((_, i) => mask & (1 << i)).map((o) => o.code));
+        for (let mask = 0; mask < 1 << n; mask++) subsets.push(q.options.filter((_, i) => mask & (1 << i)).map((o) => o.code));
         domains.push({ key, values: [null, ...subsets] });
       } else {
         return true; // open-ended domain: assume satisfiable

@@ -42,7 +42,14 @@ export function SurveyPage({ questions, answers, context, errors = {}, disabled,
   return (
     <div className="zx-page">
       {visible.map((q) => (
-        <QuestionView key={q.id} question={q} value={answers[q.id] ?? null} error={errors[q.id]} disabled={disabled} onChange={(v) => onChange(q.id, v)} />
+        <QuestionView
+          key={q.id}
+          question={q}
+          value={answers[q.id] ?? null}
+          error={errors[q.id]}
+          disabled={disabled}
+          onChange={(v) => onChange(q.id, v)}
+        />
       ))}
     </div>
   );
@@ -70,10 +77,21 @@ export function QuestionView({ question: q, value, error, disabled, onChange }: 
   const helpId = `${id}-help`;
   const describedBy = [q.help ? helpId : '', error ? errId : ''].filter(Boolean).join(' ') || undefined;
   return (
-    <fieldset className={`zx-question zx-${q.type}${error ? ' zx-has-error' : ''}`} data-question={q.id} aria-describedby={describedBy} aria-invalid={!!error} disabled={disabled}>
+    <fieldset
+      className={`zx-question zx-${q.type}${error ? ' zx-has-error' : ''}`}
+      data-question={q.id}
+      aria-describedby={describedBy}
+      aria-invalid={!!error}
+      disabled={disabled}
+    >
       <legend className="zx-text">
         {text}
-        {q.required ? <span className="zx-required" aria-hidden="true"> *</span> : null}
+        {q.required ? (
+          <span className="zx-required" aria-hidden="true">
+            {' '}
+            *
+          </span>
+        ) : null}
         {q.required ? <span className="zx-sr-only"> (required)</span> : null}
       </legend>
       {q.help ? (
@@ -159,7 +177,13 @@ function ChoiceList({
     <div className="zx-options" role={multiple ? 'group' : 'radiogroup'}>
       {options.map((o) => (
         <label key={o.code} className={`zx-option${selected.has(o.code) ? ' zx-selected' : ''}`}>
-          <input type={multiple ? 'checkbox' : 'radio'} name={name} value={o.code} checked={selected.has(o.code)} onChange={() => toggle(o)} />
+          <input
+            type={multiple ? 'checkbox' : 'radio'}
+            name={name}
+            value={o.code}
+            checked={selected.has(o.code)}
+            onChange={() => toggle(o)}
+          />
           <span>{o.label}</span>
         </label>
       ))}
@@ -274,12 +298,38 @@ export const defaultThemeCss = `
 
 /** Ready-made looks offered in the Experience Studio. Each is a partial theme. */
 export const THEME_PRESETS: Record<string, { name: string; theme: Partial<Theme> }> = {
-  zapx: { name: 'ZAPX', theme: { accent: '#2f5bea', background: '#f6f7fb', surface: '#ffffff', text: '#1b1f2a', font: 'system', radius: 12 } },
-  clinical: { name: 'Clinical', theme: { accent: '#0f766e', background: '#f3f7f7', surface: '#ffffff', text: '#12201f', font: 'humanist', radius: 6, motion: 'none' } },
-  warm: { name: 'Warm', theme: { accent: '#c2410c', background: '#fbf6f1', surface: '#fffdfa', text: '#2a1d14', font: 'rounded', radius: 18 } },
-  editorial: { name: 'Editorial', theme: { accent: '#1f2937', background: '#f7f5f0', surface: '#ffffff', text: '#111111', font: 'serif', radius: 2, motion: 'subtle' } },
-  vivid: { name: 'Vivid', theme: { accent: '#7c3aed', background: '#f5f3ff', surface: '#ffffff', text: '#1e1b2e', font: 'rounded', radius: 20, motion: 'lively' } },
-  midnight: { name: 'Midnight', theme: { accent: '#38bdf8', background: '#0b1220', surface: '#121a2b', text: '#e6edf7', font: 'system', radius: 12, colorScheme: 'light' } },
+  zapx: {
+    name: 'ZAPX',
+    theme: { accent: '#2f5bea', background: '#f6f7fb', surface: '#ffffff', text: '#1b1f2a', font: 'system', radius: 12 },
+  },
+  clinical: {
+    name: 'Clinical',
+    theme: { accent: '#0f766e', background: '#f3f7f7', surface: '#ffffff', text: '#12201f', font: 'humanist', radius: 6, motion: 'none' },
+  },
+  warm: {
+    name: 'Warm',
+    theme: { accent: '#c2410c', background: '#fbf6f1', surface: '#fffdfa', text: '#2a1d14', font: 'rounded', radius: 18 },
+  },
+  editorial: {
+    name: 'Editorial',
+    theme: { accent: '#1f2937', background: '#f7f5f0', surface: '#ffffff', text: '#111111', font: 'serif', radius: 2, motion: 'subtle' },
+  },
+  vivid: {
+    name: 'Vivid',
+    theme: { accent: '#7c3aed', background: '#f5f3ff', surface: '#ffffff', text: '#1e1b2e', font: 'rounded', radius: 20, motion: 'lively' },
+  },
+  midnight: {
+    name: 'Midnight',
+    theme: {
+      accent: '#38bdf8',
+      background: '#0b1220',
+      surface: '#121a2b',
+      text: '#e6edf7',
+      font: 'system',
+      radius: 12,
+      colorScheme: 'light',
+    },
+  },
 };
 
 const FONT_STACKS: Record<Theme['font'], string> = {
@@ -315,7 +365,8 @@ export function contrastRatio(a: string, b: string): number {
 /** Accessibility warnings for a theme (text and button contrast below WCAG AA). */
 export function themeWarnings(theme: Theme): string[] {
   const w: string[] = [];
-  if (contrastRatio(theme.text, theme.surface) < 4.5) w.push('Question text does not stand out enough from the card colour (contrast below 4.5:1).');
+  if (contrastRatio(theme.text, theme.surface) < 4.5)
+    w.push('Question text does not stand out enough from the card colour (contrast below 4.5:1).');
   if (contrastRatio(theme.text, theme.background) < 4.5) w.push('Text on the page background is hard to read (contrast below 4.5:1).');
   const onAccent = contrastRatio('#ffffff', theme.accent) >= contrastRatio('#111111', theme.accent) ? '#ffffff' : '#111111';
   if (contrastRatio(onAccent, theme.accent) < 4.5) w.push('Button text is hard to read on the accent colour (contrast below 4.5:1).');
@@ -341,14 +392,18 @@ export function themeCss(theme: Theme, devices?: DeviceSettings): string {
     `--zx-radius:${theme.radius}px`,
     `--zx-option-radius:${Math.max(0, Math.round(theme.radius * 0.8))}px`,
   ].join(';');
-  const parts = [`.zx-root{font-family:${FONT_STACKS[theme.font]};--zx-radius:${theme.radius}px;--zx-option-radius:${Math.max(0, Math.round(theme.radius * 0.8))}px}`];
+  const parts = [
+    `.zx-root{font-family:${FONT_STACKS[theme.font]};--zx-radius:${theme.radius}px;--zx-option-radius:${Math.max(0, Math.round(theme.radius * 0.8))}px}`,
+  ];
   // auto: the theme palette in light mode, the built-in dark palette for respondents in dark mode.
   parts.push(theme.colorScheme === 'light' ? `.zx-root{${vars}}` : `@media not all and (prefers-color-scheme:dark){.zx-root{${vars}}}`);
   if (theme.density === 'compact') {
     parts.push('.zx-root .zx-page{gap:12px}.zx-root .zx-option{padding:8px 12px;min-height:40px}.zx-root .zx-card{padding:18px}');
   }
   if (theme.motion === 'subtle') {
-    parts.push('@keyframes zx-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.zx-root .zx-card{animation:zx-in .28s ease-out}');
+    parts.push(
+      '@keyframes zx-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.zx-root .zx-card{animation:zx-in .28s ease-out}',
+    );
   } else if (theme.motion === 'lively') {
     parts.push(
       '@keyframes zx-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}@keyframes zx-pop{0%{transform:scale(1)}40%{transform:scale(1.025)}100%{transform:scale(1)}}' +
@@ -360,7 +415,9 @@ export function themeCss(theme: Theme, devices?: DeviceSettings): string {
       '@container zx (max-width:560px){.zx-root .zx-grid thead{display:table-header-group}.zx-root .zx-grid tr{display:table-row;padding:0}.zx-root .zx-grid tbody th{display:table-cell;padding:10px 8px}.zx-root .zx-grid td{display:table-cell;text-align:center;padding:10px 8px;border-bottom:1px solid var(--zx-border)}.zx-root .zx-grid td::after{content:none}}',
     );
   }
-  parts.push('.zx-root .zx-option{border-radius:var(--zx-option-radius)}.zx-root .zx-input{border-radius:var(--zx-option-radius)}.zx-root .zx-button{border-radius:var(--zx-option-radius);color:var(--zx-on-accent,#fff)}.zx-root .zx-button.zx-secondary{color:var(--zx-accent)}');
+  parts.push(
+    '.zx-root .zx-option{border-radius:var(--zx-option-radius)}.zx-root .zx-input{border-radius:var(--zx-option-radius)}.zx-root .zx-button{border-radius:var(--zx-option-radius);color:var(--zx-on-accent,#fff)}.zx-root .zx-button.zx-secondary{color:var(--zx-accent)}',
+  );
   // Respondents who ask for less motion always get none, whatever the theme says.
   parts.push('@media (prefers-reduced-motion:reduce){.zx-root *{transition:none!important;animation:none!important}}');
   return parts.join('\n');
@@ -373,7 +430,14 @@ export function SurveyHeader({ theme, progress, progressLabel }: { theme?: Theme
     <>
       {theme?.logo ? <img className="zx-logo" src={theme.logo} alt={theme.logoAlt ?? ''} /> : null}
       {progress !== undefined && style === 'bar' ? (
-        <div className="zx-progress" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={progressLabel}>
+        <div
+          className="zx-progress"
+          role="progressbar"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={progressLabel}
+        >
           <div style={{ width: `${progress}%` }} />
         </div>
       ) : null}

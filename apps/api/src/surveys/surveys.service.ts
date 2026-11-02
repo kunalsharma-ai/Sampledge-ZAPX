@@ -30,13 +30,13 @@ export class SurveysService {
   ) {}
 
   async getSurvey(user: AuthUser, id: string): Promise<Survey> {
-    const survey = await this.prisma.survey.findFirst({ where: { id, tenantId: user.tenantId } });
+    const survey = await this.prisma.survey.findFirst({ where: { id, tenantId: user.tenantId, deletedAt: null } });
     if (!survey) throw new NotFoundException('Survey not found');
     return survey;
   }
 
   async create(user: AuthUser, projectId: string, name: string) {
-    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId } });
+    const project = await this.prisma.project.findFirst({ where: { id: projectId, tenantId: user.tenantId, deletedAt: null } });
     if (!project) throw new NotFoundException('Project not found');
     const survey = await this.prisma.$transaction(async (tx) => {
       const s = await tx.survey.create({ data: { tenantId: user.tenantId, projectId, name } });
@@ -95,7 +95,15 @@ export class SurveysService {
     const pres = parsePresentation(presentation ?? {});
     const presentationIssues = pres.ok ? [] : pres.issues;
     if (!parsed.ok) {
-      return { schemaOk: false, schemaIssues: parsed.issues, analysis: null, presentationIssues, translations: [], languageBlockers: [], publishable: false };
+      return {
+        schemaOk: false,
+        schemaIssues: parsed.issues,
+        analysis: null,
+        presentationIssues,
+        translations: [],
+        languageBlockers: [],
+        publishable: false,
+      };
     }
     const analysis = analyzeSurvey(parsed.definition);
     const translations = pres.ok ? translationStatus(parsed.definition, pres.presentation) : [];
@@ -165,7 +173,10 @@ export class SurveysService {
     if (!draft) throw new ConflictException('There is no draft to publish');
     const check = this.check(draft.definition, draft.presentation);
     if (!check.publishable) {
-      const message = check.languageBlockers.length && check.analysis?.ok ? `Finish the translations before publishing. ${check.languageBlockers.join(' ')}` : 'Fix the logic errors before publishing';
+      const message =
+        check.languageBlockers.length && check.analysis?.ok
+          ? `Finish the translations before publishing. ${check.languageBlockers.join(' ')}`
+          : 'Fix the logic errors before publishing';
       throw new UnprocessableEntityException({ message, check });
     }
     const def = draft.definition as unknown as SurveyDefinition;
