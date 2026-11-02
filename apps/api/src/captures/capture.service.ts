@@ -93,6 +93,19 @@ export class CaptureService {
   }
 
   /**
+   * The recording of a dialer call (Milestone 19), kept with the interview. Idempotent by reference.
+   */
+  async saveCallRecording(
+    row: { tenantId: string; surveyId: string; responseId: string; ref: string; uploadedById: string },
+    data: Buffer,
+    contentType: string,
+  ) {
+    const existing = await this.prisma.capture.findUnique({ where: { responseId_ref: { responseId: row.responseId, ref: row.ref } } });
+    if (existing) return existing;
+    return this.save(data, 'audio', contentType, row);
+  }
+
+  /**
    * A respondent's photo answer, uploaded while the interview is in progress. Returns the reference
    * to submit as the answer. The question must be a photo question of the survey.
    */

@@ -72,6 +72,36 @@ interviewer in any survey, also for cases added before it was listed.
   digits. Changing `SECRETS_KEY` breaks the matching (and the sealed numbers), so keep it.
 - The call list summary counts waiting cases held back by the list.
 
+## Phone dialer (Milestone 19)
+
+With the dialer, interviewers do not dial and never see respondents' numbers.
+
+1. The installation has a telephony provider: `TELEPHONY=twilio` with `TWILIO_ACCOUNT_SID`,
+   `TWILIO_AUTH_TOKEN`, `TWILIO_CALLER_ID` (a Twilio number, E.164) and `TELEPHONY_WEBHOOK_BASE` (the
+   public address of the API ending in `/api`, for example `https://zapx.example.com/api`).
+2. A programmer turns on **Use the dialer** for the survey (Interviewers tab, Phone dialer), and
+   optionally **Record calls** with the sentence read to the respondent before connecting.
+3. Each interviewer adds the phone the dialer should ring for them (Calls, left panel), in
+   international form. It is stored encrypted like respondents' numbers.
+4. On a case, **Call the respondent** rings the interviewer's phone. When they answer, the
+   respondent is dialled from the caller id and the two are connected. The screen follows the call
+   and suggests the outcome when the respondent's line was busy or did not answer. **Hang up** ends it.
+
+Checks at the moment of dialling: the case is still open for that interviewer, and the number is not
+on the do-not-call list.
+
+**Recordings.** Both sides are recorded from the moment the respondent answers, after the notice.
+When Twilio has the recording, ZAPX copies it into the interview's recordings (the same private
+captures as CAPI recordings: same access, review queue, transcription, retention and erasure) and
+then deletes it at Twilio. A call that did not lead to an interview keeps no recording: it is deleted
+at Twilio without being copied. If a copy fails it is retried hourly, five times; after that the
+recording stays at Twilio and the reason is kept on the call.
+
+Webhooks (`/api/telephony/twilio/*`) are accepted only with a valid `X-Twilio-Signature` for the
+address under `TELEPHONY_WEBHOOK_BASE`, so that setting must match exactly what Twilio calls.
+
+The adapter has been **tested against a local stand-in of the Twilio API only**, not against Twilio.
+
 ## Following the list
 
 The panel shows how many cases are to call, due now, on callback, in a call, interviewed and
@@ -82,7 +112,7 @@ the interviewer's name, and in the fieldwork dashboard.
 ## Privacy
 
 Phone numbers are encrypted at rest; the list shows only the last three digits. Opening a case
-(which shows the full number) is in the audit log. Admins can **erase finished phone numbers** for
+(which shows the full number, unless the survey uses the dialer) is in the audit log. Admins can **erase finished phone numbers** for
 interviewed and closed cases; the call history stays.
 
 ## API
@@ -103,8 +133,15 @@ interviewed and closed cases; the call history stays.
 | `GET`, `POST /api/cati/do-not-call`           | admin, programmer (`{ phones: [...], note? }`)             |
 | `POST /api/cati/do-not-call/upload`           | admin, programmer (CSV `file`)                             |
 | `DELETE /api/cati/do-not-call/:id`            | admin                                                      |
+| `GET`, `PUT /api/surveys/:id/cati/dialer`     | read: admin, programmer, viewer; change: admin, programmer |
+| `GET /api/cati/me`, `PUT /api/cati/me/phone`  | callers (their own phone for the dialer)                   |
+| `POST`, `GET /api/cati/cases/:id/dial`        | the caller holding the case                                |
+| `POST /api/cati/dials/:id/hangup`             | the caller who placed the call                             |
+| `POST /api/telephony/twilio/*`                | Twilio (signed webhooks)                                   |
 
 ## Limits
 
-No automatic or predictive dialing or call recording here (see the dialer milestone). Calling hours
-are one window per day, not per country.
+The dialer places one call at a time per interviewer (preview dialing); there is no predictive or
+power dialing, no voicemail detection and no inbound calls. Interviewers need a phone of their own
+(mobile or desk) for the dialer to ring; there is no in-browser softphone. Twilio call charges apply
+per leg. Calling hours are one window per day, not per country.

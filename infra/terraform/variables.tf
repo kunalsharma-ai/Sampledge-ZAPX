@@ -95,7 +95,7 @@ variable "app_environment" {
 variable "app_secret_keys" {
   description = "Keys of the app secret (Secrets Manager JSON) passed to the API and worker. Values are set outside Terraform."
   type        = list(string)
-  default     = ["JWT_SECRET", "SECRETS_KEY", "ANTHROPIC_API_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "IPINFO_TOKEN", "DEEPGRAM_API_KEY"]
+  default     = ["JWT_SECRET", "SECRETS_KEY", "ANTHROPIC_API_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "IPINFO_TOKEN", "DEEPGRAM_API_KEY", "TWILIO_AUTH_TOKEN"]
 }
 
 # ---- Database ----------------------------------------------------------------------------------

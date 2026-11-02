@@ -29,5 +29,6 @@ they are accepted; a later record supersedes an earlier one.
 | [0022](0022-network-reputation.md)               | Network reputation through a provider adapter                          | Accepted                                               |
 | [0023](0023-transcription.md)                    | Transcripts of interview recordings through a provider adapter         | Accepted                                               |
 | [0024](0024-calling-rules.md)                    | CATI calling hours and the do-not-call list                            | Accepted                                               |
+| [0025](0025-dialer.md)                           | Phone dialer and call recording through a provider adapter             | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

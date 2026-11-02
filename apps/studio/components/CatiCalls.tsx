@@ -164,6 +164,7 @@ export function CatiCalls({ surveyId, readOnly }: { surveyId: string; readOnly: 
         </div>
       ) : null}
       <CallingHours surveyId={surveyId} readOnly={readOnly} onSaved={load} withinNow={summary?.withinHoursNow ?? true} />
+      <DialerSettings surveyId={surveyId} readOnly={readOnly} />
       {!readOnly ? (
         <div className="row" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <label className="field">
@@ -375,6 +376,86 @@ function CallingHours({
             </span>
           ) : null}
         </div>
+      ) : null}
+      <ErrorNote error={error} />
+    </fieldset>
+  );
+}
+
+interface Dialer {
+  available: boolean;
+  enabled: boolean;
+  recordCalls: boolean;
+  recordingNotice: string;
+}
+
+/** Milestone 19: place calls through the telephony provider instead of interviewers dialling by hand. */
+function DialerSettings({ surveyId, readOnly }: { surveyId: string; readOnly: boolean }) {
+  const [d, setD] = useState<Dialer | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  useEffect(() => {
+    void api<Dialer>(`/surveys/${surveyId}/cati/dialer`).then(setD, setError);
+  }, [surveyId]);
+  if (!d) return error ? <ErrorNote error={error} /> : null;
+  const save = async () => {
+    setError(null);
+    setSaved(null);
+    try {
+      setD(
+        await api<Dialer>(`/surveys/${surveyId}/cati/dialer`, {
+          method: 'PUT',
+          body: { enabled: d.enabled, recordCalls: d.recordCalls, recordingNotice: d.recordingNotice },
+        }),
+      );
+      setSaved('Dialer settings saved.');
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <fieldset className="plain stack" data-testid="cati-dialer">
+      <legend>
+        <strong>Phone dialer</strong>{' '}
+        <span className="small muted">
+          {!d.available
+            ? 'Not set up for this installation: interviewers dial by hand.'
+            : d.enabled
+              ? `On${d.recordCalls ? ', calls are recorded' : ''}. Interviewers do not see numbers.`
+              : 'Off: interviewers dial by hand.'}
+        </span>
+      </legend>
+      {d.available && !readOnly ? (
+        <>
+          <p className="small muted" style={{ margin: 0 }}>
+            With the dialer, the interviewer&apos;s own phone rings first and the respondent is called from your organization&apos;s number,
+            so interviewers never see respondents&apos; numbers.
+          </p>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <label className="check">
+              <input type="checkbox" checked={d.enabled} onChange={(e) => setD({ ...d, enabled: e.target.checked })} />
+              Use the dialer
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={d.recordCalls} onChange={(e) => setD({ ...d, recordCalls: e.target.checked })} />
+              Record calls
+            </label>
+          </div>
+          {d.recordCalls ? (
+            <label className="field">
+              Read to the respondent before the call is connected
+              <input value={d.recordingNotice} maxLength={300} onChange={(e) => setD({ ...d, recordingNotice: e.target.value })} />
+            </label>
+          ) : null}
+          <div className="row">
+            <button onClick={() => void save()}>Save dialer settings</button>
+            {saved ? (
+              <span role="status" className="ok-text small">
+                {saved}
+              </span>
+            ) : null}
+          </div>
+        </>
       ) : null}
       <ErrorNote error={error} />
     </fieldset>

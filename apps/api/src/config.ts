@@ -118,6 +118,21 @@ const schema = z
     DEEPGRAM_MODEL: z.string().max(100).default(''),
     DEEPGRAM_API_BASE: z.string().url().default('https://api.deepgram.com'),
     TRANSCRIPTION_TIMEOUT_S: z.coerce.number().int().min(10).max(3600).default(600),
+    /**
+     * Milestone 19: phone dialer for CATI. "twilio" places calls through Twilio's Programmable Voice
+     * API: the interviewer's phone rings first, then the respondent is dialled from TWILIO_CALLER_ID,
+     * so interviewers never see respondents' numbers. "off" leaves dialling to the interviewer.
+     * TELEPHONY_WEBHOOK_BASE is the public address of the API (ending in /api) that Twilio calls back.
+     */
+    TELEPHONY: z.enum(['off', 'twilio']).default('off'),
+    TWILIO_ACCOUNT_SID: z.string().default(''),
+    TWILIO_AUTH_TOKEN: z.string().default(''),
+    /** A Twilio number (or verified caller id) in E.164 form, e.g. +442071234567. */
+    TWILIO_CALLER_ID: z.string().default(''),
+    TWILIO_API_BASE: z.string().url().default('https://api.twilio.com'),
+    TELEPHONY_WEBHOOK_BASE: z.string().default(''),
+    /** Seconds to let each phone ring before giving up. */
+    TELEPHONY_RING_SECONDS: z.coerce.number().int().min(5).max(120).default(30),
     /** Largest interview recording (CAPI audio), in megabytes. Photos are capped at 15. */
     CAPTURE_MAX_MB: z.coerce.number().min(1).max(500).default(100),
     /** Delete photos and recordings this many days after they were uploaded. 0 keeps them until erased. */
@@ -212,6 +227,14 @@ const schema = z
         path: ['DEEPGRAM_API_KEY'],
         message: 'TRANSCRIPTION=deepgram needs DEEPGRAM_API_KEY and DEEPGRAM_MODEL',
       });
+    if (c.TELEPHONY === 'twilio') {
+      for (const k of ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_CALLER_ID', 'TELEPHONY_WEBHOOK_BASE'] as const)
+        if (!c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `TELEPHONY=twilio needs ${k}` });
+      if (c.TWILIO_CALLER_ID && !/^\+[1-9][0-9]{6,14}$/.test(c.TWILIO_CALLER_ID))
+        ctx.addIssue({ code: 'custom', path: ['TWILIO_CALLER_ID'], message: 'TWILIO_CALLER_ID must be E.164, e.g. +442071234567' });
+      if (c.TELEPHONY_WEBHOOK_BASE && !/^https?:\/\/[^/]+(\/.*)?$/.test(c.TELEPHONY_WEBHOOK_BASE))
+        ctx.addIssue({ code: 'custom', path: ['TELEPHONY_WEBHOOK_BASE'], message: 'TELEPHONY_WEBHOOK_BASE must be a URL' });
+    }
     if (c.NETWORK_REPUTATION === 'ipinfo' && !c.IPINFO_TOKEN)
       ctx.addIssue({ code: 'custom', path: ['IPINFO_TOKEN'], message: 'IPINFO_TOKEN is required when NETWORK_REPUTATION=ipinfo' });
     if (c.NODE_ENV === 'production' && !c.SECRETS_KEY)
