@@ -5,7 +5,7 @@ import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../auth/auth.types';
 import { SurveysService } from '../surveys/surveys.service';
 
-export const JOB_TYPES = ['export', 'qa_run', 'ai_propose'] as const;
+export const JOB_TYPES = ['export', 'qa_run', 'ai_propose', 'transcribe'] as const;
 export type JobType = (typeof JOB_TYPES)[number];
 
 /** What the studio and API clients see of a job. Inputs that hold documents are not returned. */

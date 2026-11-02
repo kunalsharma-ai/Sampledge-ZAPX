@@ -27,5 +27,6 @@ they are accepted; a later record supersedes an earlier one.
 | [0020](0020-edge-protection-scaling-backups.md)  | Edge protection, autoscaling and backups on AWS                        | Accepted                                               |
 | [0021](0021-weighting.md)                        | Rim weighting in analysis                                              | Accepted                                               |
 | [0022](0022-network-reputation.md)               | Network reputation through a provider adapter                          | Accepted                                               |
+| [0023](0023-transcription.md)                    | Transcripts of interview recordings through a provider adapter         | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

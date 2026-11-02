@@ -23,6 +23,8 @@ import { isFirstRead, sendBytes } from '../common/send-bytes';
 import { config } from '../config';
 import { InterviewService } from '../interview/interview.service';
 import { CaptureService, PHOTO_MAX_MB } from './capture.service';
+import { JobsService, presentJob } from '../jobs/jobs.service';
+import { TranscriptionService } from './transcription.service';
 
 const maxBytes = () => Math.max(PHOTO_MAX_MB, config().CAPTURE_MAX_MB) * 1024 * 1024;
 
@@ -34,11 +36,20 @@ const deviceUploadSchema = z.object({
 });
 
 /** Photos and interview recordings (Milestone 12). */
+const transcribeSchema = z.object({
+  captureIds: z
+    .array(z.string().regex(/^[A-Za-z0-9_-]{10,64}$/))
+    .max(200)
+    .optional(),
+});
+
 @Controller()
 export class CaptureController {
   constructor(
     private readonly captures: CaptureService,
     private readonly interview: InterviewService,
+    private readonly jobs: JobsService,
+    private readonly transcription: TranscriptionService,
   ) {}
 
   /** A respondent's photo answer. Access is by the interview's session token, like every respondent call. */
@@ -80,6 +91,20 @@ export class CaptureController {
   @Get('surveys/:id/captures')
   summary(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.captures.countOf(user, id);
+  }
+
+  /**
+   * Transcribe recordings in the background (Milestone 17): the ones named, or every recording of
+   * the survey that has no transcript yet. Each recording is sent to the transcription provider.
+   */
+  @Roles('ADMIN', 'PROGRAMMER')
+  @Post('surveys/:id/captures/transcribe')
+  @HttpCode(202)
+  async transcribe(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
+    if (!this.transcription.current()) throw new BadRequestException('Transcription is not turned on for this installation.');
+    const input = parseBody(transcribeSchema, body ?? {});
+    const job = await this.jobs.enqueue(user, 'transcribe', id, input.captureIds?.length ? { captureIds: input.captureIds } : {});
+    return presentJob(job);
   }
 
   /** Erase every photo and recording of the survey. Cannot be undone. */

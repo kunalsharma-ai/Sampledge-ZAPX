@@ -98,6 +98,9 @@ in `pnpm-workspace.yaml`.
 - **Network reputation** (`NETWORK_REPUTATION=ipinfo`, off by default) sends each online
   respondent's public address to IPinfo over HTTPS with a bearer token. Private, loopback and
   link-local addresses are never sent. ZAPX stores only the words in the answer, never the address.
+- **Transcription** (`TRANSCRIPTION=deepgram`, off by default) sends an interview recording to
+  Deepgram over HTTPS only when an admin or programmer asks, after a confirmation. The transcript is
+  stored with the recording, has the same access, and is deleted with it.
 
 ## Reporting
 

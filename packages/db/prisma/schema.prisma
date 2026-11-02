@@ -890,6 +890,11 @@ model Capture {
   uploadedById String?
   createdAt    DateTime  @default(now())
   deletedAt    DateTime?
+  /// Milestone 17: speech-to-text of a recording, when a reviewer asked for it. Deleted with the file.
+  transcript         String?
+  transcriptLanguage String?
+  transcriptProvider String?
+  transcribedAt      DateTime?
 
   @@unique([clientId, ref])
   @@unique([responseId, ref])

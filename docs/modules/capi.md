@@ -95,6 +95,24 @@ distance between start and end, the recording and the photos in the review queue
 Checks: `gps_missing`, `gps_moved` (over 1 km) and `interviewer_overlap` (two interviews by the same
 interviewer at once). See [data quality](data-quality.md).
 
+## Transcripts of recordings (Milestone 17)
+
+With `TRANSCRIPTION=deepgram`, a `DEEPGRAM_API_KEY` and a `DEEPGRAM_MODEL` (the Deepgram model to use;
+there is no default), admins and programmers see **Transcribe N** under Quality & fieldwork →
+Photos and recordings. It asks first, because the recordings leave ZAPX: each recording without a
+transcript is sent to Deepgram in a background job (up to 200 per job), in the interview's language
+(the primary subtag, `fr` of `fr-CA`). The text appears under the recording in the review queue,
+marked as machine transcription.
+
+- Same access as the recording: only the team, via the review queue. Erasing a recording, or the
+  retention period deleting it, deletes its transcript too.
+- A recording Deepgram refuses is listed in the job result with Deepgram's reason; the others are
+  kept. If none could be transcribed, the job fails with the reason.
+- A worker without transcription configured leaves these jobs for one that has it.
+- **Status: tested against a local stand-in of Deepgram's API (in the API and browser tests), not
+  against Deepgram itself.** Try a short recording on staging first.
+
 ## Not yet
 
-Interviewer device management, supervisor back-checks, and transcription of recordings.
+Interviewer device management, supervisor back-checks, and transcription of open answers spoken
+online (the runtime does not record voice answers).

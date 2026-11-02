@@ -45,6 +45,7 @@ import { CaptureController } from './captures/capture.controller';
 import { CaptureService } from './captures/capture.service';
 import { QualityService } from './quality/quality.service';
 import { NetworkReputationService } from './quality/network-reputation.service';
+import { TranscriptionService } from './captures/transcription.service';
 import { CapiAppController, CapiAssignmentsController } from './capi/capi.controller';
 import { CapiService } from './capi/capi.service';
 import { ProjectMembersController } from './projects/members.controller';
@@ -116,6 +117,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     AiUsageRepository,
     QualityService,
     NetworkReputationService,
+    TranscriptionService,
     CaptureService,
     CapiService,
     QaService,

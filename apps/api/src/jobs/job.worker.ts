@@ -12,6 +12,7 @@ import { randomBytes } from 'node:crypto';
 import type { Job, Prisma } from '@zapx/db';
 import { PrismaService } from '../common/prisma.service';
 import { CaptureService } from '../captures/capture.service';
+import { TranscriptionError, TranscriptionService } from '../captures/transcription.service';
 import { config } from '../config';
 import type { AuthUser } from '../auth/auth.types';
 import { AiError, type AiDocument } from '../ai/ai-provider';
@@ -20,6 +21,7 @@ import { notConfigured } from '../ai/claude.provider';
 import { ExportRunner, type ExportOptions } from '../exports/export-runner.service';
 import { QaService, type QaRunInput } from '../qa/qa.service';
 import { FilesService } from './files.service';
+import { JOB_TYPES } from './jobs.service';
 
 const LEASE_MS = 5 * 60_000;
 const RETRY_DELAY_MS = 30_000;
@@ -57,6 +59,7 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly qa: QaService,
     private readonly proposer: ProposeService,
     private readonly captures: CaptureService,
+    private readonly transcription: TranscriptionService,
   ) {}
 
   onApplicationBootstrap() {
@@ -102,13 +105,20 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     return out;
   }
 
+  /** Job types this process can run: a worker without a speech provider leaves transcription to one that has it. */
+  private handledTypes(): string[] {
+    return JOB_TYPES.filter((t) => t !== 'transcribe' || !!this.transcription.current());
+  }
+
   private async claim(): Promise<Job | null> {
+    const types = this.handledTypes();
     const [job] = await this.prisma.$queryRaw<Job[]>`
       UPDATE "Job" SET status = 'RUNNING', attempts = attempts + 1, "lockedUntil" = now() + (${LEASE_MS} * interval '1 millisecond'),
         "startedAt" = COALESCE("startedAt", now()), "progressNote" = 'Started', "updatedAt" = now()
       WHERE id = (
         SELECT id FROM "Job"
-        WHERE (status = 'QUEUED' AND "runAfter" <= now()) OR (status = 'RUNNING' AND "lockedUntil" < now())
+        WHERE ((status = 'QUEUED' AND "runAfter" <= now()) OR (status = 'RUNNING' AND "lockedUntil" < now()))
+          AND "type" = ANY(${types})
         ORDER BY "runAfter" ASC
         LIMIT 1
         FOR UPDATE SKIP LOCKED
@@ -249,6 +259,38 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
         const cs = await this.proposer.propose(user, surveyId, { instruction: input.instruction, documents, fileName: input.fileName });
         return { changeSetId: cs.id, title: cs.title };
       }
+      case 'transcribe': {
+        // Recordings of this survey without a transcript, or the ones asked for (Milestone 17).
+        if (!this.transcription.current()) throw new JobFailed('Transcription is not turned on for this installation.');
+        const input = job.input as { captureIds?: string[] };
+        const todo = await this.prisma.capture.findMany({
+          where: {
+            tenantId: job.tenantId,
+            surveyId,
+            kind: 'audio',
+            deletedAt: null,
+            responseId: { not: null },
+            ...(input.captureIds?.length ? { id: { in: input.captureIds } } : { transcribedAt: null }),
+          },
+          orderBy: { createdAt: 'asc' },
+          take: TRANSCRIBE_PER_JOB,
+          select: { id: true },
+        });
+        let done = 0;
+        const failed: Array<{ id: string; reason: string }> = [];
+        for (const [i, c] of todo.entries()) {
+          await ctx.progress((i / Math.max(1, todo.length)) * 100, `Transcribing recording ${i + 1} of ${todo.length}`);
+          try {
+            await this.transcription.transcribe(job.tenantId, c.id);
+            done++;
+          } catch (e) {
+            if (!(e instanceof TranscriptionError)) throw e;
+            failed.push({ id: c.id, reason: e.message });
+          }
+        }
+        if (todo.length && !done) throw new JobFailed(failed[0]?.reason ?? 'No recording could be transcribed');
+        return { transcribed: done, failed: failed.length, failures: failed.slice(0, 20), remaining: todo.length === TRANSCRIBE_PER_JOB };
+      }
       default:
         throw new JobFailed(`Unknown job type ${job.type}`);
     }
@@ -276,6 +318,9 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     return out;
   }
 }
+
+/** Recordings one transcription job handles; start another for the rest. */
+const TRANSCRIBE_PER_JOB = 200;
 
 function messageOf(e: unknown): string {
   if (e instanceof HttpException) {
