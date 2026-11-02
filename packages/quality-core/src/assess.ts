@@ -17,6 +17,19 @@ export const QUALITY_FLAG_CODES = [
   'open_duplicate',
   'same_network',
   'check_failed',
+  // Milestone 12: fraud signals
+  'automation',
+  'honeypot',
+  'no_interaction',
+  'open_pasted',
+  'same_device',
+  'geo_mismatch',
+  'blocked_device',
+  'blocked_network',
+  // Milestone 12: face-to-face (CAPI) checks
+  'gps_missing',
+  'gps_moved',
+  'interviewer_overlap',
 ] as const;
 export type QualityFlagCode = (typeof QUALITY_FLAG_CODES)[number];
 
@@ -45,7 +58,70 @@ export const PENALTY = {
   open_low_effort: 5,
   open_duplicate: 25,
   same_network: 20,
+  automation: 60,
+  honeypot: 60,
+  no_interaction: 30,
+  open_pasted: 10,
+  same_device: 25,
+  geo_mismatch: 30,
+  blocked_device: 60,
+  blocked_network: 40,
+  gps_missing: 30,
+  gps_moved: 15,
+  interviewer_overlap: 40,
 } as const;
+
+/** Pages answered with no keyboard, pointer or touch input before no_interaction is flagged. */
+export const QUIET_PAGES_FOR_FLAG = 2;
+/** Start and end of a CAPI interview further apart than this are flagged (metres). */
+export const GPS_MOVED_METRES = 1000;
+
+/** What the respondent's browser reported while answering (online interviews). */
+export interface BrowserSignals {
+  /** navigator.webdriver was true: the browser is controlled by automation software. */
+  automation?: boolean;
+  /** Times the hidden honeypot field was filled in. */
+  honeypot?: number;
+  /** Pages submitted with answers but without any keyboard, pointer or touch input. */
+  quietPages?: number;
+  /** Open questions whose answer was pasted in. */
+  pasted?: string[];
+}
+
+export interface GeoPoint {
+  lat: number;
+  lon: number;
+  /** Metres, as reported by the device. */
+  accuracy?: number | null;
+}
+
+/** Inputs for the fraud and capture checks. Everything is optional; missing evidence never adds points. */
+export interface FraudInput {
+  browser?: BrowserSignals;
+  /** Other completes of this survey from the same device (keyed hash of browser traits). */
+  sameDeviceCompletes?: number;
+  /** Country reported by the edge network, and the countries expected for this respondent. */
+  geo?: { country: string; expected: string[] };
+  /** The device or network is on the organization's block list. */
+  blocked?: { device?: boolean; network?: boolean };
+  /** CAPI only. */
+  capi?: {
+    gpsRequired: boolean;
+    start?: GeoPoint | null;
+    end?: GeoPoint | null;
+    /** Other interviews by the same interviewer whose times overlap this one. */
+    overlapping?: number;
+  };
+}
+
+/** Great-circle distance in metres. */
+export function distanceMetres(a: GeoPoint, b: GeoPoint): number {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat);
+  const dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
 
 /** The relative speeder check needs a stable median. */
 export const MIN_COMPLETES_FOR_MEDIAN = 20;
@@ -61,6 +137,7 @@ export interface QualityInput {
   duplicateOpenEnds?: ReadonlySet<string>;
   /** Other completes of this survey from the same network. */
   sameNetworkCompletes?: number;
+  fraud?: FraudInput;
 }
 
 const seconds = (ms: number) => Math.round(ms / 100) / 10;
@@ -136,6 +213,8 @@ export function assessQuality(input: QualityInput): QualityResult {
     });
   }
 
+  flags.push(...fraudFlags(q, input.fraud ?? {}));
+
   for (const check of q.checks) {
     if (conditionHolds(check.condition, input.def, input.answers))
       flags.push({ code: 'check_failed', ref: check.id, penalty: check.weight, detail: `${check.label ?? check.id} failed.` });
@@ -143,6 +222,63 @@ export function assessQuality(input: QualityInput): QualityResult {
 
   const score = Math.max(0, 100 - flags.reduce((sum, f) => sum + f.penalty, 0));
   return { score, flags };
+}
+
+function fraudFlags(q: QualitySettings, f: FraudInput): QualityFlag[] {
+  const out: QualityFlag[] = [];
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  if (q.fraud) {
+    const b = f.browser ?? {};
+    if (b.automation)
+      out.push({ code: 'automation', penalty: PENALTY.automation, detail: 'The browser reported that automation software controls it.' });
+    if ((b.honeypot ?? 0) > 0)
+      out.push({ code: 'honeypot', penalty: PENALTY.honeypot, detail: 'A hidden field that people cannot see was filled in.' });
+    if ((b.quietPages ?? 0) >= QUIET_PAGES_FOR_FLAG)
+      out.push({
+        code: 'no_interaction',
+        penalty: PENALTY.no_interaction,
+        detail: `${plural(b.quietPages!, 'page')} answered without any keyboard, mouse or touch input.`,
+      });
+    for (const id of [...new Set(b.pasted ?? [])].slice(0, 5))
+      out.push({ code: 'open_pasted', ref: id, penalty: PENALTY.open_pasted, detail: `${id}: the answer was pasted in.` });
+    if ((f.sameDeviceCompletes ?? 0) > 0)
+      out.push({
+        code: 'same_device',
+        penalty: PENALTY.same_device,
+        detail: `${plural(f.sameDeviceCompletes!, 'other complete')} came from what looks like the same device.`,
+      });
+    if (f.blocked?.device)
+      out.push({ code: 'blocked_device', penalty: PENALTY.blocked_device, detail: 'This device is on your organization’s block list.' });
+    if (f.blocked?.network)
+      out.push({ code: 'blocked_network', penalty: PENALTY.blocked_network, detail: 'This network is on your organization’s block list.' });
+  }
+  if (f.geo && f.geo.expected.length && !f.geo.expected.includes(f.geo.country))
+    out.push({
+      code: 'geo_mismatch',
+      penalty: PENALTY.geo_mismatch,
+      detail: `Answered from ${f.geo.country}; expected ${f.geo.expected.join(' or ')}.`,
+    });
+  const c = f.capi;
+  if (c) {
+    if (c.gpsRequired && (!c.start || !c.end))
+      out.push({ code: 'gps_missing', penalty: PENALTY.gps_missing, detail: 'The location was required but not recorded.' });
+    if (c.start && c.end) {
+      const m = distanceMetres(c.start, c.end);
+      if (m > GPS_MOVED_METRES)
+        out.push({
+          code: 'gps_moved',
+          penalty: PENALTY.gps_moved,
+          detail: `The interview ended ${(m / 1000).toFixed(1)} km from where it started.`,
+        });
+    }
+    if ((c.overlapping ?? 0) > 0)
+      out.push({
+        code: 'interviewer_overlap',
+        penalty: PENALTY.interviewer_overlap,
+        detail: `The interviewer recorded ${plural(c.overlapping!, 'other interview')} at the same time.`,
+      });
+  }
+  return out;
 }
 
 export type QualityDecision = 'pass' | 'review' | 'reject';

@@ -5,7 +5,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { nextPageIndex } from '@zapx/logic-engine';
-import { parseSurveyDefinition } from '@zapx/survey-schema';
+import { capiSettingsOf, parseSurveyDefinition } from '@zapx/survey-schema';
+import { locate } from './capture';
 import { NotSignedIn, downloadPackage, signIn, signOut, syncNow } from './api';
 import { Interview } from './Interview';
 import { interviews, meta, type Interviewer, type LocalInterview, type PackagedSurvey, type SurveyPackage } from './store';
@@ -54,7 +55,17 @@ export function App() {
     setProblem(null);
     try {
       const s = await syncNow(me.id);
-      if (s.sent) setNote(`Synced ${s.stored} interview${s.stored === 1 ? '' : 's'}${s.rejected ? `, ${s.rejected} not accepted` : ''}.`);
+      if (s.sent || s.waitingForFiles)
+        setNote(
+          [
+            s.sent ? `Synced ${s.stored} interview${s.stored === 1 ? '' : 's'}${s.rejected ? `, ${s.rejected} not accepted` : ''}.` : '',
+            s.waitingForFiles
+              ? `${s.waitingForFiles} interview${s.waitingForFiles === 1 ? ' waits' : 's wait'} for photos or a recording to finish uploading; they sync next time.`
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' '),
+        );
       setPkg(await downloadPackage());
       setNeedsSignIn(false);
     } catch (e) {
@@ -110,6 +121,21 @@ export function App() {
   const start = async (s: PackagedSurvey) => {
     const parsed = parseSurveyDefinition(s.version.definition);
     if (!parsed.ok) return setProblem('This survey package could not be read. Update your surveys.');
+    setProblem(null);
+    const capture = capiSettingsOf(parsed.definition);
+    let location: LocalInterview['location'];
+    if (capture.gps !== 'off') {
+      setBusy(true);
+      setNote('Finding the location of this interview…');
+      const at = await locate();
+      setBusy(false);
+      setNote(null);
+      if (!at && capture.gps === 'required')
+        return setProblem(
+          'This survey records where each interview takes place. Allow this app to use your location (and turn on location services), then start the interview again.',
+        );
+      location = { start: at, end: null };
+    }
     const record: LocalInterview = {
       clientId: crypto.randomUUID(),
       interviewerId: me.id,
@@ -127,6 +153,7 @@ export function App() {
       localOutcome: null,
       serverStatus: null,
       serverReason: null,
+      ...(location ? { location } : {}),
     };
     await interviews.put(record);
     setOpen({ survey: s, record });
@@ -204,7 +231,7 @@ export function App() {
                 </div>
                 <span className="capi-spacer" />
                 {s.status === 'LIVE' ? (
-                  <button className="capi-button" onClick={() => void start(s)}>
+                  <button className="capi-button" disabled={busy} onClick={() => void start(s)}>
                     Start interview
                   </button>
                 ) : (

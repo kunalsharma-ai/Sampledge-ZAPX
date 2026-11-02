@@ -4,8 +4,17 @@
  * completes, and the survey's quality settings (part of the draft, published like any logic).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { qualitySettingsOf, type QualityCheck, type QualitySettings, type SurveyDefinition } from '@zapx/survey-schema';
+import {
+  DEFAULT_RECORDING_CONSENT,
+  capiSettingsOf,
+  qualitySettingsOf,
+  type CapiSettings,
+  type QualityCheck,
+  type QualitySettings,
+  type SurveyDefinition,
+} from '@zapx/survey-schema';
 import { api } from '@/lib/api';
+import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
 
 interface Summary {
@@ -44,7 +53,31 @@ interface Item {
   vendor: { code: string } | null;
   interviewer: { name: string } | null;
   openEnds: Array<{ questionId: string; text: string }>;
+  photos: Array<Capture & { questionId: string }>;
+  recording: Capture | null;
+  location: { start?: Point | null; end?: Point | null; audio?: 'recorded' | 'declined' | 'unavailable' } | null;
 }
+interface Capture {
+  id: string;
+  kind: 'photo' | 'audio';
+  url: string;
+  size: number;
+}
+interface Point {
+  lat: number;
+  lon: number;
+  accuracy: number | null;
+  at: string | null;
+}
+
+/** Great-circle distance in metres (same formula as the server's gps_moved check). */
+function metres(a: Point, b: Point) {
+  const rad = (d: number) => (d * Math.PI) / 180;
+  const h = Math.sin(rad(b.lat - a.lat) / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lon - a.lon) / 2) ** 2;
+  return 2 * 6_371_000 * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+const coords = (p: Point) => `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}${p.accuracy !== null ? ` (±${p.accuracy} m)` : ''}`;
+const AUDIO_WORDS = { recorded: 'recorded with consent', declined: 'respondent declined recording', unavailable: 'no microphone' };
 type Filter = 'pending' | 'flagged' | 'accepted' | 'rejected';
 
 const pct = (n: number | null) => (n === null ? '—' : `${n}%`);
@@ -66,6 +99,9 @@ export function Quality({
       <FieldworkPanel surveyId={surveyId} />
       <ReviewQueue surveyId={surveyId} readOnly={readOnly} />
       <QualitySettingsEditor def={def} readOnly={readOnly} onChange={onChange} />
+      <CaptureSettingsEditor def={def} readOnly={readOnly} onChange={onChange} />
+      <CapturesPanel surveyId={surveyId} />
+      <BlockList />
     </div>
   );
 }
@@ -172,6 +208,7 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
   const [data, setData] = useState<{ counts: Record<string, number>; items: Item[] } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [note, setNote] = useState('');
+  const [block, setBlock] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -199,15 +236,24 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ accepted: number; rejected: number; skipped: number }>(`/surveys/${surveyId}/quality/decisions`, {
-        body: { responseIds: [...selected], decision, ...(note.trim() ? { note: note.trim() } : {}) },
-      });
+      const r = await api<{ accepted: number; rejected: number; skipped: number; blocked: number }>(
+        `/surveys/${surveyId}/quality/decisions`,
+        {
+          body: {
+            responseIds: [...selected],
+            decision,
+            ...(note.trim() ? { note: note.trim() } : {}),
+            ...(decision === 'reject' && block ? { block: true } : {}),
+          },
+        },
+      );
       setResult(
         decision === 'accept'
           ? `Accepted ${r.accepted}${r.skipped ? `, ${r.skipped} skipped` : ''}`
-          : `Rejected ${r.rejected}${r.skipped ? `, ${r.skipped} skipped` : ''}`,
+          : `Rejected ${r.rejected}${r.skipped ? `, ${r.skipped} skipped` : ''}${r.blocked ? `; blocked ${r.blocked} device or network entries` : ''}`,
       );
       setNote('');
+      setBlock(false);
       await load();
     } catch (e) {
       setError(e);
@@ -287,6 +333,7 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
                 ))}
               </div>
             ) : null}
+            <Evidence item={i} />
             {i.reviewNote ? <div className="small muted">Note: {i.reviewNote}</div> : null}
           </div>
           <div
@@ -306,6 +353,10 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
             onChange={(e) => setNote(e.target.value)}
             style={{ flex: 1 }}
           />
+          <label className="check small" title="Future completes from them are flagged in every survey of your organization">
+            <input type="checkbox" checked={block} onChange={(e) => setBlock(e.target.checked)} /> When rejecting, also block their device
+            and network
+          </label>
           <button disabled={busy || selected.size === 0} onClick={() => decide('accept')}>
             Accept selected
           </button>
@@ -315,6 +366,249 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** Photos, the recording and the location of an interview, for the reviewer. Opening them is audited. */
+function Evidence({ item: i }: { item: Item }) {
+  const start = i.location?.start;
+  const end = i.location?.end;
+  if (!i.photos.length && !i.recording && !i.location) return null;
+  return (
+    <div className="evidence small" data-testid="evidence">
+      {i.location ? (
+        <div>
+          <span className="muted">Location: </span>
+          {start ? `started at ${coords(start)}` : 'no start location'}
+          {start && end ? `, ended ${Math.round(metres(start, end))} m away` : end ? `, ended at ${coords(end)}` : ', no end location'}
+          {i.location.audio ? <span className="muted"> · audio: {AUDIO_WORDS[i.location.audio]}</span> : null}
+        </div>
+      ) : null}
+      {i.recording ? (
+        <div className="row" style={{ gap: 8 }}>
+          <span className="muted">Recording:</span>
+          <audio controls preload="none" src={i.recording.url} aria-label={`Recording of interview ${i.uid}`} />
+        </div>
+      ) : null}
+      {i.photos.length ? (
+        <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+          {i.photos.map((p) => (
+            <a key={p.id} href={p.url} target="_blank" rel="noreferrer" className="evidence-photo">
+              <img src={p.url} alt={`Photo answer ${p.questionId} of ${i.uid}`} loading="lazy" />
+              <span className="mono muted">{p.questionId}</span>
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CaptureSettingsEditor({
+  def,
+  readOnly,
+  onChange,
+}: {
+  def: SurveyDefinition;
+  readOnly: boolean;
+  onChange: (d: SurveyDefinition) => void;
+}) {
+  const c = capiSettingsOf(def);
+  const set = (patch: Partial<CapiSettings>) => onChange({ ...def, settings: { ...def.settings, capi: { ...c, ...patch } } });
+  return (
+    <section className="panel stack" data-testid="capture-settings">
+      <div className="row">
+        <h2 style={{ margin: 0 }}>Face-to-face capture</h2>
+        <span className="muted small">For interviews in the ZAPX Interviewer app. Part of the draft.</span>
+      </div>
+      <fieldset disabled={readOnly} className="stack" style={{ border: 0, padding: 0, margin: 0, gap: 8 }}>
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          <label className="field">
+            Record the interview location
+            <select value={c.gps} onChange={(e) => set({ gps: e.target.value as CapiSettings['gps'] })}>
+              <option value="off">No</option>
+              <option value="optional">When the device allows it</option>
+              <option value="required">Required: no interview without a location</option>
+            </select>
+          </label>
+          <label className="field">
+            Record the interview audio
+            <select value={c.audio} onChange={(e) => set({ audio: e.target.value as CapiSettings['audio'] })}>
+              <option value="off">No</option>
+              <option value="consent">After the respondent agrees</option>
+            </select>
+          </label>
+        </div>
+        {c.audio === 'consent' ? (
+          <label className="field">
+            What the interviewer reads out to ask for consent
+            <textarea
+              rows={2}
+              value={c.consentText ?? ''}
+              placeholder={DEFAULT_RECORDING_CONSENT}
+              onChange={(e) => set({ consentText: e.target.value || undefined })}
+            />
+          </label>
+        ) : null}
+        <p className="muted small" style={{ margin: 0 }}>
+          The location is taken when an interview starts and ends, rounded to about a metre, and checked: an interview that ends more than 1
+          km from its start, or that overlaps another interview by the same interviewer, goes to review. Recordings start only after the
+          interviewer records the respondent&apos;s answer, and are never made silently.
+        </p>
+      </fieldset>
+    </section>
+  );
+}
+
+function CapturesPanel({ surveyId }: { surveyId: string }) {
+  const me = useMe();
+  const [s, setS] = useState<{ photos: number; recordings: number; bytes: number; retentionDays: number } | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const load = useCallback(async () => {
+    try {
+      setS(await api(`/surveys/${surveyId}/captures`));
+    } catch (e) {
+      setError(e);
+    }
+  }, [surveyId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  if (!s || (s.photos === 0 && s.recordings === 0)) return null;
+  const erase = async () => {
+    if (!window.confirm(`Erase all ${s.photos} photos and ${s.recordings} recordings of this survey? This cannot be undone.`)) return;
+    try {
+      const r = await api<{ erased: number }>(`/surveys/${surveyId}/captures/erase`, { method: 'POST' });
+      window.alert(`Erased ${r.erased} files.`);
+      await load();
+    } catch (e) {
+      setError(e);
+    }
+  };
+  return (
+    <section className="panel row" data-testid="captures" style={{ flexWrap: 'wrap' }}>
+      <div style={{ flex: 1 }}>
+        <strong>Photos and recordings</strong>{' '}
+        <span className="small">
+          {s.photos} photo{s.photos === 1 ? '' : 's'}, {s.recordings} recording{s.recordings === 1 ? '' : 's'} (
+          {(s.bytes / 1024 / 1024).toFixed(1)} MB).
+        </span>{' '}
+        <span className="muted small">
+          {s.retentionDays ? `Deleted automatically ${s.retentionDays} days after upload.` : 'Kept until erased.'} Only your team can open
+          them, and every view is recorded in the audit log.
+        </span>
+      </div>
+      {me?.role === 'ADMIN' ? (
+        <button className="danger" onClick={erase}>
+          Erase all
+        </button>
+      ) : null}
+      <ErrorNote error={error} />
+    </section>
+  );
+}
+
+interface Block {
+  id: string;
+  kind: 'device' | 'network';
+  note: string | null;
+  createdAt: string;
+  createdBy: string | null;
+  from: { uid: string; survey: string } | null;
+}
+
+/** The organization's block list (administrators). Only keyed hashes are stored, so entries show where they came from. */
+function BlockList() {
+  const me = useMe();
+  const [rows, setRows] = useState<Block[] | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const load = useCallback(async () => {
+    try {
+      setRows(await api<Block[]>('/quality/blocks'));
+    } catch (e) {
+      setError(e);
+    }
+  }, []);
+  useEffect(() => {
+    if (me?.role === 'ADMIN') void load();
+  }, [me, load]);
+  if (me?.role !== 'ADMIN' || !rows) return null;
+  return (
+    <section className="panel stack" data-testid="block-list">
+      <div className="row">
+        <h2 style={{ margin: 0 }}>Blocked devices and networks</h2>
+        <span className="muted small">For your whole organization. Completes from them are flagged in every survey and go to review.</span>
+      </div>
+      <ErrorNote error={error} />
+      {rows.length === 0 ? (
+        <p className="muted small">Nothing is blocked. Tick “also block” when rejecting a complete to add its device and network here.</p>
+      ) : (
+        <table className="data">
+          <thead>
+            <tr>
+              <th>What</th>
+              <th>From</th>
+              <th>Note</th>
+              <th>Blocked</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((b) => (
+              <tr key={b.id}>
+                <td>{b.kind}</td>
+                <td>{b.from ? `${b.from.uid} in ${b.from.survey}` : '—'}</td>
+                <td>{b.note ?? ''}</td>
+                <td className="small">
+                  {new Date(b.createdAt).toLocaleDateString()}
+                  {b.createdBy ? ` by ${b.createdBy}` : ''}
+                </td>
+                <td>
+                  <button
+                    className="link"
+                    onClick={async () => {
+                      try {
+                        await api(`/quality/blocks/${b.id}`, { method: 'DELETE' });
+                        await load();
+                      } catch (e) {
+                        setError(e);
+                      }
+                    }}
+                  >
+                    Unblock
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
+function CountriesField({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const [text, setText] = useState(value.join(', '));
+  return (
+    <label className="field" style={{ maxWidth: 560 }}>
+      Expected countries (two-letter codes, comma separated; empty uses the vendor&apos;s cc parameter). Checked only when your deployment
+      reports respondents&apos; countries (GEO_COUNTRY_HEADER).
+      <input
+        value={text}
+        placeholder="e.g. GB, IE"
+        onChange={(e) => {
+          setText(e.target.value);
+          onChange([
+            ...new Set(
+              e.target.value
+                .toUpperCase()
+                .split(/[^A-Z]+/)
+                .filter((x) => x.length === 2),
+            ),
+          ]);
+        }}
+      />
+    </label>
   );
 }
 
@@ -390,6 +684,12 @@ function QualitySettingsEditor({
           <input type="checkbox" checked={q.sameNetwork} onChange={(e) => set({ sameNetwork: e.target.checked })} /> Flag several completes
           from the same network (a keyed hash of the address is kept, never the address)
         </label>
+        <label className="check">
+          <input type="checkbox" checked={q.fraud} onChange={(e) => set({ fraud: e.target.checked })} /> Fraud checks: automated browsers, a
+          hidden field only bots fill in, pages answered without any keyboard, mouse or touch input, pasted open answers, the same device as
+          another complete, and blocked devices or networks
+        </label>
+        <CountriesField value={q.countries} onChange={(countries) => set({ countries })} />
         <div className="stack" style={{ gap: 6 }}>
           <strong className="small">Survey-specific checks</strong>
           <span className="muted small">

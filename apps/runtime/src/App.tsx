@@ -6,14 +6,17 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
+  Honeypot,
   SurveyHeader,
   SurveyPage,
   answersToSubmit,
   defaultThemeCss,
   pendingMedia,
   themeCss,
+  usePageSignals,
   type DisplayQuestion,
   type FieldErrors,
+  type PhotoHandler,
 } from '@zapx/survey-renderer';
 import type { AnswerValue, Answers, Theme } from '@zapx/survey-schema';
 
@@ -34,6 +37,11 @@ interface Look {
     playToEnd?: string;
     readAloud?: string;
     stopReading?: string;
+    takePhoto?: string;
+    retakePhoto?: string;
+    photoUploading?: string;
+    photoFailed?: string;
+    photoSaved?: string;
   };
   readAloud?: boolean;
 }
@@ -53,6 +61,23 @@ type State =
     }
   | { state: 'finished'; status: string; message: string; redirectUrl: string | null; isTest: boolean; look?: Look }
   | { state: 'unavailable'; message: string };
+
+/**
+ * Browser traits for the same-device check (Milestone 12). Only coarse values every site can read; no
+ * canvas, audio or font probing. The server keeps a keyed hash of them, never the values.
+ */
+function deviceTraits() {
+  const n = navigator as Navigator & { deviceMemory?: number };
+  return {
+    screen: `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone ?? '',
+    langs: (navigator.languages ?? [navigator.language]).join(',').slice(0, 100),
+    platform: navigator.platform ?? '',
+    cores: navigator.hardwareConcurrency ?? 0,
+    memory: n.deviceMemory ?? 0,
+    touch: navigator.maxTouchPoints ?? 0,
+  };
+}
 
 async function api<T>(path: string, body?: unknown): Promise<{ status: number; data: T }> {
   const res = await fetch(`/api${path}`, {
@@ -75,26 +100,32 @@ export function App() {
   const [look, setLook] = useState<Look | null>(null);
   /** Questions on this page whose video or audio has been played to the end. */
   const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
+  const signals = usePageSignals();
+  const { reset: resetSignals } = signals;
 
-  const show = useCallback((s: State) => {
-    setView(s);
-    setErrors({});
-    if (s.state !== 'unavailable' && s.look) {
-      setLook(s.look);
-      document.documentElement.lang = s.look.language;
-    }
-    if (s.state === 'in_progress') {
-      setAnswers(s.answers ?? {});
-      setPlayed(new Set());
-      document.title = s.survey.title;
-      window.scrollTo({ top: 0 });
-      requestAnimationFrame(() => document.querySelector<HTMLElement>('.zx-card')?.focus());
-    }
-    if (s.state === 'finished' && s.redirectUrl) {
-      const url = s.redirectUrl;
-      setTimeout(() => window.location.replace(url), 800);
-    }
-  }, []);
+  const show = useCallback(
+    (s: State) => {
+      setView(s);
+      setErrors({});
+      if (s.state !== 'unavailable' && s.look) {
+        setLook(s.look);
+        document.documentElement.lang = s.look.language;
+      }
+      if (s.state === 'in_progress') {
+        setAnswers(s.answers ?? {});
+        setPlayed(new Set());
+        resetSignals();
+        document.title = s.survey.title;
+        window.scrollTo({ top: 0 });
+        requestAnimationFrame(() => document.querySelector<HTMLElement>('.zx-card')?.focus());
+      }
+      if (s.state === 'finished' && s.redirectUrl) {
+        const url = s.redirectUrl;
+        setTimeout(() => window.location.replace(url), 800);
+      }
+    },
+    [resetSignals],
+  );
 
   useEffect(() => {
     const path = window.location.pathname;
@@ -103,8 +134,14 @@ export function App() {
     (async () => {
       if (entry) {
         const query = Object.fromEntries(new URLSearchParams(window.location.search));
-        // Coarse hints for device rules (iPads report a desktop user agent). Nothing else is collected.
-        const client = { touch: navigator.maxTouchPoints > 0, screenShortSide: Math.min(window.screen.width, window.screen.height) };
+        // Coarse hints for device rules (iPads report a desktop user agent), whether automation software
+        // drives the browser, and the traits behind the same-device check.
+        const client = {
+          touch: navigator.maxTouchPoints > 0,
+          screenShortSide: Math.min(window.screen.width, window.screen.height),
+          automation: navigator.webdriver === true,
+          traits: deviceTraits(),
+        };
         const { data } = await api<State & { token?: string }>(`/public/s/${entry[1]}/start`, { query, client });
         if (data.state === 'in_progress' && data.token) {
           setToken(data.token);
@@ -135,7 +172,7 @@ export function App() {
       const payload = answersToSubmit(view.page.questions, answers, view.context);
       const { status, data } = await api<State & { errors?: Array<{ questionId: string; message: string }>; message?: string }>(
         `/public/r/${token}/answers`,
-        { pageId: view.page.id, answers: payload },
+        { pageId: view.page.id, answers: payload, signals: signals.read() },
       );
       if (status === 422 && data.errors) {
         setErrors(Object.fromEntries(data.errors.map((e) => [e.questionId, e.message])));
@@ -179,6 +216,17 @@ export function App() {
     }
   };
 
+  const photos: PhotoHandler = {
+    take: async (questionId, photo) => {
+      const form = new FormData();
+      form.append('questionId', questionId);
+      form.append('file', photo, 'photo.jpg');
+      const res = await fetch(`/api/public/r/${token}/captures`, { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+      return ((await res.json()) as { ref: string }).ref;
+    },
+  };
+
   const waiting = view?.state === 'in_progress' && pendingMedia(view.page.questions, answers, view.context, played).length > 0;
 
   return (
@@ -208,6 +256,7 @@ export function App() {
         ) : (
           <form
             className="zx-card"
+            {...signals.handlers}
             tabIndex={-1}
             onSubmit={(e) => {
               e.preventDefault();
@@ -252,7 +301,9 @@ export function App() {
               readAloud={view.look.readAloud}
               language={view.look.language}
               messages={view.look.ui}
+              photos={photos}
             />
+            <Honeypot inputRef={signals.honeypot} />
             {waiting ? <p className="zx-media-wait">{view.look.ui.playToEnd}</p> : null}
             <div className="zx-actions">
               {view.survey.allowBack && !view.isFirstPage ? (

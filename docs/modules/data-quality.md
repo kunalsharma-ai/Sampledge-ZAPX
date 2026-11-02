@@ -33,6 +33,25 @@ Owner: maintainer (see `.github/CODEOWNERS`) · Decision: [ADR 0007](../adr/0007
 | `same_network`    | Another complete of this survey came from the same network                            | 20         |
 | `check_failed`    | A survey-specific check's condition is true (e.g. `ATTN != 3`)                        | its weight |
 
+Fraud signals (Milestone 12, [ADR 0018](../adr/0018-fraud-detection-and-capi-capture.md)):
+
+| Flag                  | When                                                                                     | Points  |
+| --------------------- | ---------------------------------------------------------------------------------------- | ------- |
+| `automation`          | The browser reports that automation software controls it (`navigator.webdriver`)         | 60      |
+| `honeypot`            | The hidden field (invisible, not read by screen readers, not in the tab order) is filled | 60      |
+| `no_interaction`      | Two or more pages answered with no keyboard, mouse or touch input                        | 30      |
+| `open_pasted`         | An open answer was pasted in                                                             | 10 each |
+| `same_device`         | Another complete of this survey came from what looks like the same device                | 25      |
+| `geo_mismatch`        | The edge network's country is not one of the expected countries                          | 30      |
+| `blocked_device`      | The device is on the organization's block list                                           | 60      |
+| `blocked_network`     | The network is on the organization's block list                                          | 40      |
+| `gps_missing`         | CAPI: the survey requires a location and none was recorded                               | 30      |
+| `gps_moved`           | CAPI: the interview ended more than 1 km from where it started                           | 15      |
+| `interviewer_overlap` | CAPI: the interviewer recorded another interview at the same time (over 1 minute)        | 40      |
+
+These are signals for a reviewer, not proof. Two identical laptops look like one device; a VPN
+changes the country; some people paste answers they wrote elsewhere.
+
 Score = 100 − points, never below 0. Length of interview is the time on answered pages, with each
 page capped at 30 minutes; time away from a resumed interview is not counted.
 
@@ -46,6 +65,8 @@ page capped at 30 minutes; time away from a resumed interview is not counted.
 | `straightlineMinRows` | 5       | Grids smaller than this are not checked.                           |
 | `openEnds`            | true    | Open-answer checks and fingerprints.                               |
 | `sameNetwork`         | true    | Same-network check (keyed hash only).                              |
+| `fraud`               | true    | Browser signals, same device and the block list (Milestone 12).    |
+| `countries`           | []      | Expected countries (ISO two-letter); empty uses the vendor's `cc`. |
 | `checks`              | []      | `{id, condition, label?, weight}` in the logic language.           |
 | `reviewBelow`         | 70      | Completes below this wait for review.                              |
 | `rejectBelow`         | 0       | Completes below this end as `quality_fail` in the survey; 0 = off. |
@@ -63,8 +84,30 @@ page capped at 30 minutes; time away from a resumed interview is not counted.
 A rejection cannot be undone. Test respondents are scored but never enter the queue and are never
 compared with real respondents.
 
+## Block list
+
+When rejecting, tick **also block their device and network**. The response's device and network
+hashes are added to the organization's block list (`POST .../quality/decisions` with
+`"block": true`). Later completes from them, in any survey, get `blocked_device` or
+`blocked_network` and go to review. Administrators see the list under Quality & fieldwork, with the
+interview each entry came from, and can unblock (`GET /api/quality/blocks`,
+`DELETE /api/quality/blocks/:id`). Blocking never refuses entry: shared networks would lock out
+innocent people.
+
+## Country check
+
+Set `GEO_COUNTRY_HEADER` to the header your edge network adds (`cloudfront-viewer-country`,
+`cf-ipcountry`). Only do this when respondents can reach the API through that edge alone;
+otherwise anyone could send the header. Without it there is no country check. The country (two
+letters) is stored with the response as `geoCountry`.
+
 ## Privacy
 
 - Network: `HMAC(key, tenantId + ":" + address)`, key derived from `JWT_SECRET`. The address is not
   stored. Rotating `JWT_SECRET` resets same-network detection.
 - Open answers: fingerprints are SHA-256 of normalized text, compared only within one survey.
+- Device: `HMAC(key, tenantId + user agent + traits)` of coarse browser traits (screen, time zone,
+  languages, platform, cores, memory, touch points). The traits are not stored. No canvas, audio or
+  font fingerprinting.
+- Browser signals: only counts and question ids (pages without input, honeypot hits, which open
+  answers were pasted). No keystrokes or text.

@@ -206,7 +206,7 @@ describe('quality review queue', () => {
       .set(programmer.headers)
       .send({ responseIds: [r1.id], decision: 'reject', note: 'Keyboard mashing' })
       .expect(200);
-    expect(res.body).toEqual({ accepted: 0, rejected: 1, skipped: 0 });
+    expect(res.body).toEqual({ accepted: 0, rejected: 1, skipped: 0, blocked: 0 });
     expect(await row(surveyId, 'R-1')).toMatchObject({
       status: 'QUALITY_FAIL',
       outcomeReason: 'quality_review',
@@ -224,7 +224,7 @@ describe('quality review queue', () => {
       .set(auth)
       .send({ responseIds: [r1.id], decision: 'accept' })
       .expect(200);
-    expect(again.body).toEqual({ accepted: 0, rejected: 0, skipped: 1 });
+    expect(again.body).toEqual({ accepted: 0, rejected: 0, skipped: 1, blocked: 0 });
   });
 
   it('accepting keeps the complete and clears it from the queue', async () => {

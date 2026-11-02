@@ -198,6 +198,9 @@ function generateAnswer(q: Question, g: GenContext): AnswerValue | undefined {
     }
     case 'open':
       return `Synthetic answer ${++g.serial}`.slice(0, q.maxLength);
+    case 'photo':
+      // A reference only: synthetic respondents never upload files.
+      return `synthetic-photo-${++g.serial}`;
     case 'grid':
       return Object.fromEntries(q.rows.map((r) => [r.id, pickOption(q, q.columns, g).code]));
     case 'scale': {

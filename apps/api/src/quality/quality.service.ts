@@ -16,7 +16,9 @@ import {
   fieldwork,
   openEndFingerprints,
   qualityDecision,
+  type BrowserSignals,
   type FieldworkRow,
+  type FraudInput,
   type FieldworkStatus,
   type QualityDecision,
   type QualityResult,
@@ -29,10 +31,15 @@ import { AccessService } from '../common/access.service';
 import { WebhookService } from '../integrations/webhook.service';
 import { RedirectService } from '../integrations/redirect.service';
 import type { AuthUser } from '../auth/auth.types';
+import { CaptureService } from '../captures/capture.service';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
-export type ScoredFor = Pick<Response, 'id' | 'surveyId' | 'isTest' | 'ipHash'>;
+export type ScoredFor = Pick<Response, 'id' | 'surveyId' | 'isTest' | 'ipHash'> &
+  Partial<Pick<Response, 'tenantId' | 'deviceHash' | 'signals' | 'geoCountry' | 'country'>>;
+
+/** Browser traits the runtime reports for the device check. Only their keyed hash is kept. */
+export type DeviceTraits = Record<string, string | number | boolean>;
 
 export interface Assessment extends QualityResult {
   decision: QualityDecision;
@@ -51,6 +58,7 @@ export class QualityService {
     private readonly redirects: RedirectService,
     private readonly access: AccessService,
     private readonly webhooks: WebhookService,
+    private readonly captures: CaptureService,
   ) {}
 
   /**
@@ -63,6 +71,27 @@ export class QualityService {
     return createHmac('sha256', key).update(`${tenantId}:${ip}`).digest('hex').slice(0, 32);
   }
 
+  private key(purpose: string) {
+    return createHmac('sha256', config().JWT_SECRET).update(purpose).digest();
+  }
+
+  /**
+   * Keyed hash of the browser's traits (screen, time zone, languages, platform, cores, user agent).
+   * Two browsers with the same traits look like one device: a signal for review, never proof.
+   */
+  deviceHash(tenantId: string, userAgent: string | undefined, traits: DeviceTraits | undefined): string | null {
+    if (!traits || Object.keys(traits).length < 3) return null;
+    const canonical = Object.keys(traits)
+      .sort()
+      .slice(0, 20)
+      .map((k) => `${k.slice(0, 20)}=${String(traits[k]).slice(0, 100)}`)
+      .join('|');
+    return createHmac('sha256', this.key('zapx:device-hash'))
+      .update(`${tenantId}:${(userAgent ?? '').slice(0, 500)}:${canonical}`)
+      .digest('hex')
+      .slice(0, 32);
+  }
+
   /** Score a complete before it is recorded. Test respondents are scored but never compared with real ones. */
   async assess(
     r: ScoredFor,
@@ -70,6 +99,7 @@ export class QualityService {
     answers: Answers,
     durationMs: number | null,
     db: Db = this.prisma,
+    capi?: FraudInput['capi'],
   ): Promise<Assessment> {
     const settings = qualitySettingsOf(def);
     if (!settings.enabled) return { score: 100, flags: [], decision: 'pass' };
@@ -77,6 +107,11 @@ export class QualityService {
     let medianMs: number | null = null;
     let duplicateOpenEnds = new Set<string>();
     let sameNetworkCompletes = 0;
+    const fraud: FraudInput = { browser: (r.signals ?? {}) as BrowserSignals, ...(capi ? { capi } : {}) };
+    if (r.geoCountry) {
+      const declared = r.country && /^[A-Za-z]{2}$/.test(r.country) ? [r.country.toUpperCase()] : [];
+      fraud.geo = { country: r.geoCountry, expected: settings.countries.length ? settings.countries : declared };
+    }
     if (!r.isTest) {
       const [m] = await db.$queryRaw<Array<{ median: number | null; n: bigint }>>`
         SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY "durationMs") AS median, count(*) AS n
@@ -97,8 +132,26 @@ export class QualityService {
           where: { surveyId: r.surveyId, ipHash: r.ipHash, status: 'COMPLETE', isTest: false, id: { not: r.id } },
         });
       }
+      if (settings.fraud && r.deviceHash) {
+        fraud.sameDeviceCompletes = await db.response.count({
+          where: { surveyId: r.surveyId, deviceHash: r.deviceHash, status: 'COMPLETE', isTest: false, id: { not: r.id } },
+        });
+      }
+      if (settings.fraud && r.tenantId && (r.deviceHash || r.ipHash)) {
+        const hits = await db.fraudBlock.findMany({
+          where: {
+            tenantId: r.tenantId,
+            OR: [
+              ...(r.deviceHash ? [{ kind: 'device', hash: r.deviceHash }] : []),
+              ...(r.ipHash ? [{ kind: 'network', hash: r.ipHash }] : []),
+            ],
+          },
+          select: { kind: true },
+        });
+        fraud.blocked = { device: hits.some((h) => h.kind === 'device'), network: hits.some((h) => h.kind === 'network') };
+      }
     }
-    const result = assessQuality({ def, answers, durationMs, medianMs, duplicateOpenEnds, sameNetworkCompletes });
+    const result = assessQuality({ def, answers, durationMs, medianMs, duplicateOpenEnds, sameNetworkCompletes, fraud });
     return { ...result, decision: qualityDecision(settings, result.score) };
   }
 
@@ -156,6 +209,7 @@ export class QualityService {
         completedAt: true,
         answers: true,
         versionId: true,
+        location: true,
         vendor: { select: { code: true } },
         interviewer: { select: { name: true } },
       },
@@ -174,10 +228,28 @@ export class QualityService {
       where: { surveyId, isTest: false, OR: [{ reviewState: { not: 'PENDING' } }, { status: 'COMPLETE' }] },
       _count: true,
     });
+    const captures = await this.captures.ofResponses(
+      user.tenantId,
+      rows.map((r) => r.id),
+    );
+    const photoIds = new Map(
+      versions.map((v) => [
+        v.id,
+        allQuestions(v.definition as unknown as SurveyDefinition)
+          .filter((q) => q.type === 'photo')
+          .map((q) => q.id),
+      ]),
+    );
     return {
       counts: Object.fromEntries(counts.map((c) => [c.reviewState.toLowerCase(), c._count])),
       items: rows.map(({ answers, versionId, ...r }) => ({
         ...r,
+        // Photo answers with their files, and the interview recording when there is one.
+        photos: (photoIds.get(versionId) ?? []).flatMap((questionId) => {
+          const c = captures.get(r.id)?.find((x) => x.kind === 'photo' && x.ref === (answers as Answers)[questionId]);
+          return c ? [{ questionId, ...c }] : [];
+        }),
+        recording: captures.get(r.id)?.find((x) => x.kind === 'audio') ?? null,
         openEnds: (openIds.get(versionId) ?? [])
           .map((id) => ({ questionId: id, text: (answers as Answers)[id] }))
           .filter((o): o is { questionId: string; text: string } => typeof o.text === 'string' && o.text !== ''),
@@ -185,9 +257,9 @@ export class QualityService {
     };
   }
 
-  async decide(user: AuthUser, surveyId: string, ids: string[], decision: 'accept' | 'reject', note: string | undefined) {
+  async decide(user: AuthUser, surveyId: string, ids: string[], decision: 'accept' | 'reject', note: string | undefined, block = false) {
     await this.survey(user, surveyId);
-    const result = { accepted: 0, rejected: 0, skipped: 0 };
+    const result = { accepted: 0, rejected: 0, skipped: 0, blocked: 0 };
     for (const id of ids) {
       const r = await this.prisma.forTenant(user.tenantId).response.findFirst({ where: { id, surveyId } });
       if (!r || r.status !== 'COMPLETE' || r.reviewState === 'REJECTED') {
@@ -233,10 +305,60 @@ export class QualityService {
         continue;
       }
       result.rejected++;
+      if (block && !r.isTest) result.blocked += await this.block(user, r, note);
       await this.redirects.outcomeRecorded(r, 'quality_fail');
       await this.decided(r, 'rejected');
     }
     return result;
+  }
+
+  // ---- Block list (Milestone 12) -----------------------------------------------------------------
+
+  /** Block the device and network of a rejected response in every survey of the organization. */
+  private async block(user: AuthUser, r: Pick<Response, 'id' | 'uid' | 'deviceHash' | 'ipHash'>, note: string | undefined) {
+    let n = 0;
+    for (const [kind, hash] of [
+      ['device', r.deviceHash],
+      ['network', r.ipHash],
+    ] as const) {
+      if (!hash) continue;
+      const created = await this.prisma.fraudBlock.createMany({
+        data: [{ tenantId: user.tenantId, kind, hash, responseId: r.id, note: note ?? null, createdById: user.id }],
+        skipDuplicates: true,
+      });
+      n += created.count;
+    }
+    if (n) await this.audit.record(user, 'fraud.block', 'response', r.id, { uid: r.uid, entries: n });
+    return n;
+  }
+
+  async blocks(user: AuthUser) {
+    const rows = await this.prisma.fraudBlock.findMany({ where: { tenantId: user.tenantId }, orderBy: { createdAt: 'desc' }, take: 500 });
+    const responses = await this.prisma.response.findMany({
+      where: { tenantId: user.tenantId, id: { in: rows.map((b) => b.responseId).filter((x): x is string => !!x) } },
+      select: { id: true, uid: true, survey: { select: { name: true } } },
+    });
+    const people = await this.prisma.user.findMany({
+      where: { tenantId: user.tenantId, id: { in: rows.map((b) => b.createdById).filter((x): x is string => !!x) } },
+      select: { id: true, name: true },
+    });
+    return rows.map((b) => {
+      const resp = responses.find((x) => x.id === b.responseId);
+      return {
+        id: b.id,
+        kind: b.kind,
+        note: b.note,
+        createdAt: b.createdAt,
+        createdBy: people.find((p) => p.id === b.createdById)?.name ?? null,
+        from: resp ? { uid: resp.uid, survey: resp.survey.name } : null,
+      };
+    });
+  }
+
+  async unblock(user: AuthUser, id: string) {
+    const n = await this.prisma.fraudBlock.deleteMany({ where: { id, tenantId: user.tenantId } });
+    if (n.count === 0) throw new NotFoundException('Block not found');
+    await this.audit.record(user, 'fraud.unblock', 'fraud_block', id, {});
   }
 
   private async decided(

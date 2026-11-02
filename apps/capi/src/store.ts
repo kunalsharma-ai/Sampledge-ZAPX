@@ -48,10 +48,35 @@ export interface LocalInterview {
   localOutcome: string | null;
   serverStatus: string | null;
   serverReason: string | null;
+  /** Milestone 12: where the interview started and ended (when the survey records locations). */
+  location?: { start: DevicePoint | null; end: DevicePoint | null };
+  /** Recording consent: recorded, declined, or unavailable (no microphone or permission). Unset until asked. */
+  audio?: 'recorded' | 'declined' | 'unavailable';
+}
+
+export interface DevicePoint {
+  lat: number;
+  lon: number;
+  accuracy: number;
+  at: string;
+}
+
+/** A photo answer or the interview recording, kept on the device until it is uploaded. */
+export interface LocalCapture {
+  /** `${clientId}:${ref}` */
+  key: string;
+  clientId: string;
+  surveyId: string;
+  ref: string;
+  kind: 'photo' | 'audio';
+  /** Audio is saved in pieces while recording, so closing the app keeps what was recorded. */
+  parts: Blob[];
+  type: string;
+  state: 'waiting' | 'uploaded' | 'refused';
 }
 
 const DB = 'zapx-capi';
-const VERSION = 1;
+const VERSION = 2;
 
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -62,6 +87,10 @@ function open(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('interviews')) {
         const s = db.createObjectStore('interviews', { keyPath: 'clientId' });
         s.createIndex('state', 'state');
+      }
+      if (!db.objectStoreNames.contains('captures')) {
+        const c = db.createObjectStore('captures', { keyPath: 'key' });
+        c.createIndex('clientId', 'clientId');
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -96,6 +125,14 @@ export const interviews = {
   get: (id: string) =>
     run<LocalInterview | undefined>('interviews', 'readonly', (s) => s.get(id) as IDBRequest<LocalInterview | undefined>),
   put: (i: LocalInterview) => run('interviews', 'readwrite', (s) => s.put(i)),
+};
+
+export const captures = {
+  of: (clientId: string) =>
+    run<LocalCapture[]>('captures', 'readonly', (s) => s.index('clientId').getAll(clientId) as IDBRequest<LocalCapture[]>),
+  get: (key: string) => run<LocalCapture | undefined>('captures', 'readonly', (s) => s.get(key) as IDBRequest<LocalCapture | undefined>),
+  put: (c: LocalCapture) => run('captures', 'readwrite', (s) => s.put(c)),
+  del: (key: string) => run('captures', 'readwrite', (s) => s.delete(key)),
 };
 
 /** A random id for this installation (not a hardware identifier). */

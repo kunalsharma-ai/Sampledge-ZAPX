@@ -194,6 +194,18 @@ Details: [modules/analytics.md](modules/analytics.md).
 
 Details: [modules/rich-media.md](modules/rich-media.md).
 
+## Fraud detection and face-to-face capture (Milestone 12)
+
+- **Fraud signals** are quality flags in `@zapx/quality-core` (`FraudInput`): browser signals the
+  runtime sends with each page (`Response.signals`: honeypot, pages without input, pasted open
+  answers), `navigator.webdriver`, a keyed device hash (`Response.deviceHash`), the edge network's
+  country (`GEO_COUNTRY_HEADER`), and the organization's `FraudBlock` list.
+- **Captures** (`Capture`): photo answers and CAPI recordings, private (`GET /api/captures/:id`,
+  audited), under row-level security, in the `FileStore`. CAPI uploads files before the interview
+  and the sync links them; `CAPTURE_RETENTION_DAYS` and per-survey erasure delete them.
+- **CAPI** stores the start and end location and the recording consent in `Response.location`; the
+  sync checks for overlapping interviews by the same interviewer. [ADR 0018](adr/0018-fraud-detection-and-capi-capture.md)
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)

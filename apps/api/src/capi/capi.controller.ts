@@ -11,6 +11,13 @@ const assignSchema = z.object({
   target: z.number().int().min(1).max(100000).nullable().optional(),
 });
 
+const pointSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+  accuracy: z.number().min(0).max(1_000_000).optional(),
+  at: z.string().max(40).optional(),
+});
+
 const interviewSchema = z.object({
   clientId: z.string().uuid(),
   surveyId: z.string().min(1).max(64),
@@ -24,6 +31,15 @@ const interviewSchema = z.object({
     .max(7 * 24 * 3600 * 1000),
   language: z.string().max(35).optional(),
   endedEarly: z.boolean().optional(),
+  /** Milestone 12: where the interview started and ended, when the survey records locations. */
+  location: z
+    .object({
+      start: pointSchema.nullable().optional(),
+      end: pointSchema.nullable().optional(),
+    })
+    .optional(),
+  /** recorded: the respondent agreed and audio was uploaded; declined; unavailable: no microphone. */
+  audio: z.enum(['recorded', 'declined', 'unavailable']).optional(),
 });
 
 const syncSchema = z.object({

@@ -12,7 +12,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { createHash, randomBytes } from 'node:crypto';
 import { Prisma, type ResponseStatus, type SurveyVersion } from '@zapx/db';
 import { classifyDevice, matchingQuotas, replayInterview } from '@zapx/logic-engine';
-import type { Answers, SurveyDefinition } from '@zapx/survey-schema';
+import { capiSettingsOf, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -21,6 +21,7 @@ import { WebhookService } from '../integrations/webhook.service';
 import type { RedirectStatus } from '@zapx/redirect-core';
 import type { AuthUser } from '../auth/auth.types';
 import { QualityService } from '../quality/quality.service';
+import { CaptureService } from '../captures/capture.service';
 
 export interface UploadedInterview {
   clientId: string;
@@ -34,6 +35,26 @@ export interface UploadedInterview {
   language?: string;
   /** The interviewer ended the interview before the last page. */
   endedEarly?: boolean;
+  location?: { start?: DevicePoint | null; end?: DevicePoint | null };
+  audio?: 'recorded' | 'declined' | 'unavailable';
+}
+
+export interface DevicePoint {
+  lat: number;
+  lon: number;
+  accuracy?: number;
+  at?: string;
+}
+
+/** Interviews by one interviewer overlapping by more than this are flagged (clock drift and quick handovers allowed). */
+const OVERLAP_GRACE_MS = 60_000;
+
+/** About a metre: enough to check the interviewer was there, without keeping more precision than needed. */
+const round = (n: number) => Math.round(n * 1e5) / 1e5;
+function point(p: DevicePoint | null | undefined) {
+  if (!p) return null;
+  const at = p.at && Number.isFinite(Date.parse(p.at)) ? new Date(p.at).toISOString() : null;
+  return { lat: round(p.lat), lon: round(p.lon), accuracy: p.accuracy === undefined ? null : Math.round(p.accuracy), at };
 }
 
 export interface SyncResult {
@@ -60,6 +81,7 @@ export class CapiService {
     private readonly quality: QualityService,
     private readonly access: AccessService,
     private readonly webhooks: WebhookService,
+    private readonly captures: CaptureService,
   ) {}
 
   // ---- Assignments (studio) ---------------------------------------------------------------------
@@ -239,6 +261,15 @@ export class CapiService {
     }
 
     const id = cuidLike();
+    const capture = capiSettingsOf(def);
+    const where = { start: point(item.location?.start), end: point(item.location?.end) };
+    const location =
+      capture.gps !== 'off' || capture.audio !== 'off'
+        ? {
+            ...(capture.gps !== 'off' ? where : {}),
+            ...(capture.audio !== 'off' ? { audio: item.audio ?? 'unavailable' } : {}),
+          }
+        : null;
     const base = {
       id,
       tenantId: user.tenantId,
@@ -259,11 +290,33 @@ export class CapiService {
       currentPage: -1,
       durationMs,
       lastPageId,
+      ...(location ? { location: location as Prisma.InputJsonValue } : {}),
     };
 
     let quality = {};
     if (status === 'COMPLETE') {
-      const assessment = await this.quality.assess({ id, surveyId: item.surveyId, isTest: false, ipHash: null }, def, answers, durationMs);
+      // The same interviewer cannot be in two interviews at once: a strong sign of made-up interviews.
+      const overlapping = await this.prisma.response.count({
+        where: {
+          interviewerId: user.id,
+          mode: 'CAPI',
+          id: { not: id },
+          startedAt: { lt: new Date(finished.getTime() - OVERLAP_GRACE_MS) },
+          completedAt: { gt: new Date(started.getTime() + OVERLAP_GRACE_MS) },
+        },
+      });
+      const assessment = await this.quality.assess(
+        { id, tenantId: user.tenantId, surveyId: item.surveyId, isTest: false, ipHash: null },
+        def,
+        answers,
+        durationMs,
+        undefined,
+        {
+          gpsRequired: capture.gps === 'required',
+          ...(capture.gps !== 'off' ? where : {}),
+          overlapping,
+        },
+      );
       quality = this.quality.fields(def, assessment, false);
       if (assessment.decision === 'reject') {
         status = 'QUALITY_FAIL';
@@ -294,6 +347,7 @@ export class CapiService {
       quality = { ...quality, reviewState: 'NONE' };
       await this.prisma.$transaction((tx) => create(status, reason, tx));
     }
+    await this.captures.link(user.tenantId, item.clientId, id);
     if (status === 'COMPLETE')
       await this.quality.rememberOpenEnds({ id, surveyId: item.surveyId, isTest: false, ipHash: null }, def, answers);
     await this.webhooks.responseFinished(id, status.toLowerCase() as RedirectStatus);

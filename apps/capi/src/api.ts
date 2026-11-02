@@ -1,7 +1,7 @@
 /** Talking to the ZAPX API: sign-in, survey package download and sync. Only ever called online. */
 import { mediaIdsOf, parseSurveyDefinition } from '@zapx/survey-schema';
 import { defaultMediaUrl } from '@zapx/survey-renderer';
-import { deviceId, interviews, meta, type Interviewer, type LocalInterview, type SurveyPackage } from './store';
+import { captures, deviceId, interviews, meta, type Interviewer, type LocalInterview, type SurveyPackage } from './store';
 
 export class NotSignedIn extends Error {}
 
@@ -80,13 +80,59 @@ export interface SyncSummary {
   sent: number;
   stored: number;
   rejected: number;
+  /** Interviews held back because a photo or recording could not be uploaded yet. */
+  waitingForFiles: number;
+}
+
+/**
+ * Upload an interview's photos and recording before the interview itself, so the server can link
+ * them when the answers arrive. True when nothing is left to upload. A file the server refuses (too
+ * large, not a photo) is marked refused and not retried; the interview still syncs without it.
+ */
+async function uploadCaptures(i: LocalInterview): Promise<boolean> {
+  let ok = true;
+  for (const c of await captures.of(i.clientId)) {
+    if (c.state !== 'waiting' || c.parts.length === 0) continue;
+    const form = new FormData();
+    form.append('clientId', c.clientId);
+    form.append('surveyId', c.surveyId);
+    form.append('ref', c.ref);
+    form.append('kind', c.kind);
+    form.append('file', new Blob(c.parts, { type: c.type }), c.kind === 'photo' ? 'photo.jpg' : 'interview');
+    try {
+      const res = await fetch('/api/capi/captures', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'x-zapx-csrf': '1' },
+        body: form,
+      });
+      if (res.status === 401) throw new NotSignedIn('Please sign in again to sync.');
+      if (res.ok) await captures.put({ ...c, state: 'uploaded' });
+      else if (res.status === 400 || res.status === 413) await captures.put({ ...c, state: 'refused' });
+      else ok = false;
+    } catch (e) {
+      if (e instanceof NotSignedIn) throw e;
+      ok = false;
+    }
+  }
+  return ok;
+}
+
+/** Once the server has the interview, its files are removed from the device. */
+async function forgetCaptures(clientId: string) {
+  for (const c of await captures.of(clientId)) if (c.state !== 'waiting') await captures.del(c.key);
 }
 
 /** Upload finished interviews of the signed-in interviewer, in small batches. */
 export async function syncNow(interviewerId: string): Promise<SyncSummary> {
   const device = await deviceId();
-  const waiting = (await interviews.all()).filter((i) => i.state === 'finished' && i.interviewerId === interviewerId);
-  const summary: SyncSummary = { sent: 0, stored: 0, rejected: 0 };
+  const finished = (await interviews.all()).filter((i) => i.state === 'finished' && i.interviewerId === interviewerId);
+  const summary: SyncSummary = { sent: 0, stored: 0, rejected: 0, waitingForFiles: 0 };
+  const waiting: LocalInterview[] = [];
+  for (const i of finished) {
+    if (await uploadCaptures(i)) waiting.push(i);
+    else summary.waitingForFiles++;
+  }
   for (let n = 0; n < waiting.length; n += 10) {
     const batch = waiting.slice(n, n + 10);
     const { results } = await call<{ results: Array<{ clientId: string; result: string; status?: string; reason?: string }> }>(
@@ -102,6 +148,7 @@ export async function syncNow(interviewerId: string): Promise<SyncSummary> {
       summary.sent++;
       if (r.result === 'rejected') summary.rejected++;
       else summary.stored++;
+      if (r.result !== 'rejected') await forgetCaptures(local.clientId);
       await interviews.put({
         ...local,
         state: r.result === 'rejected' ? 'rejected' : 'synced',
@@ -124,5 +171,7 @@ function toUpload(i: LocalInterview) {
     durationMs: Math.round(i.durationMs),
     language: i.language,
     ...(i.endedEarly ? { endedEarly: true } : {}),
+    ...(i.location ? { location: i.location } : {}),
+    ...(i.audio ? { audio: i.audio } : {}),
   };
 }

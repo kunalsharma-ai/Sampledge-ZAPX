@@ -6,6 +6,7 @@
  * client's idea of routing: it recomputes visibility and validation from the stored answers.
  */
 import {
+  CAPTURE_REF,
   scaleCodes,
   type AnswerValue,
   type Answers,
@@ -162,6 +163,12 @@ export const SYSTEM_MESSAGES = {
   rankUp: 'Move up',
   rankDown: 'Move down',
   playToEnd: 'Please play the media to the end to continue.',
+  takePhoto: 'Take or choose a photo',
+  retakePhoto: 'Use a different photo',
+  photoUploading: 'Uploading the photo…',
+  photoFailed: 'The photo could not be uploaded. Try again.',
+  photoMissing: 'Take or choose a photo.',
+  photoSaved: 'Photo saved.',
   readAloud: 'Read aloud',
   stopReading: 'Stop reading',
   next: 'Next',
@@ -308,6 +315,10 @@ export function normalizeAnswer(
       // Every option gets an amount (0 when left empty), so the data has no gaps.
       for (const o of q.options) out[String(o.code)] ??= 0;
       return { value: out };
+    }
+    case 'photo': {
+      if (typeof raw !== 'string' || !CAPTURE_REF.test(raw)) return { error: msg.photoMissing };
+      return { value: raw };
     }
   }
 }

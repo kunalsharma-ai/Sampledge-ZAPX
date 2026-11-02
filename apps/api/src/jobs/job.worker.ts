@@ -11,6 +11,7 @@ import { HttpException, Injectable, Logger, OnApplicationBootstrap, OnModuleDest
 import { randomBytes } from 'node:crypto';
 import type { Job, Prisma } from '@zapx/db';
 import { PrismaService } from '../common/prisma.service';
+import { CaptureService } from '../captures/capture.service';
 import { config } from '../config';
 import type { AuthUser } from '../auth/auth.types';
 import { AiError, type AiDocument } from '../ai/ai-provider';
@@ -55,6 +56,7 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly exports: ExportRunner,
     private readonly qa: QaService,
     private readonly proposer: ProposeService,
+    private readonly captures: CaptureService,
   ) {}
 
   onApplicationBootstrap() {
@@ -252,7 +254,7 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /** Delete expired files, old finished jobs and old webhook deliveries. */
+  /** Delete expired files, old finished jobs, old webhook deliveries and photos and recordings past CAPTURE_RETENTION_DAYS. */
   async housekeeping() {
     const cfg = config();
     const files = await this.files.purgeExpired();
@@ -264,8 +266,9 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     const deliveries = await this.prisma.webhookDelivery.deleteMany({
       where: { state: { in: ['DELIVERED', 'FAILED', 'DEAD'] }, createdAt: { lt: hookCutoff } },
     });
-    const out = { files, jobs: jobs.count, webhookDeliveries: deliveries.count };
-    if (files || jobs.count || deliveries.count) this.log.log(`Housekeeping removed ${JSON.stringify(out)}`);
+    const captures = await this.captures.purgeExpired();
+    const out = { files, jobs: jobs.count, webhookDeliveries: deliveries.count, captures };
+    if (files || jobs.count || deliveries.count || captures) this.log.log(`Housekeeping removed ${JSON.stringify(out)}`);
     return out;
   }
 }

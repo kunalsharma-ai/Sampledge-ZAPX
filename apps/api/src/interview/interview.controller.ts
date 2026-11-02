@@ -4,13 +4,29 @@ import { z } from 'zod';
 import { Public } from '../auth/decorators';
 import { parseBody } from '../common/validation';
 import { InterviewService } from './interview.service';
+import { config } from '../config';
+
+const signalsSchema = z.object({
+  hp: z.boolean().optional(),
+  interactions: z.number().int().min(0).max(1_000_000).optional(),
+  pasted: z.array(z.string().max(64)).max(100).optional(),
+});
 
 const answersSchema = z.object({
   pageId: z.string().min(1).max(64),
   answers: z.record(z.string().max(64), z.unknown()).refine((a) => Object.keys(a).length <= 500, 'Too many answers'),
+  signals: signalsSchema.optional(),
 });
 
-const clientSchema = z.object({ touch: z.boolean().optional(), screenShortSide: z.number().min(0).max(20000).optional() });
+const clientSchema = z.object({
+  touch: z.boolean().optional(),
+  screenShortSide: z.number().min(0).max(20000).optional(),
+  automation: z.boolean().optional(),
+  traits: z
+    .record(z.string().max(20), z.union([z.string().max(100), z.number(), z.boolean()]))
+    .refine((t) => Object.keys(t).length <= 20, 'Too many traits')
+    .optional(),
+});
 const languageSchema = z.object({ language: z.string().min(2).max(35) });
 
 /** Respondent-facing endpoints. No login: access is by signed link and an unguessable session token. */
@@ -27,9 +43,12 @@ export class InterviewController {
     @Param('surveyId') surveyId: string,
     @Body() body: unknown,
     @Ip() ip: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
     @Headers('user-agent') userAgent?: string,
     @Headers('accept-language') acceptLanguage?: string,
   ) {
+    const geoHeader = config().GEO_COUNTRY_HEADER;
+    const geo = geoHeader ? headers[geoHeader] : undefined;
     const b = (body && typeof body === 'object' ? body : {}) as { query?: unknown; client?: unknown };
     const query = (b.query && typeof b.query === 'object' ? b.query : {}) as Record<string, unknown>;
     const client = clientSchema.safeParse(b.client ?? {});
@@ -38,6 +57,7 @@ export class InterviewController {
       ip,
       acceptLanguage: acceptLanguage?.slice(0, 200),
       client: client.success ? client.data : {},
+      geoCountry: typeof geo === 'string' ? geo.slice(0, 2) : undefined,
     });
   }
 
@@ -56,7 +76,7 @@ export class InterviewController {
   @HttpCode(200)
   submit(@Param('token') token: string, @Body() body: unknown) {
     const input = parseBody(answersSchema, body);
-    return this.interview.submit(token, input.pageId, input.answers);
+    return this.interview.submit(token, input.pageId, input.answers, input.signals);
   }
 
   @Post('r/:token/back')

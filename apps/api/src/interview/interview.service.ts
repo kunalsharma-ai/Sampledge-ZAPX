@@ -32,6 +32,7 @@ import {
   type Answers,
   type DeviceType,
   type OutcomeStatus,
+  type Page,
   type Presentation,
   type Question,
   type SurveyDefinition,
@@ -42,7 +43,9 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { isAllowedReturnUrl, verifySignedParams } from '@zapx/redirect-core';
 import { RedirectService } from '../integrations/redirect.service';
-import { MAX_PAGE_MS, QualityService } from '../quality/quality.service';
+import { MAX_PAGE_MS, QualityService, type DeviceTraits } from '../quality/quality.service';
+import { CaptureService } from '../captures/capture.service';
+import type { BrowserSignals } from '@zapx/quality-core';
 import { PlanService } from '../plans/plan.service';
 
 const MAX_PARAMS = 30;
@@ -75,6 +78,11 @@ export interface Look {
     | 'playToEnd'
     | 'readAloud'
     | 'stopReading'
+    | 'takePhoto'
+    | 'retakePhoto'
+    | 'photoUploading'
+    | 'photoFailed'
+    | 'photoSaved'
   >;
   /** Offer "Read aloud" on each question (the respondent's own device voices). */
   readAloud: boolean;
@@ -161,6 +169,11 @@ export function interviewContext(version: { definition: unknown; presentation: u
         playToEnd: msg.playToEnd,
         readAloud: msg.readAloud,
         stopReading: msg.stopReading,
+        takePhoto: msg.takePhoto,
+        retakePhoto: msg.retakePhoto,
+        photoUploading: msg.photoUploading,
+        photoFailed: msg.photoFailed,
+        photoSaved: msg.photoSaved,
       },
       readAloud: presentation.readAloud,
     },
@@ -172,7 +185,31 @@ export interface EntryMeta {
   /** Network address, used only as a keyed hash for same-network quality checks. */
   ip?: string;
   acceptLanguage?: string;
-  client?: DeviceHints;
+  client?: DeviceHints & { automation?: boolean; traits?: DeviceTraits };
+  /** Country from the edge network header (GEO_COUNTRY_HEADER), when configured. */
+  geoCountry?: string;
+}
+
+/** What the runtime reports with each page (Milestone 12 fraud signals). */
+export interface PageSignals {
+  /** The hidden honeypot field was filled in. */
+  hp?: boolean;
+  /** Keyboard, pointer and touch events on the page. */
+  interactions?: number;
+  /** Questions whose answer was pasted in. */
+  pasted?: string[];
+}
+
+function addSignals(prior: unknown, page: Page, answered: Answers, s: PageSignals | undefined): BrowserSignals {
+  const out: BrowserSignals = { ...((prior ?? {}) as BrowserSignals) };
+  if (!s) return out;
+  if (s.hp) out.honeypot = (out.honeypot ?? 0) + 1;
+  const gaveAnswers = page.questions.some((q) => q.type !== 'info' && answered[q.id] !== null && answered[q.id] !== undefined);
+  if (s.interactions === 0 && gaveAnswers) out.quietPages = (out.quietPages ?? 0) + 1;
+  const open = new Set(page.questions.filter((q) => q.type === 'open').map((q) => q.id));
+  const pasted = (s.pasted ?? []).filter((id) => open.has(id) && typeof answered[id] === 'string');
+  if (pasted.length) out.pasted = [...new Set([...(out.pasted ?? []), ...pasted])].slice(0, 50);
+  return out;
 }
 
 /** Test links are signed with the server secret so that only the studio can create them. */
@@ -190,6 +227,7 @@ function validTestSignature(surveyId: string, uid: string, sig: string | undefin
 interface Timing {
   durationMs: number;
   lastPageId: string;
+  signals?: Prisma.InputJsonValue;
 }
 
 class QuotaFull extends Error {
@@ -208,6 +246,7 @@ export class InterviewService {
     private readonly redirects: RedirectService,
     private readonly quality: QualityService,
     private readonly plans: PlanService,
+    private readonly captures: CaptureService,
   ) {}
 
   // ---- Entry --------------------------------------------------------------------------------
@@ -311,6 +350,9 @@ export class InterviewService {
           pageShownAt: new Date(),
           durationMs: 0,
           ipHash: this.quality.networkHash(survey.tenantId, meta.ip),
+          deviceHash: this.quality.deviceHash(survey.tenantId, meta.userAgent, meta.client?.traits),
+          geoCountry: meta.geoCountry && /^[A-Za-z]{2}$/.test(meta.geoCountry) ? meta.geoCountry.toUpperCase() : null,
+          signals: (meta.client?.automation ? { automation: true } : {}) as Prisma.InputJsonValue,
           entryParams: entryParams as Prisma.InputJsonValue,
           returnUrl,
           sessionTokenHash: hashToken(token),
@@ -526,10 +568,10 @@ export class InterviewService {
 
   // ---- Answering ----------------------------------------------------------------------------
 
-  async submit(token: string, pageId: string, submitted: Record<string, unknown>): Promise<InterviewState> {
+  async submit(token: string, pageId: string, submitted: Record<string, unknown>, signals?: PageSignals): Promise<InterviewState> {
     const r = await this.byToken(token);
     try {
-      return await this.submitFor(r, pageId, submitted);
+      return await this.submitFor(r, pageId, submitted, signals);
     } catch (e) {
       if (e instanceof HttpException) throw e;
       return this.technicalError(r, e as Error);
@@ -557,7 +599,19 @@ export class InterviewService {
     }
   }
 
-  private async submitFor(r: Response, pageId: string, submitted: Record<string, unknown>): Promise<InterviewState> {
+  /** A photo answer: stored privately, the reference is then submitted with the page. */
+  async uploadPhoto(token: string, questionId: string, data: Buffer) {
+    const r = await this.byToken(token);
+    const ctx = await this.ctxOf(r);
+    return this.captures.uploadForResponse(r, ctx.def, questionId, data);
+  }
+
+  private async submitFor(
+    r: Response,
+    pageId: string,
+    submitted: Record<string, unknown>,
+    pageSignals?: PageSignals,
+  ): Promise<InterviewState> {
     const ctx = await this.ctxOf(r);
     const def = ctx.def;
     const vendor = await this.vendorOf(r);
@@ -568,10 +622,18 @@ export class InterviewService {
     const prior = (r.answers ?? {}) as Answers;
     const result = validatePage(def, page, prior, submitted, ctx.msg);
     if (!result.ok) throw new InterviewValidationError(result.errors);
+    const noFile = await this.captures.missingPhotos(def, result.answers, { responseId: r.id });
+    if (noFile.length) throw new InterviewValidationError(noFile.map((questionId) => ({ questionId, message: ctx.msg.photoFailed })));
     const answers: Answers = { ...prior, ...result.answers };
+    const signals = addSignals(r.signals, page, result.answers, pageSignals);
+    r = { ...r, signals: signals as Prisma.JsonValue };
     const now = new Date();
     const onPage = r.pageShownAt ? Math.min(MAX_PAGE_MS, Math.max(0, now.getTime() - r.pageShownAt.getTime())) : 0;
-    const timing = { durationMs: (r.durationMs ?? 0) + onPage, lastPageId: page.id };
+    const timing = {
+      durationMs: (r.durationMs ?? 0) + onPage,
+      lastPageId: page.id,
+      signals: signals as Prisma.InputJsonValue,
+    };
 
     const termination = firstMatchingTermination(def, answers);
     if (termination) return this.finish(r, ctx, vendor, answers, termination.status, termination.id, timing);
@@ -592,6 +654,7 @@ export class InterviewService {
         pageShownAt: now,
         durationMs: timing.durationMs,
         lastPageId: def.pages[next]!.id,
+        signals: timing.signals,
       },
     });
     if (moved.count === 0) throw new ConflictException('This page was already submitted. Reload to continue.');
@@ -660,6 +723,7 @@ export class InterviewService {
       throw e;
     }
     await this.quality.rememberOpenEnds(r, def, answers);
+    await this.captures.settle(r.id, def, answers);
     await this.redirects.outcomeRecorded(r, 'complete');
     return this.outcomeState(vendor, r, 'complete', ctx);
   }
@@ -684,7 +748,10 @@ export class InterviewService {
         completedAt: new Date(),
       },
     });
-    if (changed.count === 1) await this.redirects.outcomeRecorded(r, status);
+    if (changed.count === 1) {
+      await this.captures.settle(r.id, ctx.def, answers);
+      await this.redirects.outcomeRecorded(r, status);
+    }
     const fresh = await this.prisma.response.findUniqueOrThrow({ where: { id: r.id } });
     return this.stateOf(fresh, ctx, vendor);
   }

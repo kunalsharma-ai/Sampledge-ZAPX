@@ -49,10 +49,52 @@ Owner: maintainer (see `.github/CODEOWNERS`) · Decision: [ADR 0008](../adr/0008
 
 Response: `{ "results": [{ "clientId", "result": "stored" | "already_synced" | "rejected", "status"?, "reason"? }] }`.
 
+Milestone 12 adds, when the survey records them:
+
+```json
+{
+  "location": {
+    "start": { "lat": 51.5007, "lon": -0.1246, "accuracy": 9, "at": "ISO 8601" },
+    "end": { "lat": 51.5009, "lon": -0.1247, "accuracy": 12, "at": "ISO 8601" }
+  },
+  "audio": "recorded"
+}
+```
+
+`audio` is `recorded`, `declined` or `unavailable` (no microphone or permission). Photos and the
+recording are uploaded first, one file per call:
+
+`POST /api/capi/captures` (multipart: `clientId`, `surveyId`, `ref`, `kind` = `photo` | `audio`,
+`file`). `ref` is the photo answer's value (a UUID generated on the device) or `audio`. Repeating an
+upload returns `{ "stored": false }`. The server links the files to the interview when it syncs.
+
 Reasons you may see: `T_<termination id>`, `capi_ended_early`, `capi_incomplete`,
 `capi_invalid:<page>` (stored as technical error with the raw answers), `quota_full_at_sync:<quota>`,
 `quality:<flags>`.
 
+## Location, recording and photos (Milestone 12)
+
+Set under Quality & fieldwork → Face-to-face capture (part of the draft, published with it):
+
+- **Location**: off, when the device allows it, or required. The app takes the position when the
+  interview starts and when it ends; it is rounded to about a metre on the server. Required: the
+  interviewer cannot start without a location (the app explains how to allow it).
+- **Recording**: off, or after the respondent agrees. Before the first question the app shows the
+  consent text to read out and two buttons: _Respondent agrees: start recording_ and _Respondent
+  declines_. While recording, the top bar shows **● Recording**. Audio is saved on the device
+  every 10 seconds; if the app is closed, what was recorded so far is kept and the interview
+  continues without recording.
+- **Photo questions** work offline: the photo is shrunk, its metadata removed, and kept on the
+  device until sync.
+
+At sync the app uploads files first, then the interview; an interview whose files could not be
+uploaded yet waits for the next sync (the app says so). Once the server has the interview, its files
+are deleted from the device. Reviewers see the location (as coordinates, no map service), the
+distance between start and end, the recording and the photos in the review queue.
+
+Checks: `gps_missing`, `gps_moved` (over 1 km) and `interviewer_overlap` (two interviews by the same
+interviewer at once). See [data quality](data-quality.md).
+
 ## Not yet
 
-Audio recording, photos, GPS, interviewer device management, and supervisor back-checks.
+Interviewer device management, supervisor back-checks, and transcription of recordings.
