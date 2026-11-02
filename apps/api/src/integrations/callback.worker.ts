@@ -46,8 +46,13 @@ export class CallbackWorker implements OnApplicationBootstrap, OnModuleDestroy {
   ) {}
 
   onApplicationBootstrap() {
+    if (config().CALLBACK_WORKER !== 'on') return;
+    this.start();
+  }
+
+  start() {
+    if (this.timer) return;
     const cfg = config();
-    if (cfg.CALLBACK_WORKER !== 'on') return;
     this.timer = setInterval(
       () => void this.runOnce().catch((e) => this.log.error(`Worker run failed: ${(e as Error).message}`)),
       cfg.CALLBACK_POLL_MS,

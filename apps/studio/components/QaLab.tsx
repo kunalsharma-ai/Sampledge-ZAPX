@@ -1,8 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import type { QaReport } from '@zapx/logic-engine';
-import { api } from '@/lib/api';
+import { api, waitForJob, type Job } from '@/lib/api';
+import { JobProgress } from './ExportJobs';
 import { ErrorNote } from './Shell';
+
+/** Runs up to this size answer in the request; larger runs go to the background job worker. */
+const DIRECT_MAX = 2000;
+const JOB_MAX = 10000;
 
 interface RunSummary {
   id: string;
@@ -31,6 +36,7 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
   const [runs, setRuns] = useState<RunSummary[]>([]);
   const [current, setCurrent] = useState<{ version: number; report: QaReport } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [job, setJob] = useState<Job<unknown> | null>(null);
   const [error, setError] = useState<unknown>(null);
 
   const loadRuns = useCallback(async () => {
@@ -48,16 +54,21 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ version: number; report: QaReport }>(`/surveys/${surveyId}/qa/run`, {
-        method: 'POST',
-        body: { respondents, target, ...(seed.trim() ? { seed: seed.trim() } : {}) },
-      });
-      setCurrent(r);
+      const body = { respondents, target, ...(seed.trim() ? { seed: seed.trim() } : {}) };
+      if (respondents > DIRECT_MAX) {
+        const queued = await api<Job<{ runId: string }>>(`/surveys/${surveyId}/jobs/qa`, { method: 'POST', body });
+        setJob(queued);
+        const done = await waitForJob<{ runId: string }>(queued.id, setJob);
+        await open(done.result!.runId);
+      } else {
+        setCurrent(await api<{ version: number; report: QaReport }>(`/surveys/${surveyId}/qa/run`, { method: 'POST', body }));
+      }
       await loadRuns();
     } catch (e) {
       setError(e);
     } finally {
       setBusy(false);
+      setJob(null);
     }
   };
 
@@ -88,9 +99,9 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
                 <input
                   type="number"
                   min={1}
-                  max={2000}
+                  max={JOB_MAX}
                   value={respondents}
-                  onChange={(e) => setRespondents(Math.max(1, Math.min(2000, Number(e.target.value) || 1)))}
+                  onChange={(e) => setRespondents(Math.max(1, Math.min(JOB_MAX, Number(e.target.value) || 1)))}
                   style={{ width: 110 }}
                 />
               </label>
@@ -112,6 +123,12 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
               </button>
             </div>
           ) : null}
+          {!readOnly && respondents > DIRECT_MAX ? (
+            <p className="small muted">
+              Runs above {DIRECT_MAX.toLocaleString()} respondents go to the background worker. You can leave this page while it runs.
+            </p>
+          ) : null}
+          {job ? <JobProgress job={job} /> : null}
           {dirty && target === 'draft' ? (
             <p className="small" style={{ color: 'var(--warn)' }}>
               You have unsaved edits. QA runs on the saved draft, so save first to test them.

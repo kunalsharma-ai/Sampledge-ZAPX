@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 6)
+# ZAPX architecture (Milestones 1 to 7)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -137,6 +137,20 @@ have their own role and cannot reach the studio API. Details: [modules/capi.md](
 Details: [modules/access-and-api-keys.md](modules/access-and-api-keys.md),
 [modules/webhooks.md](modules/webhooks.md).
 
+## Background jobs and files (Milestone 7)
+
+- **Job queue in PostgreSQL.** Exports, QA runs above 2,000 respondents and AI drafts are queued in
+  `Job` and claimed with `SKIP LOCKED` under a renewable lease, so a crashed worker's job is picked up
+  again. Jobs run as their creator, reloaded from the database, through the same services as the
+  HTTP endpoints. [ADR 0013](adr/0013-background-jobs-and-file-storage.md)
+- **File store.** `FileStore` with a local-disk implementation; `StoredFile` keeps owner, survey,
+  SHA-256 and expiry. Downloads re-check access and are audited.
+- **Worker process.** `dist/worker.js` runs jobs, vendor callbacks and webhooks without the HTTP
+  server; by default the API runs them in-process. Hourly housekeeping removes expired files, old
+  jobs and old webhook deliveries.
+
+Details: [modules/jobs-and-files.md](modules/jobs-and-files.md).
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -160,13 +174,12 @@ Details: [modules/access-and-api-keys.md](modules/access-and-api-keys.md),
 
 ## Known limits
 
-- QA runs and AI proposals run inside the request (up to 2,000 respondents; AI calls can take a
-  minute). They move to background jobs when volumes grow.
+- Background files are stored on a local disk shared by the API and the worker. The S3 store is
+  designed for but not built; jobs are polled from PostgreSQL (fine for hundreds an hour).
 - AI proposals return a full definition, so very long questionnaires may need to be imported in parts.
 - The Claude provider has been tested with a scripted fake; it needs an API key to be exercised live.
 - Grid questions are single choice per row; MaxDiff, conjoint, ranking and media questions come later.
 - Back navigation is optional per survey and re-shows the previous visible page.
-- Exports are generated synchronously; background export jobs come with larger data volumes.
 - The fieldwork dashboard and review queue read response rows in the API process; very large
   surveys need SQL aggregates or a reporting store.
 - CAPI quotas are only known at sync, so the field can exceed a quota (kept as quota full).
@@ -174,7 +187,7 @@ Details: [modules/access-and-api-keys.md](modules/access-and-api-keys.md),
 - Row-level security covers `Response` for studio reads only, and is bypassed by the local
   `docker compose` database role (a superuser). Other tables rely on application filters.
 - API keys are role-scoped only (no per-endpoint scopes or IP allow lists); there is no SSO or SCIM yet.
-- Webhook deliveries are kept indefinitely (no retention job yet) and are organization-wide (no
-  per-project webhooks).
+- Webhooks are organization-wide (no per-project webhooks). Deliveries are kept for
+  `WEBHOOK_DELIVERY_RETENTION_DAYS` (30).
 - Re-entry with the same UID resumes an unfinished interview. With unsigned links, anyone who knows a
   UID can do this, so vendors handling sensitive studies should use signed entry links.

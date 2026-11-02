@@ -17,5 +17,6 @@ they are accepted; a later record supersedes an earlier one.
 | [0010](0010-project-access-and-api-keys.md)      | Project-level access and organization API keys                         | Accepted                                               |
 | [0011](0011-outbound-webhooks.md)                | Signed outbound webhooks                                               | Accepted                                               |
 | [0012](0012-row-level-security.md)               | PostgreSQL row-level security on respondent data                       | Accepted                                               |
+| [0013](0013-background-jobs-and-file-storage.md) | Background jobs and file storage in PostgreSQL                         | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

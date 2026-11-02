@@ -601,3 +601,69 @@ model WebhookDelivery {
   @@index([state, nextAttemptAt])
   @@index([webhookId, createdAt])
 }
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+/// Background job (Milestone 7): exports, QA runs, AI drafts. Run by the job worker, which claims
+/// rows with FOR UPDATE SKIP LOCKED and a lease, so several workers can run safely.
+model Job {
+  id              String       @id @default(cuid())
+  tenantId        String
+  /// export | qa_run | ai_propose
+  type            String
+  surveyId        String?
+  status          JobStatus    @default(QUEUED)
+  input           Json
+  result          Json?
+  error           String?
+  /// 0-100, and a short description of the current step.
+  progress        Int          @default(0)
+  progressNote    String?
+  attempts        Int          @default(0)
+  maxAttempts     Int          @default(2)
+  runAfter        DateTime     @default(now())
+  /// Lease: a running job whose lease expired (worker crashed) is picked up again.
+  lockedUntil     DateTime?
+  cancelRequested Boolean      @default(false)
+  /// The member the job runs as; their current role and project access are checked when it runs.
+  createdById     String
+  startedAt       DateTime?
+  finishedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  files           StoredFile[]
+
+  @@index([status, runAfter])
+  @@index([tenantId, surveyId, createdAt])
+  @@index([finishedAt])
+}
+
+/// A file kept in the file store (Milestone 7): export results and uploaded documents for AI jobs.
+/// The bytes live in the FileStore (local disk or object storage), never in the database.
+model StoredFile {
+  id          String    @id @default(cuid())
+  tenantId    String
+  surveyId    String?
+  jobId       String?
+  job         Job?      @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  /// export | upload
+  purpose     String
+  name        String
+  contentType String
+  size        Int
+  sha256      String
+  storageKey  String    @unique
+  expiresAt   DateTime
+  createdById String?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  @@index([expiresAt, deletedAt])
+  @@index([tenantId, createdAt])
+}

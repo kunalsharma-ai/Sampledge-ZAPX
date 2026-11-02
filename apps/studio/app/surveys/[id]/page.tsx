@@ -20,6 +20,7 @@ import { DesignStudio } from '@/components/DesignStudio';
 import { Languages } from '@/components/Languages';
 import { Quality } from '@/components/Quality';
 import { CapiAssignments } from '@/components/CapiAssignments';
+import { ExportJobs } from '@/components/ExportJobs';
 
 interface SurveyDetail {
   id: string;
@@ -627,6 +628,7 @@ function Results({ surveyId }: { surveyId: string }) {
             Export Excel
           </a>
         </div>
+        <ExportJobs surveyId={surveyId} includeTest={includeTest} />
         {responses.length === 0 ? (
           <p className="muted">No responses yet.</p>
         ) : (

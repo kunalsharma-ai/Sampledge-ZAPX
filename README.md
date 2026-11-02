@@ -29,6 +29,11 @@ projects), role changes that apply at once, organization API keys, signed outbou
 log viewer with CSV export, and PostgreSQL row-level security on respondent data for the studio's
 reads.
 
+**Milestone 7 (background jobs and files)** moves long work off the browser request: background
+exports with expiring download links, QA runs of up to 10,000 synthetic respondents, and AI drafts
+as jobs with progress. Jobs are queued in PostgreSQL and can run in a separate worker process
+(`docker compose` runs one); old files, jobs and webhook deliveries are cleaned up automatically.
+
 ## What works today
 
 | Area                  | What you can do                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -70,6 +75,7 @@ reads.
 | API keys              | Create keys for scripts and integrations (shown once, stored hashed, optional expiry, revoke at once). A key acts as its creator with at most programmer rights and sees the same projects; its changes are audited as "via API key" ([guide](docs/modules/access-and-api-keys.md))                                                                                                                                                        |
 | Webhooks              | Signed JSON events to your endpoint: response finished, review decided, survey published, survey status changed. Retries with backoff, delivery log, test event, redeliver, secret rotation. No answers in payloads ([guide](docs/modules/webhooks.md))                                                                                                                                                                                    |
 | Audit log viewer      | Settings → Audit log: filter the organization's audit trail by action, entity, member and time; page through it and download CSV                                                                                                                                                                                                                                                                                                           |
+| Background jobs       | Background CSV/Excel exports with progress and a download link kept for 72 hours (direct downloads up to 10,000 rows), QA runs up to 10,000 respondents, and AI drafts that keep running if you leave the page. Runs in the API or a separate worker ([guide](docs/modules/jobs-and-files.md))                                                                                                                                             |
 | Row-level security    | PostgreSQL policy on respondent data: the studio's reads of responses, exports, review queue and fieldwork run scoped to the organization in the database too. Applies when the API's database role is not a superuser ([details](docs/adr/0012-row-level-security.md))                                                                                                                                                                    |
 | Deletion              | Projects, surveys and vendors are soft-deleted: they disappear and their links stop working, history is kept                                                                                                                                                                                                                                                                                                                               |
 

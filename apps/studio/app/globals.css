@@ -460,3 +460,11 @@ table.data th {
   padding: 10px 12px;
   gap: 6px;
 }
+
+/* Milestone 7: background job progress */
+.job-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}

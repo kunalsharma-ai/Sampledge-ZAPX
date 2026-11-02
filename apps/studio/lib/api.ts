@@ -48,3 +48,40 @@ export async function upload<T = unknown>(path: string, form: FormData): Promise
   if (!res.ok) throw new ApiError(res.status, data);
   return data as T;
 }
+
+/** A background job (Milestone 7), as GET /api/jobs/:id returns it. */
+export interface Job<R = Record<string, unknown>> {
+  id: string;
+  type: 'export' | 'qa_run' | 'ai_propose';
+  surveyId: string | null;
+  status: 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+  progress: number;
+  progressNote: string | null;
+  result: R | null;
+  error: string | null;
+  attempts: number;
+  cancelRequested: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export const jobDone = (j: Job<unknown>) => j.status === 'SUCCEEDED' || j.status === 'FAILED' || j.status === 'CANCELLED';
+
+/**
+ * Poll a job until it finishes, reporting each update. Resolves with the finished job; rejects with
+ * an Error carrying the job's message when it failed or was cancelled.
+ */
+export async function waitForJob<R>(id: string, onUpdate?: (j: Job<R>) => void, signal?: { stopped: boolean }): Promise<Job<R>> {
+  let delay = 500;
+  for (;;) {
+    const j = await api<Job<R>>(`/jobs/${id}`);
+    onUpdate?.(j);
+    if (j.status === 'SUCCEEDED') return j;
+    if (j.status === 'FAILED') throw new Error(j.error ?? 'The job failed.');
+    if (j.status === 'CANCELLED') throw new Error('The job was cancelled.');
+    if (signal?.stopped) return j;
+    await new Promise((r) => setTimeout(r, delay));
+    delay = Math.min(3000, Math.round(delay * 1.5));
+  }
+}
