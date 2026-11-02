@@ -22,7 +22,7 @@ interface Fieldwork {
   total: Summary;
   vendors: Array<{ vendor: string; summary: Summary }>;
   dropOff: Array<{ pageId: string; count: number }>;
-  modes: { cawi: number; capi: number };
+  modes: { cawi: number; capi: number; cati?: number };
 }
 interface Flag {
   code: string;
@@ -34,7 +34,7 @@ interface Item {
   id: string;
   uid: string;
   status: string;
-  mode: 'CAWI' | 'CAPI';
+  mode: 'CAWI' | 'CAPI' | 'CATI';
   qualityScore: number | null;
   qualityFlags: Flag[];
   reviewState: string;
@@ -96,7 +96,13 @@ function FieldworkPanel({ surveyId }: { surveyId: string }) {
       {t ? (
         <>
           <div className="tiles">
-            <Tile label="Starts" value={t.starts} note={f!.modes.capi ? `${f!.modes.cawi} online · ${f!.modes.capi} CAPI` : undefined} />
+            <Tile
+              label="Starts"
+              value={t.starts}
+              note={
+                f!.modes.capi || f!.modes.cati ? `${f!.modes.cawi} online · ${f!.modes.capi} CAPI · ${f!.modes.cati ?? 0} CATI` : undefined
+              }
+            />
             <Tile label="Completes" value={t.counts.complete ?? 0} />
             <Tile label="Incidence" value={pct(t.incidence)} note="completes ÷ (completes + screen-outs)" />
             <Tile label="Median length" value={loi(t.medianLoiSeconds)} />
@@ -256,7 +262,9 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
           <div>
             <div className="row" style={{ gap: 6 }}>
               <strong className="mono">{i.uid}</strong>
-              <span className="muted small">{i.vendor ? `vid=${i.vendor.code}` : i.interviewer ? `CAPI · ${i.interviewer.name}` : ''}</span>
+              <span className="muted small">
+                {i.vendor ? `vid=${i.vendor.code}` : i.interviewer ? `${i.mode} · ${i.interviewer.name}` : ''}
+              </span>
               <span className={`badge ${i.status.toLowerCase()}`}>{i.status.toLowerCase()}</span>
               {i.reviewState !== 'NONE' ? (
                 <span className={`badge ${i.reviewState.toLowerCase()}`}>{i.reviewState.toLowerCase()}</span>

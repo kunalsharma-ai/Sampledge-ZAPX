@@ -41,11 +41,11 @@ export function CapiAssignments({ surveyId, readOnly, hasLive }: { surveyId: str
 
   return (
     <section className="panel stack" data-testid="capi-assignments">
-      <h2 style={{ margin: 0 }}>Face-to-face interviewing (CAPI)</h2>
+      <h2 style={{ margin: 0 }}>Interviewers (CAPI and phone)</h2>
       <p className="muted small" style={{ margin: 0 }}>
         Interviewers download the live version to a tablet or phone, interview offline, and sync when they have a connection. The server
         re-checks every interview against the version it was recorded on, counts quotas and scores quality. Completes that arrive after a
-        quota filled are kept as quota full.
+        quota filled are kept as quota full. Assigned interviewers can also make phone interviews for this survey from Calls.
       </p>
       {data ? <CopyField value={data.appUrl} label="Interviewer app address" /> : null}
       {!hasLive ? <p className="small">Publish the survey before interviewers can download it.</p> : null}

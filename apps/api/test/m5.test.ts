@@ -252,7 +252,7 @@ describe('quality review queue', () => {
     expect(f.total.incidence).toBe(50);
     expect(f.dropOff).toEqual([{ pageId: 'P2', count: 1 }]);
     expect(f.vendors.map((v: { vendor: string }) => v.vendor)).toEqual(['QV']);
-    expect(f.modes).toEqual({ cawi: 5, capi: 0 });
+    expect(f.modes).toEqual({ cawi: 5, capi: 0, cati: 0 });
   });
 
   it('exports quality columns', async () => {

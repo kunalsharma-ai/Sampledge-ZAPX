@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 
-export function Shell({ children, crumbs }: { children: ReactNode; crumbs?: ReactNode }) {
+/** `forInterviewers`: the page is also for the interviewer role (the phone calling screen). */
+export function Shell({ children, crumbs, forInterviewers }: { children: ReactNode; crumbs?: ReactNode; forInterviewers?: boolean }) {
   const me = useMe();
   return (
     <>
@@ -14,6 +15,11 @@ export function Shell({ children, crumbs }: { children: ReactNode; crumbs?: Reac
         </Link>
         <nav className="muted">{crumbs}</nav>
         <div className="spacer" />
+        {me && me.role !== 'VIEWER' ? (
+          <Link href="/calls" className="small">
+            Calls
+          </Link>
+        ) : null}
         {me?.role === 'ADMIN' ? (
           <Link href="/settings" className="small">
             Settings
@@ -39,11 +45,12 @@ export function Shell({ children, crumbs }: { children: ReactNode; crumbs?: Reac
         </button>
       </header>
       <main className="container">
-        {me?.role === 'INTERVIEWER' ? (
+        {me?.role === 'INTERVIEWER' && !forInterviewers ? (
           <section className="panel" data-testid="interviewer-notice">
             <h1>Use the interviewer app</h1>
             <p>
-              Your account is for face-to-face interviewing. Sign in to the ZAPX interviewer (CAPI) app on your tablet or phone instead.
+              Your account is for interviewing. For face-to-face interviews, sign in to the ZAPX interviewer (CAPI) app on your tablet or
+              phone. For phone interviews, open <Link href="/calls">Calls</Link>.
             </p>
           </section>
         ) : (
