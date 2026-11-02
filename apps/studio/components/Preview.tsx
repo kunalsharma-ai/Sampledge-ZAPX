@@ -15,7 +15,15 @@ import {
   renderQuestion,
   validatePage,
 } from '@zapx/logic-engine';
-import { SurveyHeader, SurveyPage, answersToSubmit, defaultThemeCss, themeCss, type FieldErrors } from '@zapx/survey-renderer';
+import {
+  SurveyHeader,
+  SurveyPage,
+  answersToSubmit,
+  defaultThemeCss,
+  pendingMedia,
+  themeCss,
+  type FieldErrors,
+} from '@zapx/survey-renderer';
 import { defaultPresentation, type AnswerValue, type Answers, type Presentation, type SurveyDefinition } from '@zapx/survey-schema';
 
 const WIDTHS = { desktop: undefined, tablet: 768, mobile: 375 } as const;
@@ -33,6 +41,7 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
   const [errors, setErrors] = useState<FieldErrors>({});
   const [outcome, setOutcome] = useState<string | null>(null);
   const [device, setDevice] = useState<Device>('desktop');
+  const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
 
   const restart = () => {
     setSeed(Math.random().toString(36).slice(2));
@@ -59,6 +68,7 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
     setAnswers(merged);
     setPageAnswers({});
     setErrors({});
+    setPlayed(new Set());
     const t = firstMatchingTermination(def, merged);
     if (t) return setOutcome(`${t.status} (rule ${t.id})`);
     const n = nextPageIndex(def, merged, pageIndex);
@@ -139,7 +149,14 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
                     context={answers}
                     errors={errors}
                     onChange={(id: string, v: AnswerValue) => setPageAnswers((a) => ({ ...a, [id]: v }))}
+                    onMediaPlayed={(id) => setPlayed((p) => new Set(p).add(id))}
+                    readAloud={presentation.readAloud}
+                    language={def.language}
+                    messages={msg}
                   />
+                  {pendingMedia(questions, pageAnswers, answers, played).length ? (
+                    <p className="zx-media-wait">{msg.playToEnd} (Preview: you can continue without playing it.)</p>
+                  ) : null}
                   <div className="zx-actions">
                     <span />
                     <button className="zx-button">{msg.next}</button>

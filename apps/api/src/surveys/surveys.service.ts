@@ -1,7 +1,14 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { Prisma, Survey, SurveyVersion } from '@zapx/db';
 import { analyzeSurvey, translationStatus, type AnalysisReport, type TranslationStatus } from '@zapx/logic-engine';
-import { emptySurvey, parsePresentation, parseSurveyDefinition, type SchemaIssue, type SurveyDefinition } from '@zapx/survey-schema';
+import {
+  emptySurvey,
+  mediaIdsOf,
+  parsePresentation,
+  parseSurveyDefinition,
+  type SchemaIssue,
+  type SurveyDefinition,
+} from '@zapx/survey-schema';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccessService } from '../common/access.service';
@@ -184,6 +191,19 @@ export class SurveysService {
           ? `Finish the translations before publishing. ${check.languageBlockers.join(' ')}`
           : 'Fix the logic errors before publishing';
       throw new UnprocessableEntityException({ message, check });
+    }
+    // Every image, video and audio file the questionnaire shows must be an upload of this survey.
+    const mediaIds = mediaIdsOf(draft.definition as unknown as SurveyDefinition);
+    if (mediaIds.length) {
+      const found = await this.prisma.mediaAsset.findMany({
+        where: { id: { in: mediaIds }, tenantId: user.tenantId, surveyId: id, deletedAt: null },
+        select: { id: true },
+      });
+      const missing = mediaIds.filter((m) => !found.some((f) => f.id === m));
+      if (missing.length)
+        throw new UnprocessableEntityException({
+          message: `Upload the media again before publishing; these files are missing: ${missing.join(', ')}`,
+        });
     }
     // A first publish puts the survey live, which counts against the plan.
     if (survey.status === 'DRAFT') await this.plans.assertLiveSurvey(user.tenantId);

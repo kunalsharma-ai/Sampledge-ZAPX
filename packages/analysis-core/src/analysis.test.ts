@@ -172,3 +172,102 @@ describe('crosstabs', () => {
     expect(() => crosstab(v('GENDER'), v('BRANDS'), records, { confidence: 0.8 })).toThrow(/Confidence/);
   });
 });
+
+describe('Milestone 11 types', () => {
+  const rich = {
+    schemaVersion: 1,
+    title: 'Rich',
+    language: 'en',
+    pages: [
+      {
+        id: 'P1',
+        questions: [
+          {
+            id: 'G',
+            type: 'single',
+            text: 'Group',
+            options: [
+              { code: 1, label: 'A' },
+              { code: 2, label: 'B' },
+            ],
+          },
+          {
+            id: 'NPS',
+            type: 'scale',
+            text: 'Recommend?',
+            min: 0,
+            max: 10,
+            nps: true,
+            minLabel: 'Never',
+            dontKnow: { code: 99, label: 'DK' },
+          },
+          {
+            id: 'RK',
+            type: 'ranking',
+            text: 'Rank',
+            options: [
+              { code: 1, label: 'X' },
+              { code: 2, label: 'Y' },
+            ],
+          },
+          {
+            id: 'SUM',
+            type: 'sum',
+            text: 'Split',
+            total: 100,
+            unit: '%',
+            options: [
+              { code: 1, label: 'X' },
+              { code: 2, label: 'Y' },
+            ],
+          },
+        ],
+      },
+    ],
+    terminations: [],
+    quotas: [],
+  } as unknown as SurveyDefinition;
+  const vs = variables(rich);
+  const v = (id: string) => vs.find((x) => x.id === id)!;
+  const rows = [
+    rec({ G: 1, NPS: 10, RK: [1, 2], SUM: { 1: 70, 2: 30 } }),
+    rec({ G: 1, NPS: 9, RK: [1, 2], SUM: { 1: 60, 2: 40 } }),
+    rec({ G: 2, NPS: 3, RK: [2, 1], SUM: { 1: 20, 2: 80 } }),
+    rec({ G: 2, NPS: 99, RK: [2, 1], SUM: { 1: 50, 2: 50 } }),
+  ];
+
+  it('lists scale, rank and amount variables', () => {
+    expect(vs.map((x) => `${x.id}:${x.kind}`).slice(0, 6)).toEqual([
+      'G:single',
+      'NPS:scale',
+      'RK_1:numeric',
+      'RK_2:numeric',
+      'SUM_1:numeric',
+      'SUM_2:numeric',
+    ]);
+    expect(v('NPS').categories[0]).toEqual({ code: 0, label: '0 Never' });
+    expect(v('NPS').categories.at(-1)).toEqual({ code: 99, label: 'DK' });
+    expect(v('SUM_1').label).toBe('Split: X (%)');
+  });
+
+  it('reports NPS and a mean that leaves out don’t know', () => {
+    const f = frequency(v('NPS'), rows);
+    expect(f.base).toBe(4);
+    expect(f.stats).toMatchObject({ n: 3, mean: (10 + 9 + 3) / 3 });
+    expect(f.nps!.base).toBe(3);
+    expect(f.nps!.score).toBeCloseTo(100 * (2 / 3 - 1 / 3));
+  });
+
+  it('reads ranks and amounts', () => {
+    expect(frequency(v('RK_1'), rows).stats).toMatchObject({ mean: 1.5, min: 1, max: 2 });
+    expect(frequency(v('SUM_2'), rows).stats).toMatchObject({ mean: 50 });
+  });
+
+  it('crosstabs a scale with shares and means, and allows a scale banner', () => {
+    const t = crosstab(v('G'), v('NPS'), rows, { minBase: 1 });
+    expect(t.rows.find((r) => r.code === 10)!.cells[1]!.pct).toBe(50);
+    expect(t.means![1]!.stats!.mean).toBe(9.5);
+    expect(t.means![2]!.stats!.mean).toBe(3);
+    expect(crosstab(v('NPS'), v('G'), rows, { minBase: 1 }).columns).toHaveLength(13);
+  });
+});

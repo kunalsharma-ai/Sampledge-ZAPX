@@ -10,6 +10,7 @@ import {
   SurveyPage,
   answersToSubmit,
   defaultThemeCss,
+  pendingMedia,
   themeCss,
   type DisplayQuestion,
   type FieldErrors,
@@ -21,7 +22,20 @@ interface Look {
   gridOnMobile: 'cards' | 'scroll';
   language: string;
   languages: Array<{ tag: string; name: string }>;
-  ui: { next: string; back: string; saving: string; language: string; fixErrors: string };
+  ui: {
+    next: string;
+    back: string;
+    saving: string;
+    language: string;
+    fixErrors: string;
+    rankUp?: string;
+    rankDown?: string;
+    sumRemaining?: string;
+    playToEnd?: string;
+    readAloud?: string;
+    stopReading?: string;
+  };
+  readAloud?: boolean;
 }
 
 type State =
@@ -59,6 +73,8 @@ export function App() {
   const [fatal, setFatal] = useState<string | null>(null);
 
   const [look, setLook] = useState<Look | null>(null);
+  /** Questions on this page whose video or audio has been played to the end. */
+  const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
 
   const show = useCallback((s: State) => {
     setView(s);
@@ -69,6 +85,7 @@ export function App() {
     }
     if (s.state === 'in_progress') {
       setAnswers(s.answers ?? {});
+      setPlayed(new Set());
       document.title = s.survey.title;
       window.scrollTo({ top: 0 });
       requestAnimationFrame(() => document.querySelector<HTMLElement>('.zx-card')?.focus());
@@ -162,6 +179,8 @@ export function App() {
     }
   };
 
+  const waiting = view?.state === 'in_progress' && pendingMedia(view.page.questions, answers, view.context, played).length > 0;
+
   return (
     <div className="zx-root">
       <style>{defaultThemeCss}</style>
@@ -229,7 +248,12 @@ export function App() {
               errors={errors}
               disabled={busy}
               onChange={onChange}
+              onMediaPlayed={(id) => setPlayed((p) => new Set(p).add(id))}
+              readAloud={view.look.readAloud}
+              language={view.look.language}
+              messages={view.look.ui}
             />
+            {waiting ? <p className="zx-media-wait">{view.look.ui.playToEnd}</p> : null}
             <div className="zx-actions">
               {view.survey.allowBack && !view.isFirstPage ? (
                 <button type="button" className="zx-button zx-secondary" onClick={() => void back()} disabled={busy}>
@@ -238,7 +262,7 @@ export function App() {
               ) : (
                 <span />
               )}
-              <button type="submit" className="zx-button" disabled={busy}>
+              <button type="submit" className="zx-button" disabled={busy || waiting}>
                 {busy ? view.look.ui.saving : view.look.ui.next}
               </button>
             </div>

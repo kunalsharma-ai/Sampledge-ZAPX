@@ -650,3 +650,44 @@ table.xtab tr.base th {
 label.check > input {
   flex-shrink: 0;
 }
+.nps {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+}
+.nps-score {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+table.xtab tr.mean-row th,
+table.xtab tr.mean-row td {
+  border-top: 2px solid var(--border);
+  font-weight: 600;
+}
+
+/* Milestone 11: media */
+.media-thumb {
+  max-width: 260px;
+  max-height: 180px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.option-thumb {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.media-editor {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.option-image select {
+  max-width: 150px;
+}

@@ -5,6 +5,7 @@
  */
 import { useState } from 'react';
 import type { Option, Page, Question, QuestionType, SurveyDefinition } from '@zapx/survey-schema';
+import { MediaLibraryProvider, OptionImagePicker, QuestionMediaEditor, useHasMediaLibrary } from './MediaLibrary';
 
 type Selection = { kind: 'survey' } | { kind: 'page'; page: number } | { kind: 'question'; page: number; q: number };
 
@@ -14,6 +15,9 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   open: 'Open text',
   numeric: 'Numeric',
   grid: 'Grid',
+  scale: 'Rating scale / NPS',
+  ranking: 'Ranking',
+  sum: 'Constant sum',
   info: 'Information',
 };
 
@@ -37,7 +41,21 @@ function newQuestion(def: SurveyDefinition, type: QuestionType): Question {
     case 'open':
       return { ...base, type, multiline: false, maxLength: 2000 };
     case 'numeric':
-      return { ...base, type, integer: true };
+      return { ...base, type, integer: true, display: 'input' };
+    case 'scale':
+      return { ...base, type, min: 0, max: 10, nps: false, minLabel: 'Not at all likely', maxLabel: 'Extremely likely' };
+    case 'ranking':
+      return { ...base, type, options: [...opts, { code: 3, label: 'Option 3' }], randomize: true };
+    case 'sum':
+      return {
+        ...base,
+        type,
+        options: [...opts, { code: 3, label: 'Option 3' }],
+        randomize: false,
+        total: 100,
+        integer: true,
+        unit: 'points',
+      };
     case 'grid':
       return { ...base, type, rows: [{ id: 'r1', label: 'Item 1' }], columns: opts, randomizeRows: false };
     case 'info':
@@ -57,11 +75,25 @@ export function VisualEditor({
   def,
   onChange,
   readOnly,
+  surveyId,
 }: {
   def: SurveyDefinition;
   onChange: (d: SurveyDefinition) => void;
   readOnly?: boolean;
+  /** Enables media uploads and pickers. */
+  surveyId?: string;
 }) {
+  const editor = <Editor def={def} onChange={onChange} readOnly={readOnly} />;
+  return surveyId ? (
+    <MediaLibraryProvider surveyId={surveyId} readOnly={!!readOnly}>
+      {editor}
+    </MediaLibraryProvider>
+  ) : (
+    editor
+  );
+}
+
+function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: (d: SurveyDefinition) => void; readOnly?: boolean }) {
   const [sel, setSel] = useState<Selection>({ kind: 'survey' });
   const [newType, setNewType] = useState<QuestionType>('single');
 
@@ -242,7 +274,7 @@ function Check({ label, value, onChange }: { label: string; value: boolean; onCh
   );
 }
 
-const CONDITION_HELP = 'Logic, e.g. Q1 == 2 and AGE >= 18 · selected(Q3, 1, 2) · Q5.r1 >= 4 · answered(Q2)';
+const CONDITION_HELP = 'Logic, e.g. Q1 == 2 and AGE >= 18 · selected(Q3, 1, 2) · Q5.r1 >= 4 · RANK.2 == 1 · answered(Q2)';
 
 function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d: SurveyDefinition) => void }) {
   return (
@@ -461,15 +493,30 @@ function PageForm({
   );
 }
 
-function OptionsEditor({ options, onChange, multi }: { options: Option[]; onChange: (o: Option[]) => void; multi?: boolean }) {
+function OptionsEditor({
+  options,
+  onChange,
+  multi,
+  images,
+  anchors = true,
+}: {
+  options: Option[];
+  onChange: (o: Option[]) => void;
+  multi?: boolean;
+  /** Offer a picture per option (image choice). */
+  images?: boolean;
+  anchors?: boolean;
+}) {
   const set = (i: number, o: Option) => onChange(options.map((x, j) => (j === i ? o : x)));
+  const withImages = useHasMediaLibrary() && images;
   return (
     <table className="data list-editor">
       <thead>
         <tr>
           <th style={{ width: 80 }}>Code</th>
           <th>Label</th>
-          <th>Anchor</th>
+          {withImages ? <th>Picture</th> : null}
+          {anchors ? <th>Anchor</th> : null}
           {multi ? <th>Exclusive</th> : null}
           <th />
         </tr>
@@ -487,16 +534,28 @@ function OptionsEditor({ options, onChange, multi }: { options: Option[]; onChan
               />
             </td>
             <td>
-              <input value={o.label} onChange={(e) => set(i, { ...o, label: e.target.value })} aria-label="Answer label" />
-            </td>
-            <td>
               <input
-                type="checkbox"
-                checked={!!o.anchor}
-                onChange={(e) => set(i, { ...o, anchor: e.target.checked || undefined })}
-                aria-label="Keep in place when randomizing"
+                value={o.label}
+                style={{ minWidth: 160 }}
+                onChange={(e) => set(i, { ...o, label: e.target.value })}
+                aria-label="Answer label"
               />
             </td>
+            {withImages ? (
+              <td>
+                <OptionImagePicker image={o.image} label={o.label} onChange={(image) => set(i, { ...o, image })} />
+              </td>
+            ) : null}
+            {anchors ? (
+              <td>
+                <input
+                  type="checkbox"
+                  checked={!!o.anchor}
+                  onChange={(e) => set(i, { ...o, anchor: e.target.checked || undefined })}
+                  aria-label="Keep in place when randomizing"
+                />
+              </td>
+            ) : null}
             {multi ? (
               <td>
                 <input
@@ -515,7 +574,7 @@ function OptionsEditor({ options, onChange, multi }: { options: Option[]; onChan
           </tr>
         ))}
         <tr>
-          <td colSpan={5}>
+          <td colSpan={6}>
             <button
               onClick={() => {
                 const code = Math.max(0, ...options.filter((o) => o.code < 90).map((o) => o.code)) + 1;
@@ -581,10 +640,11 @@ function QuestionForm({
           <Check label="Answer required" value={q.required} onChange={(v) => onChange({ ...q, required: v })} />
         </>
       ) : null}
+      <QuestionMediaEditor media={q.media} onChange={(media) => onChange({ ...q, media })} />
       {q.type === 'single' || q.type === 'multi' ? (
         <>
           <h3>Answer options</h3>
-          <OptionsEditor options={q.options} multi={q.type === 'multi'} onChange={(options) => onChange({ ...q, options })} />
+          <OptionsEditor options={q.options} multi={q.type === 'multi'} images onChange={(options) => onChange({ ...q, options })} />
           <Check
             label="Randomize order (anchored options stay in place)"
             value={q.randomize}
@@ -599,12 +659,100 @@ function QuestionForm({
         </div>
       ) : null}
       {q.type === 'numeric' ? (
-        <div className="row">
-          <Num label="Minimum" value={q.min} onChange={(v) => onChange({ ...q, min: v })} />
-          <Num label="Maximum" value={q.max} onChange={(v) => onChange({ ...q, max: v })} />
-          <Text label="Unit" value={q.unit} onChange={(v) => onChange({ ...q, unit: v })} />
-          <Check label="Whole numbers only" value={q.integer} onChange={(v) => onChange({ ...q, integer: v })} />
-        </div>
+        <>
+          <div className="row">
+            <Num label="Minimum" value={q.min} onChange={(v) => onChange({ ...q, min: v })} />
+            <Num label="Maximum" value={q.max} onChange={(v) => onChange({ ...q, max: v })} />
+            <Text label="Unit" value={q.unit} onChange={(v) => onChange({ ...q, unit: v })} />
+            <Check label="Whole numbers only" value={q.integer} onChange={(v) => onChange({ ...q, integer: v })} />
+          </div>
+          <div className="row">
+            <label className="field">
+              Shown as
+              <select value={q.display} onChange={(e) => onChange({ ...q, display: e.target.value as 'input' | 'slider' })}>
+                <option value="input">Number box</option>
+                <option value="slider">Slider (needs a minimum and maximum)</option>
+              </select>
+            </label>
+            {q.display === 'slider' ? (
+              <>
+                <Num label="Step" value={q.step} onChange={(v) => onChange({ ...q, step: v && v > 0 ? v : undefined })} />
+                <Text label="Low end label" value={q.minLabel} onChange={(v) => onChange({ ...q, minLabel: v })} />
+                <Text label="High end label" value={q.maxLabel} onChange={(v) => onChange({ ...q, maxLabel: v })} />
+              </>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+      {q.type === 'scale' ? (
+        <>
+          <div className="row">
+            <Check
+              label="Net Promoter Score (0 to 10; analysis reports the NPS)"
+              value={q.nps}
+              onChange={(v) => onChange(v ? { ...q, nps: true, min: 0, max: 10 } : { ...q, nps: false })}
+            />
+          </div>
+          <div className="row">
+            <Num label="From" value={q.min} onChange={(v) => onChange({ ...q, min: v ?? 0 })} />
+            <Num label="To" value={q.max} onChange={(v) => onChange({ ...q, max: v ?? 10 })} />
+            <Text label="Low end label" value={q.minLabel} onChange={(v) => onChange({ ...q, minLabel: v })} />
+            <Text label="High end label" value={q.maxLabel} onChange={(v) => onChange({ ...q, maxLabel: v })} />
+          </div>
+          <div className="row">
+            <Check
+              label="Offer an answer outside the scale"
+              value={!!q.dontKnow}
+              onChange={(v) => onChange({ ...q, dontKnow: v ? { code: 99, label: "Don't know" } : undefined })}
+            />
+            {q.dontKnow ? (
+              <>
+                <Num
+                  label="Its code"
+                  value={q.dontKnow.code}
+                  onChange={(v) => onChange({ ...q, dontKnow: { ...q.dontKnow!, code: v ?? 99 } })}
+                />
+                <Text
+                  label="Its label"
+                  value={q.dontKnow.label}
+                  onChange={(v) => onChange({ ...q, dontKnow: { ...q.dontKnow!, label: v ?? '' } })}
+                />
+              </>
+            ) : null}
+          </div>
+        </>
+      ) : null}
+      {q.type === 'ranking' ? (
+        <>
+          <h3>Items to rank</h3>
+          <p className="muted small">Stored as the codes in rank order. In logic, {q.id}.2 is the rank given to item 2 (1 = first).</p>
+          <OptionsEditor options={q.options} images onChange={(options) => onChange({ ...q, options })} />
+          <div className="row">
+            <Check
+              label="Randomize order (anchored items stay in place)"
+              value={q.randomize}
+              onChange={(v) => onChange({ ...q, randomize: v })}
+            />
+            <Num
+              label="Rank only the top (empty: all)"
+              value={q.rankCount}
+              onChange={(v) => onChange({ ...q, rankCount: v && v > 0 ? v : undefined })}
+            />
+          </div>
+        </>
+      ) : null}
+      {q.type === 'sum' ? (
+        <>
+          <h3>Items</h3>
+          <p className="muted small">Respondents share the total across the items. In logic, {q.id}.1 is the amount given to item 1.</p>
+          <OptionsEditor options={q.options} onChange={(options) => onChange({ ...q, options })} />
+          <div className="row">
+            <Num label="Total" value={q.total} onChange={(v) => onChange({ ...q, total: v ?? 100 })} />
+            <Text label="Unit" value={q.unit} onChange={(v) => onChange({ ...q, unit: v })} />
+            <Check label="Whole numbers only" value={q.integer} onChange={(v) => onChange({ ...q, integer: v })} />
+            <Check label="Randomize order" value={q.randomize} onChange={(v) => onChange({ ...q, randomize: v })} />
+          </div>
+        </>
       ) : null}
       {q.type === 'open' ? (
         <div className="row">

@@ -183,6 +183,17 @@ Details: [modules/cati.md](modules/cati.md).
 
 Details: [modules/analytics.md](modules/analytics.md).
 
+## Rich media and question types (Milestone 11)
+
+- New types `scale` (with NPS), `ranking`, `sum` and slider `numeric`, in the schema and logic
+  engine (`RANK.2`, `SPEND.1` in expressions), simulation, translations, exports and analysis.
+- **Media** (`MediaAsset`): uploaded per survey, type detected from content, stored in the
+  `FileStore`, served at `/api/public/media/:id` (cacheable, byte ranges). Publishing checks every
+  referenced file; files in use cannot be deleted. The CAPI app caches media for offline use.
+- Read aloud uses the device's speech voices. [ADR 0017](adr/0017-rich-media-and-question-types.md)
+
+Details: [modules/rich-media.md](modules/rich-media.md).
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -220,6 +231,8 @@ Details: [modules/analytics.md](modules/analytics.md).
   `docker compose` database role (a superuser). Other tables rely on application filters.
 - API keys are role-scoped only (no per-endpoint scopes or IP allow lists).
 - CATI has no dialer, call recording, time-zone calling windows or do-not-call list.
+- Media are public by id and stored on the local file store (no S3 adapter yet); no recorded
+  voice-over, transcription, MaxDiff or conjoint.
 - Analysis is unweighted, reads rows in the API process (up to 200,000 interviews) and has no
   nets, banner books, charts or scheduled delivery yet.
 - SSO is OpenID Connect only (no SAML) and has been tested against a mock provider, not a real one.

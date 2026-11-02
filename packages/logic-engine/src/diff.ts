@@ -3,7 +3,7 @@
  * imports) before they are applied. Items are keyed by id, so reordering is reported as a move
  * rather than as a delete plus an add.
  */
-import type { Question, SurveyDefinition } from '@zapx/survey-schema';
+import { scaleCodes, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 
 export type DiffEntity = 'survey' | 'settings' | 'page' | 'question' | 'termination' | 'quota';
 
@@ -46,8 +46,9 @@ function shortText(t: string, n = 60): string {
 }
 
 function codesOf(q: Question): number[] {
-  if (q.type === 'single' || q.type === 'multi') return q.options.map((o) => o.code);
+  if (q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum') return q.options.map((o) => o.code);
   if (q.type === 'grid') return q.columns.map((o) => o.code);
+  if (q.type === 'scale') return scaleCodes(q);
   return [];
 }
 

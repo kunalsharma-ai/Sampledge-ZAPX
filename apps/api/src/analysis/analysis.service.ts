@@ -221,13 +221,15 @@ function writeFrequency(ws: ExcelJS.Worksheet, f: Frequency) {
   ws.addRow([]);
   ws.addRow([`${f.variable.id}: ${f.variable.label}`]).font = { bold: true };
   ws.addRow(['Base', f.base]);
+  if (f.nps) ws.addRow(['Net Promoter Score', Math.round(f.nps.score * 10) / 10]);
+  if (f.rows.length) {
+    ws.addRow(['', 'Count', '%']).font = { italic: true };
+    for (const row of f.rows) ws.addRow([row.label, row.count, pct(row.pct)]);
+  }
   if (f.stats) {
     for (const [k, v] of Object.entries(f.stats)) ws.addRow([k, Math.round((v as number) * 100) / 100]);
   } else if (f.samples) {
     ws.addRow(['Answered', f.base]);
-  } else {
-    ws.addRow(['', 'Count', '%']).font = { italic: true };
-    for (const row of f.rows) ws.addRow([row.label, row.count, pct(row.pct)]);
   }
 }
 

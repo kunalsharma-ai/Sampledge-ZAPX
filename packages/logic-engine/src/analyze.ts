@@ -3,7 +3,7 @@
  *
  * Errors block publishing. Warnings are shown to the programmer but do not block.
  */
-import { qualitySettingsOf, type Question, type SurveyDefinition } from '@zapx/survey-schema';
+import { qualitySettingsOf, scaleCodes, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 import { ExpressionError, FUNCTIONS, evaluate, parse, references, truthy, type Node, type Value } from './expression.js';
 import { PIPE_PATTERN } from './interview.js';
 
@@ -29,7 +29,8 @@ export interface LogicIssue {
     | 'INVALID_RANGE'
     | 'PIPING_UNDEFINED'
     | 'ZERO_QUOTA'
-    | 'QUALITY_SETTINGS';
+    | 'QUALITY_SETTINGS'
+    | 'MEDIA';
   message: string;
   /** Where the problem is, e.g. "pages.P2.questions.Q5.condition". */
   location: string;
@@ -80,7 +81,7 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
       const loc = `pages.${page.id}.questions.${q.id}`;
       claim(q.id, loc);
       symbols.set(q.id, { question: q, pageIndex: pi, questionIndex: qi });
-      if (q.type === 'single' || q.type === 'multi' || q.type === 'grid') {
+      if (q.type === 'single' || q.type === 'multi' || q.type === 'grid' || q.type === 'ranking' || q.type === 'sum') {
         const opts = q.type === 'grid' ? q.columns : q.options;
         const codes = new Set<number>();
         for (const o of opts) {
@@ -97,6 +98,23 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
       }
       if (q.type === 'numeric' && q.min !== undefined && q.max !== undefined && q.min > q.max)
         add('error', 'INVALID_RANGE', `${q.id}: minimum ${q.min} is greater than maximum ${q.max}.`, loc);
+      if (q.type === 'numeric' && q.display === 'slider' && (q.min === undefined || q.max === undefined))
+        add('error', 'INVALID_RANGE', `${q.id}: a slider needs a minimum and a maximum.`, loc);
+      if (q.type === 'scale') {
+        if (q.min >= q.max) add('error', 'INVALID_RANGE', `${q.id}: the scale must go from a lower to a higher number.`, loc);
+        if (q.nps && (q.min !== 0 || q.max !== 10))
+          add('error', 'INVALID_RANGE', `${q.id}: a Net Promoter Score question runs from 0 to 10.`, loc);
+        if (q.dontKnow && q.dontKnow.code >= q.min && q.dontKnow.code <= q.max)
+          add('error', 'DUPLICATE_CODE', `${q.id}: the "${q.dontKnow.label}" code ${q.dontKnow.code} is also a point on the scale.`, loc);
+      }
+      if (q.type === 'ranking' && q.rankCount !== undefined && q.rankCount > q.options.length)
+        add('error', 'INVALID_RANGE', `${q.id}: asks for the top ${q.rankCount} but has ${q.options.length} items.`, loc);
+      if (q.type === 'sum' && q.integer && !Number.isInteger(q.total))
+        add('error', 'INVALID_RANGE', `${q.id}: whole-number amounts cannot add up to ${q.total}.`, loc);
+      if (q.media && q.media.kind === 'image' && !q.media.alt.trim())
+        add('warning', 'MEDIA', `${q.id}: describe the image in its text alternative, for people using screen readers.`, loc);
+      if (q.media && q.media.kind === 'image' && q.media.requireComplete)
+        add('warning', 'MEDIA', `${q.id}: "play to the end" only applies to video and audio.`, loc);
       if (q.type === 'multi') {
         if (q.minSelected !== undefined && q.minSelected > q.options.length)
           add('error', 'INVALID_RANGE', `${q.id}: requires ${q.minSelected} selections but has ${q.options.length} options.`, loc);
@@ -129,6 +147,8 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
     if (!s) return null;
     const q = s.question;
     if (q.type === 'single' || q.type === 'multi') return member ? null : q.options.map((o) => o.code);
+    if (q.type === 'ranking') return member ? null : q.options.map((o) => o.code);
+    if (q.type === 'scale') return member ? null : scaleCodes(q);
     if (q.type === 'grid' && member) return q.columns.map((o) => o.code);
     return null;
   };
@@ -154,10 +174,20 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
         continue;
       }
       if (ref.member !== undefined) {
-        if (s.question.type !== 'grid')
-          add('error', 'INVALID_MEMBER', `"${ref.name}.${ref.member}": only grid questions have rows.`, location);
-        else if (!s.question.rows.some((r) => r.id === ref.member))
-          add('error', 'INVALID_MEMBER', `Grid ${ref.name} has no row "${ref.member}".`, location);
+        const q = s.question;
+        if (q.type === 'grid') {
+          if (!q.rows.some((r) => r.id === ref.member))
+            add('error', 'INVALID_MEMBER', `Grid ${ref.name} has no row "${ref.member}".`, location);
+        } else if (q.type === 'ranking' || q.type === 'sum') {
+          if (!q.options.some((o) => String(o.code) === ref.member))
+            add('error', 'INVALID_MEMBER', `${ref.name} has no item with code ${ref.member}.`, location);
+        } else
+          add(
+            'error',
+            'INVALID_MEMBER',
+            `"${ref.name}.${ref.member}": only grid rows, ranking and constant sum items can be addressed with a dot.`,
+            location,
+          );
       }
       if (role.kind === 'page') {
         if (s.pageIndex >= role.pageIndex)
@@ -297,6 +327,10 @@ export function analyzeSurvey(def: SurveyDefinition): AnalysisReport {
       if (q.type === 'single' || (q.type === 'grid' && r.member)) {
         const opts = q.type === 'single' ? q.options : q.columns;
         domains.push({ key, values: [null, ...opts.map((o) => o.code)] });
+      } else if (q.type === 'scale' && !r.member) {
+        domains.push({ key, values: [null, ...scaleCodes(q)] });
+      } else if (q.type === 'ranking' && r.member) {
+        domains.push({ key, values: [null, ...q.options.map((_, i) => i + 1)] });
       } else if (q.type === 'multi' && q.options.length <= 10) {
         // every subset of the options
         const subsets: Value[] = [];

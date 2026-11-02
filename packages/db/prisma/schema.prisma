@@ -241,6 +241,7 @@ model Survey {
   capiAssignments CapiAssignment[]
   catiCases       CatiCase[]
   reports         Report[]
+  MediaAsset      MediaAsset[]
 
   @@index([tenantId, projectId, deletedAt])
 }
@@ -790,6 +791,28 @@ model Report {
   createdById String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, surveyId])
+}
+
+/// An image, video or audio file shown in a survey (Milestone 11). Referenced from definitions by id,
+/// served publicly to respondents. Kept while any version uses it; never expires.
+model MediaAsset {
+  /// 22-character random id (not a cuid): it is the public URL, so it must not be guessable.
+  id          String    @id
+  tenantId    String
+  surveyId    String
+  survey      Survey    @relation(fields: [surveyId], references: [id])
+  /// image | video | audio
+  kind        String
+  name        String
+  contentType String
+  size        Int
+  sha256      String
+  storageKey  String    @unique
+  createdById String?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
 
   @@index([tenantId, surveyId])
 }

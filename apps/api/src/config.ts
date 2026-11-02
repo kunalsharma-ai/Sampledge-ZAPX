@@ -87,6 +87,8 @@ const schema = z
       .default(24 * 60),
     /** Max upload size for questionnaire files, in megabytes. */
     UPLOAD_MAX_MB: z.coerce.number().min(1).max(50).default(15),
+    /** Max size of one survey media upload (video, audio, images), in megabytes. Images are capped at 10, audio at 25. */
+    MEDIA_MAX_MB: z.coerce.number().min(1).max(500).default(100),
     /** Exports with more rows than this are refused by the download endpoint and run as background jobs. */
     EXPORT_SYNC_MAX_ROWS: z.coerce.number().int().min(1).default(10_000),
     /** Background jobs (Milestone 7): run the job worker in this process. Turn off in the API when a separate worker runs. */

@@ -120,6 +120,31 @@ export class ExportService {
                 },
               });
             break;
+          case 'ranking':
+            // One column per item: its rank (1 = first), empty when not ranked.
+            for (const o of q.options)
+              add({
+                key: `${q.id}_${o.code}`,
+                label: `${q.id}: rank of ${o.label}`,
+                get: (r) => {
+                  const a = ans(r)[q.id];
+                  if (!Array.isArray(a)) return null;
+                  const i = a.indexOf(o.code);
+                  return i < 0 ? null : i + 1;
+                },
+              });
+            break;
+          case 'sum':
+            for (const o of q.options)
+              add({
+                key: `${q.id}_${o.code}`,
+                label: `${q.id}: ${o.label}${q.unit ? ` (${q.unit})` : ''}`,
+                get: (r) => {
+                  const a = ans(r)[q.id];
+                  return a && typeof a === 'object' && !Array.isArray(a) ? ((a as Record<string, number>)[String(o.code)] ?? null) : null;
+                },
+              });
+            break;
           default:
             add({
               key: q.id,
@@ -170,6 +195,11 @@ export class ExportService {
     const latest = versions.reduce((a, b) => (b.version > a.version ? b : a));
     for (const q of allQuestions(latest.definition as unknown as SurveyDefinition)) {
       if (q.type === 'single') for (const o of q.options) book.addRow({ variable: q.id, code: o.code, label: o.label });
+      if (q.type === 'scale') {
+        book.addRow({ variable: q.id, code: q.min, label: q.minLabel ?? `${q.min} (lowest)` });
+        book.addRow({ variable: q.id, code: q.max, label: q.maxLabel ?? `${q.max} (highest)` });
+        if (q.dontKnow) book.addRow({ variable: q.id, code: q.dontKnow.code, label: q.dontKnow.label });
+      }
       if (q.type === 'grid') for (const o of q.columns) book.addRow({ variable: `${q.id}_*`, code: o.code, label: o.label });
     }
     book.getRow(1).font = { bold: true };
