@@ -20,10 +20,11 @@ they are accepted; a later record supersedes an earlier one.
 | [0013](0013-background-jobs-and-file-storage.md) | Background jobs and file storage in PostgreSQL                         | Accepted (file storage extended by 0019)               |
 | [0014](0014-sso-scim-and-plans.md)               | Single sign-on, SCIM provisioning and plan limits                      | Accepted (SAML and billing added by 0019)              |
 | [0015](0015-cati-call-lists.md)                  | CATI call lists on the existing interview engine                       | Accepted                                               |
-| [0016](0016-analysis-and-reports.md)             | Survey analysis and saved reports in the API                           | Accepted                                               |
+| [0016](0016-analysis-and-reports.md)             | Survey analysis and saved reports in the API                           | Accepted (weighting added by 0021)                     |
 | [0017](0017-rich-media-and-question-types.md)    | Rich media and advanced question types                                 | Accepted                                               |
 | [0018](0018-fraud-detection-and-capi-capture.md) | Fraud detection and face-to-face capture                               | Accepted                                               |
 | [0019](0019-production-readiness.md)             | Production readiness: S3, SAML, billing, AWS and the PROJEXA check     | Accepted                                               |
 | [0020](0020-edge-protection-scaling-backups.md)  | Edge protection, autoscaling and backups on AWS                        | Accepted                                               |
+| [0021](0021-weighting.md)                        | Rim weighting in analysis                                              | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

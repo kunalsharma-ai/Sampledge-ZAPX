@@ -4,7 +4,12 @@
  * column proportions (pooled two-proportion z-test) and column means (Welch's t, normal
  * approximation), each column compared with every other, results shown as column letters.
  *
- * Pure functions, no framework or database. Unweighted.
+ * Weighting (Milestone 15): records may carry a weight (raking, see weighting.ts). Counts, shares
+ * and means then use the weights, and significance tests use the effective base (Kish), so a
+ * heavily weighted sample is not tested as if it were larger than it is. Without weights every
+ * result is exactly the unweighted one.
+ *
+ * Pure functions, no framework or database.
  */
 import { scaleCodes, type SurveyDefinition } from '@zapx/survey-schema';
 
@@ -37,6 +42,21 @@ export interface AnalysisRecord {
   answers: Record<string, unknown>;
   /** System variables, already as plain values: status, vendor, mode, language, device... */
   system: Record<string, string | null>;
+  /** Analysis weight (1 when absent). */
+  weight?: number;
+}
+
+export const weightOf = (r: AnalysisRecord) => (typeof r.weight === 'number' && Number.isFinite(r.weight) ? r.weight : 1);
+
+/** Kish effective sample size: (sum w)^2 / sum w^2. Equals n when all weights are equal. */
+export function effectiveBase(weights: number[]) {
+  let s = 0;
+  let s2 = 0;
+  for (const w of weights) {
+    s += w;
+    s2 += w * w;
+  }
+  return s2 ? (s * s) / s2 : 0;
 }
 
 export const SYSTEM_VARIABLES = ['status', 'vendor', 'mode', 'language', 'device'] as const;
@@ -145,7 +165,7 @@ function rawValue(v: Variable, r: AnalysisRecord): unknown {
   }
   return r.answers[v.id];
 }
-function codes(v: Variable, r: AnalysisRecord): Array<number | string> {
+export function codes(v: Variable, r: AnalysisRecord): Array<number | string> {
   const raw = rawValue(v, r);
   if (raw === undefined || raw === null || raw === '') return [];
   if (v.kind === 'multi') return Array.isArray(raw) ? (raw as Array<number | string>) : [];
@@ -159,27 +179,55 @@ function numberOf(v: Variable, r: AnalysisRecord): number | null {
 const same = (a: number | string, b: number | string) => String(a) === String(b);
 
 export interface NumericStats {
+  /** Interviews with a value (unweighted). */
   n: number;
+  /** Effective base used for tests (equals n without weights). */
+  neff: number;
   mean: number;
   sd: number;
   min: number;
   median: number;
   max: number;
 }
-export function numericStats(values: number[]): NumericStats | null {
+export function numericStats(values: number[], weights?: number[]): NumericStats | null {
   if (!values.length) return null;
+  if (weights && weights.some((w) => w !== 1)) return weightedStats(values, weights);
   const sorted = [...values].sort((a, b) => a - b);
   const n = sorted.length;
   const mean = sorted.reduce((a, b) => a + b, 0) / n;
   const sd = n > 1 ? Math.sqrt(sorted.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1)) : 0;
   const mid = Math.floor(n / 2);
   const median = n % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
-  return { n, mean, sd, min: sorted[0]!, median, max: sorted[n - 1]! };
+  return { n, neff: n, mean, sd, min: sorted[0]!, median, max: sorted[n - 1]! };
+}
+
+/** Weighted mean, standard deviation (frequency-style, n-1 corrected) and weighted median. */
+function weightedStats(values: number[], weights: number[]): NumericStats | null {
+  const pairs = values.map((x, i) => ({ x, w: weights[i] ?? 1 })).filter((p) => p.w > 0);
+  if (!pairs.length) return null;
+  pairs.sort((a, b) => a.x - b.x);
+  const n = pairs.length;
+  const sw = pairs.reduce((a, p) => a + p.w, 0);
+  const mean = pairs.reduce((a, p) => a + p.w * p.x, 0) / sw;
+  const v = pairs.reduce((a, p) => a + p.w * (p.x - mean) ** 2, 0) / sw;
+  const sd = n > 1 ? Math.sqrt((v * n) / (n - 1)) : 0;
+  let acc = 0;
+  let median = pairs[n - 1]!.x;
+  for (let i = 0; i < n; i++) {
+    acc += pairs[i]!.w;
+    if (acc >= sw / 2 - 1e-9) {
+      // Exactly half: average with the next value, as the unweighted median does.
+      median = Math.abs(acc - sw / 2) < 1e-9 && i + 1 < n ? (pairs[i]!.x + pairs[i + 1]!.x) / 2 : pairs[i]!.x;
+      break;
+    }
+  }
+  return { n, neff: effectiveBase(pairs.map((p) => p.w)), mean, sd, min: pairs[0]!.x, median, max: pairs[n - 1]!.x };
 }
 
 export interface FrequencyRow {
   code: number | string;
   label: string;
+  /** Interviews (weighted when the analysis is weighted). */
   count: number;
   /** Share of people who answered (base), 0-100. For multi, rows can add up to more than 100. */
   pct: number;
@@ -188,8 +236,12 @@ export interface Frequency {
   variable: Variable;
   /** Records in the analysis. */
   total: number;
-  /** Records with an answer to this variable. */
+  /** Records with an answer to this variable (weighted when the analysis is weighted). */
   base: number;
+  /** Interviews with an answer, unweighted. */
+  unweightedBase: number;
+  /** Effective base for tests (equals unweightedBase without weights). */
+  effectiveBase: number;
   rows: FrequencyRow[];
   stats: NumericStats | null;
   /** Open answers: a sample of the latest non-empty answers. */
@@ -198,23 +250,49 @@ export interface Frequency {
   nps?: { score: number; promoters: number; passives: number; detractors: number; base: number };
 }
 
+const bases = (ws: number[]) => ({
+  base: ws.reduce((a, w) => a + w, 0),
+  unweightedBase: ws.length,
+  effectiveBase: effectiveBase(ws),
+});
+
 export function frequency(v: Variable, records: AnalysisRecord[]): Frequency {
   if (v.kind === 'numeric') {
-    const values = records.map((r) => numberOf(v, r)).filter((n): n is number => n !== null);
-    return { variable: v, total: records.length, base: values.length, rows: [], stats: numericStats(values) };
+    const answered = records.map((r) => ({ x: numberOf(v, r), w: weightOf(r) })).filter((p): p is { x: number; w: number } => p.x !== null);
+    const ws = answered.map((p) => p.w);
+    return {
+      variable: v,
+      total: records.length,
+      ...bases(ws),
+      rows: [],
+      stats: numericStats(
+        answered.map((p) => p.x),
+        ws,
+      ),
+    };
   }
   if (v.kind === 'open') {
-    const texts = records.map((r) => r.answers[v.id]).filter((t): t is string => typeof t === 'string' && t.trim() !== '');
-    return { variable: v, total: records.length, base: texts.length, rows: [], stats: null, samples: texts.slice(-20).reverse() };
+    const answered = records.filter((r) => typeof r.answers[v.id] === 'string' && (r.answers[v.id] as string).trim() !== '');
+    const texts = answered.map((r) => r.answers[v.id] as string);
+    return {
+      variable: v,
+      total: records.length,
+      ...bases(answered.map(weightOf)),
+      rows: [],
+      stats: null,
+      samples: texts.slice(-20).reverse(),
+    };
   }
   const counts = new Map<string, number>();
-  let base = 0;
+  const ws: number[] = [];
   for (const r of records) {
     const cs = codes(v, r);
     if (!cs.length) continue;
-    base++;
-    for (const c of new Set(cs.map(String))) counts.set(c, (counts.get(c) ?? 0) + 1);
+    const w = weightOf(r);
+    ws.push(w);
+    for (const c of new Set(cs.map(String))) counts.set(c, (counts.get(c) ?? 0) + w);
   }
+  const { base, unweightedBase, effectiveBase: neff } = bases(ws);
   const rows = v.categories.map((c) => {
     const count = counts.get(String(c.code)) ?? 0;
     return { code: c.code, label: c.label, count, pct: base ? (count / base) * 100 : 0 };
@@ -224,21 +302,43 @@ export function frequency(v: Variable, records: AnalysisRecord[]): Frequency {
     if (!v.categories.some((c) => same(c.code, code)))
       rows.push({ code, label: `Code ${code} (not in the current version)`, count, pct: base ? (count / base) * 100 : 0 });
   }
-  if (v.kind !== 'scale') return { variable: v, total: records.length, base, rows, stats: null };
+  const head = { variable: v, total: records.length, base, unweightedBase, effectiveBase: neff, rows };
+  if (v.kind !== 'scale') return { ...head, stats: null };
   const scores = scaleValues(v, records);
-  return { variable: v, total: records.length, base, rows, stats: numericStats(scores), ...(v.nps ? { nps: npsOf(scores) } : {}) };
+  const sw = scores.map((s) => s.w);
+  return {
+    ...head,
+    stats: numericStats(
+      scores.map((s) => s.x),
+      sw,
+    ),
+    ...(v.nps
+      ? {
+          nps: npsOf(
+            scores.map((s) => s.x),
+            sw,
+          ),
+        }
+      : {}),
+  };
 }
 
-/** Scale answers that are points on the scale (not "don't know"), as numbers. */
-function scaleValues(v: Variable, records: AnalysisRecord[]): number[] {
+/** Scale answers that are points on the scale (not "don't know"), as numbers with their weights. */
+function scaleValues(v: Variable, records: AnalysisRecord[]) {
   const skip = new Set((v.excludeFromStats ?? []).map(String));
-  return records.map((r) => rawValue(v, r)).filter((x): x is number => typeof x === 'number' && !skip.has(String(x)));
+  const out: Array<{ x: number; w: number }> = [];
+  for (const r of records) {
+    const x = rawValue(v, r);
+    if (typeof x === 'number' && !skip.has(String(x))) out.push({ x, w: weightOf(r) });
+  }
+  return out;
 }
 
-export function npsOf(scores: number[]) {
-  const base = scores.length;
-  const promoters = scores.filter((s) => s >= 9).length;
-  const detractors = scores.filter((s) => s <= 6).length;
+export function npsOf(scores: number[], weights?: number[]) {
+  const w = (i: number) => weights?.[i] ?? 1;
+  const base = scores.reduce((a, _, i) => a + w(i), 0);
+  const promoters = scores.reduce((a, s, i) => a + (s >= 9 ? w(i) : 0), 0);
+  const detractors = scores.reduce((a, s, i) => a + (s <= 6 ? w(i) : 0), 0);
   const pct = (n: number) => (base ? (n / base) * 100 : 0);
   return {
     score: pct(promoters) - pct(detractors),
@@ -264,8 +364,15 @@ export function proportionZ(x1: number, n1: number, x2: number, n2: number) {
 /** Welch's t for two means, used with the normal critical value (fine for the bases we test). */
 export function meanZ(a: NumericStats, b: NumericStats) {
   if (a.n < 2 || b.n < 2) return 0;
-  const se = Math.sqrt(a.sd ** 2 / a.n + b.sd ** 2 / b.n);
+  const se = Math.sqrt(a.sd ** 2 / (a.neff ?? a.n) + b.sd ** 2 / (b.neff ?? b.n));
   return se ? (a.mean - b.mean) / se : 0;
+}
+
+/** Column proportion test on the effective bases (the plain z-test when unweighted). */
+function proportionTest(pct1: number, c1: CrosstabColumn, pct2: number, c2: CrosstabColumn) {
+  const n1 = c1.effectiveBase;
+  const n2 = c2.effectiveBase;
+  return proportionZ((pct1 / 100) * n1, n1, (pct2 / 100) * n2, n2);
 }
 
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -280,7 +387,11 @@ export interface CrosstabColumn {
   key: string;
   label: string;
   letter: string;
+  /** Weighted when the analysis is weighted. */
   base: number;
+  unweightedBase: number;
+  effectiveBase: number;
+  /** Judged on the unweighted base. */
   lowBase: boolean;
 }
 export interface CrosstabCell {
@@ -340,7 +451,9 @@ export function crosstab(banner: Variable, stub: Variable, records: AnalysisReco
     label: g.label,
     letter: i === 0 ? '' : (LETTERS[i - 1] ?? `${i}`),
     base: freq[i]!.base,
-    lowBase: i > 0 && freq[i]!.base < minBase,
+    unweightedBase: freq[i]!.unweightedBase,
+    effectiveBase: freq[i]!.effectiveBase,
+    lowBase: i > 0 && freq[i]!.unweightedBase < minBase,
   }));
 
   const sigAgainst = (i: number, j: number) => testable && i > 0 && j > 0 && i !== j && !columns[i]!.lowBase && !columns[j]!.lowBase;
@@ -366,7 +479,7 @@ export function crosstab(banner: Variable, stub: Variable, records: AnalysisReco
     cells.forEach((cell, i) => {
       cell.higherThan = columns
         .map((_, j) => j)
-        .filter((j) => sigAgainst(i, j) && proportionZ(cell.count, columns[i]!.base, cells[j]!.count, columns[j]!.base) > crit)
+        .filter((j) => sigAgainst(i, j) && proportionTest(cell.pct, columns[i]!, cells[j]!.pct, columns[j]!) > crit)
         .map((j) => columns[j]!.letter);
     });
     return { code: rk.code, label: rk.label, cells };
@@ -374,3 +487,5 @@ export function crosstab(banner: Variable, stub: Variable, records: AnalysisReco
   // Scales show the share per point and the mean score (points on the scale only).
   return { banner, stub, confidence, minBase, columns, rows, ...(stub.kind === 'scale' ? { means: meanRow() } : {}), testNote };
 }
+
+export * from './weighting';

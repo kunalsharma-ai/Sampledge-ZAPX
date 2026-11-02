@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Crosstab, Frequency, Variable } from '@zapx/analysis-core';
+import type { Crosstab, Frequency, RakeResult, Variable } from '@zapx/analysis-core';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 
@@ -14,16 +14,25 @@ interface Filters {
   from?: string;
   to?: string;
 }
+interface Weighting {
+  dimensions: Array<{ variable: string; targets: Array<{ code: number | string; pct: number }> }>;
+  minWeight: number;
+  maxWeight: number;
+}
+type WeightingSummary = Omit<RakeResult, 'weights'>;
 type ReportConfig =
-  | { type: 'frequencies'; filters: Filters; variables?: string[] }
-  | { type: 'crosstab'; filters: Filters; banner: string; stubs: string[]; confidence: 0.9 | 0.95 | 0.99 };
+  | { type: 'frequencies'; filters: Filters; weighting?: Weighting; variables?: string[] }
+  | { type: 'crosstab'; filters: Filters; weighting?: Weighting; banner: string; stubs: string[]; confidence: 0.9 | 0.95 | 0.99 };
 interface Report {
   id: string;
   name: string;
   config: ReportConfig;
   updatedAt: string;
 }
-type Result = { total: number; frequencies: Frequency[] } | { total: number; tables: Crosstab[] };
+type Result =
+  | { total: number; weighting: WeightingSummary | null; frequencies: Frequency[] }
+  | { total: number; weighting: WeightingSummary | null; tables: Crosstab[] };
+const NO_WEIGHTING: Weighting = { dimensions: [], minWeight: 0.2, maxWeight: 5 };
 
 const STATUS_OPTIONS: Array<[Status, string]> = [
   ['COMPLETE', 'Completes'],
@@ -68,6 +77,7 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [weighting, setWeighting] = useState<Weighting>(NO_WEIGHTING);
 
   const loadReports = useCallback(async () => setReports(await api<Report[]>(`/surveys/${surveyId}/reports`)), [surveyId]);
   useEffect(() => {
@@ -89,16 +99,18 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
     [vars, kind, banner],
   );
 
+  const activeWeighting = weighting.dimensions.length ? { weighting } : {};
   const config = (): ReportConfig =>
     kind === 'crosstab'
       ? {
           type: 'crosstab',
           filters: cleanFilters(filters),
+          ...activeWeighting,
           banner,
           stubs: picked.length ? picked.filter((p) => p !== banner) : stubOptions.filter((v) => v.source !== 'system').map((v) => v.id),
           confidence,
         }
-      : { type: 'frequencies', filters: cleanFilters(filters), ...(picked.length ? { variables: picked } : {}) };
+      : { type: 'frequencies', filters: cleanFilters(filters), ...activeWeighting, ...(picked.length ? { variables: picked } : {}) };
 
   const run = async (cfg = config()) => {
     setBusy(true);
@@ -126,6 +138,7 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
       from: c.filters.from?.slice(0, 10),
       to: c.filters.to?.slice(0, 10),
     });
+    setWeighting(c.weighting ?? NO_WEIGHTING);
     if (c.type === 'crosstab') {
       setBanner(c.banner);
       setPicked(c.stubs);
@@ -260,6 +273,8 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
             Include interviews rejected in quality review
           </label>
         </section>
+
+        <WeightingPanel surveyId={surveyId} vars={vars} filters={filters} weighting={weighting} onChange={setWeighting} />
       </aside>
 
       <div className="stack" style={{ minWidth: 0 }}>
@@ -358,7 +373,16 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
         {result ? (
           <section aria-label="Results" className="stack" data-testid="analysis-results">
             <p className="muted small">
-              {result.total.toLocaleString()} interviews · unweighted
+              {result.total.toLocaleString()} interviews ·{' '}
+              {result.weighting ? (
+                <strong data-testid="weighted-note">
+                  weighted by {result.weighting.dimensions.map((d) => d.variable).join(', ')} (efficiency{' '}
+                  {fmt(result.weighting.efficiency, 0)}%, effective base {fmt(result.weighting.effectiveBase, 0)}
+                  {result.weighting.converged ? '' : ', targets not fully met'})
+                </strong>
+              ) : (
+                'unweighted'
+              )}
               {'tables' in result && result.tables[0]
                 ? ` · letters mark a column significantly higher than the column with that letter, at ${Math.round(result.tables[0].confidence * 100)}% confidence; columns with a base under ${result.tables[0].minBase} are not tested`
                 : ''}
@@ -383,7 +407,8 @@ function FrequencyCard({ f }: { f: Frequency }) {
         <span className="mono">{f.variable.id}</span> {f.variable.label}
       </h3>
       <p className="small muted">
-        Base: {f.base.toLocaleString()} answered
+        Base: {f.unweightedBase.toLocaleString()} answered
+        {f.base !== f.unweightedBase ? ` (weighted ${fmt(f.base)}, effective ${fmt(f.effectiveBase, 0)})` : ''}
         {f.variable.kind === 'multi' ? ' · more than one answer allowed, so shares can add up to more than 100%' : ''}
       </p>
       {f.nps ? (
@@ -439,7 +464,7 @@ function FrequencyCard({ f }: { f: Frequency }) {
             {f.rows.map((r) => (
               <tr key={String(r.code)}>
                 <td>{r.label}</td>
-                <td className="num">{r.count.toLocaleString()}</td>
+                <td className="num">{Number.isInteger(r.count) ? r.count.toLocaleString() : fmt(r.count)}</td>
                 <td className="num">{fmt(r.pct)}%</td>
                 <td className="bar-cell" aria-hidden="true">
                   {r.count ? <div className="hbar" style={{ width: `${(r.pct / max) * 100}%` }} /> : null}
@@ -477,8 +502,9 @@ function CrosstabTable({ t }: { t: Crosstab }) {
               <th>Base</th>
               {t.columns.map((c) => (
                 <td key={c.key} className="num">
-                  {c.base.toLocaleString()}
-                  {c.lowBase && c.base > 0 ? <span className="small warn-text"> low</span> : null}
+                  {c.unweightedBase.toLocaleString()}
+                  {c.base !== c.unweightedBase ? <span className="small muted"> (w {fmt(c.base, 0)})</span> : null}
+                  {c.lowBase && c.unweightedBase > 0 ? <span className="small warn-text"> low</span> : null}
                 </td>
               ))}
             </tr>
@@ -488,7 +514,7 @@ function CrosstabTable({ t }: { t: Crosstab }) {
               <tr key={String(r.code)}>
                 <th>{r.label}</th>
                 {r.cells.map((c, i) => (
-                  <td key={i} className="num" title={`${c.count} of ${t.columns[i]!.base}`}>
+                  <td key={i} className="num" title={`${fmt(c.count)} of ${fmt(t.columns[i]!.base)}`}>
                     {t.columns[i]!.base ? `${fmt(c.pct)}%` : '–'} {sig(c.higherThan)}
                   </td>
                 ))}
@@ -508,5 +534,211 @@ function CrosstabTable({ t }: { t: Crosstab }) {
         </table>
       </div>
     </article>
+  );
+}
+
+/**
+ * Weighting (Milestone 15): rim weighting to target shares on one or more single-answer variables.
+ * "Check weights" rakes the current selection and shows how well the targets were met and what the
+ * weighting costs (efficiency, effective base); Run then applies the same weights to the tables.
+ */
+function WeightingPanel({
+  surveyId,
+  vars,
+  filters,
+  weighting,
+  onChange,
+}: {
+  surveyId: string;
+  vars: Variable[];
+  filters: Filters;
+  weighting: Weighting;
+  onChange: (w: Weighting) => void;
+}) {
+  const options = vars.filter((v) => (v.kind === 'single' || v.kind === 'scale') && v.categories.length > 1);
+  const unused = options.filter((v) => !weighting.dimensions.some((d) => d.variable === v.id));
+  const [add, setAdd] = useState('');
+  const [check, setCheck] = useState<WeightingSummary | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const byId = (id: string) => vars.find((v) => v.id === id);
+
+  const set = (w: Weighting) => {
+    setCheck(null);
+    onChange(w);
+  };
+  const addDimension = () => {
+    const v = byId(add || unused[0]?.id || '');
+    if (!v) return;
+    const even = Math.round((100 / v.categories.length) * 10) / 10;
+    set({
+      ...weighting,
+      dimensions: [...weighting.dimensions, { variable: v.id, targets: v.categories.map((c) => ({ code: c.code, pct: even })) }],
+    });
+    setAdd('');
+  };
+  const setTarget = (i: number, code: number | string, pct: number) =>
+    set({
+      ...weighting,
+      dimensions: weighting.dimensions.map((d, j) =>
+        j === i ? { ...d, targets: d.targets.map((t) => (String(t.code) === String(code) ? { ...t, pct } : t)) } : d,
+      ),
+    });
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ weighting: WeightingSummary }>(`/surveys/${surveyId}/analysis/weights`, {
+        body: { filters: cleanFilters(filters), weighting },
+      });
+      setCheck(r.weighting);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="panel stack" aria-label="Weighting" data-testid="weighting">
+      <h2>Weighting</h2>
+      {!weighting.dimensions.length ? (
+        <p className="small muted">Results are unweighted. Add a variable to weight the sample to known shares, e.g. gender and age.</p>
+      ) : null}
+      {weighting.dimensions.map((d, i) => {
+        const v = byId(d.variable);
+        const sum = d.targets.reduce((a, t) => a + (Number.isFinite(t.pct) ? t.pct : 0), 0);
+        const achieved = check?.dimensions.find((x) => x.variable === d.variable);
+        return (
+          <fieldset key={d.variable} className="plain stack" data-testid={`weight-dim-${d.variable}`}>
+            <legend className="row" style={{ justifyContent: 'space-between', width: '100%' }}>
+              <span>
+                <span className="mono small">{d.variable}</span> {v?.label ?? ''}
+              </span>
+              <button
+                className="link danger small"
+                onClick={() => set({ ...weighting, dimensions: weighting.dimensions.filter((_, j) => j !== i) })}
+                aria-label={`Remove weighting by ${d.variable}`}
+              >
+                Remove
+              </button>
+            </legend>
+            <table className="data weight-targets">
+              <thead>
+                <tr>
+                  <th>Category</th>
+                  <th className="num">Target %</th>
+                  {achieved ? (
+                    <>
+                      <th className="num">Sample</th>
+                      <th className="num">Weighted</th>
+                    </>
+                  ) : null}
+                </tr>
+              </thead>
+              <tbody>
+                {d.targets.map((t) => {
+                  const label = v?.categories.find((c) => String(c.code) === String(t.code))?.label ?? String(t.code);
+                  const a = achieved?.categories.find((c) => String(c.code) === String(t.code));
+                  return (
+                    <tr key={String(t.code)}>
+                      <td>{label}</td>
+                      <td className="num">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.1}
+                          aria-label={`Target for ${label}`}
+                          value={Number.isFinite(t.pct) ? t.pct : ''}
+                          onChange={(e) => setTarget(i, t.code, e.target.value === '' ? 0 : Number(e.target.value))}
+                          style={{ width: '5.5em' }}
+                        />
+                      </td>
+                      {a ? (
+                        <>
+                          <td className="num">{fmt(a.unweighted)}%</td>
+                          <td className="num">{fmt(a.weighted)}%</td>
+                        </>
+                      ) : null}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <span className={`small ${Math.abs(sum - 100) > 0.05 ? 'warn-text' : 'muted'}`}>
+              Targets add up to {fmt(sum)}%{Math.abs(sum - 100) > 0.05 ? '; they will be rescaled to 100%.' : '.'}
+            </span>
+          </fieldset>
+        );
+      })}
+      {unused.length ? (
+        <div className="row">
+          <select aria-label="Variable to weight by" value={add} onChange={(e) => setAdd(e.target.value)}>
+            {unused.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.id}: {v.label}
+              </option>
+            ))}
+          </select>
+          <button onClick={addDimension} disabled={weighting.dimensions.length >= 10}>
+            Add
+          </button>
+        </div>
+      ) : null}
+      {weighting.dimensions.length ? (
+        <>
+          <div className="row">
+            <label className="field">
+              Lowest weight
+              <input
+                type="number"
+                min={0.01}
+                max={1}
+                step={0.05}
+                value={weighting.minWeight}
+                onChange={(e) => set({ ...weighting, minWeight: Number(e.target.value) })}
+                style={{ width: '5em' }}
+              />
+            </label>
+            <label className="field">
+              Highest weight
+              <input
+                type="number"
+                min={1}
+                max={50}
+                step={0.5}
+                value={weighting.maxWeight}
+                onChange={(e) => set({ ...weighting, maxWeight: Number(e.target.value) })}
+                style={{ width: '5em' }}
+              />
+            </label>
+          </div>
+          <button onClick={() => void run()} disabled={busy || !filters.statuses.length}>
+            {busy ? 'Checking…' : 'Check weights'}
+          </button>
+          {check ? (
+            <div className="small stack" role="status" data-testid="weight-check">
+              <span className={check.converged ? 'ok-text' : 'warn-text'}>
+                {check.converged ? `Targets met after ${check.iterations} passes.` : 'Targets not fully met.'}
+              </span>
+              <span>
+                Efficiency {fmt(check.efficiency, 0)}% · effective base {fmt(check.effectiveBase, 0)} · weights {fmt(check.minWeight, 2)} to{' '}
+                {fmt(check.maxWeight, 2)}
+                {check.capped ? ` · ${check.capped} at a cap` : ''}
+              </span>
+              {check.warnings.map((w) => (
+                <span key={w} className="warn-text">
+                  {w}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <span className="small muted">Run uses these weights. Check weights first to see how well they fit.</span>
+          )}
+        </>
+      ) : null}
+      <ErrorNote error={error} />
+    </section>
   );
 }

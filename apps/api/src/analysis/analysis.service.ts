@@ -1,7 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import type { Prisma } from '@zapx/db';
-import { crosstab, frequency, variables, type AnalysisRecord, type Crosstab, type Frequency, type Variable } from '@zapx/analysis-core';
+import {
+  crosstab,
+  frequency,
+  rake,
+  variables,
+  type AnalysisRecord,
+  type Crosstab,
+  type Frequency,
+  type RakeResult,
+  type Variable,
+} from '@zapx/analysis-core';
 import { parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
 import { z } from 'zod';
 import { PrismaService } from '../common/prisma.service';
@@ -39,11 +49,38 @@ export const filtersSchema = z
   .default({});
 export type Filters = z.infer<typeof filtersSchema>;
 
+/** Rim weighting targets (Milestone 15): per variable, a target share per category. */
+export const weightingSchema = z
+  .object({
+    dimensions: z
+      .array(
+        z.object({
+          variable: z.string().max(100),
+          targets: z
+            .array(z.object({ code: z.union([z.number(), z.string().max(64)]), pct: z.number().min(0).max(100) }))
+            .min(1)
+            .max(100),
+        }),
+      )
+      .min(1)
+      .max(10),
+    minWeight: z.number().gt(0).max(1).default(0.2),
+    maxWeight: z.number().min(1).max(50).default(5),
+  })
+  .optional();
+export type Weighting = z.infer<typeof weightingSchema>;
+
 export const reportConfigSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('frequencies'), filters: filtersSchema, variables: z.array(z.string().max(100)).max(500).optional() }),
+  z.object({
+    type: z.literal('frequencies'),
+    filters: filtersSchema,
+    weighting: weightingSchema,
+    variables: z.array(z.string().max(100)).max(500).optional(),
+  }),
   z.object({
     type: z.literal('crosstab'),
     filters: filtersSchema,
+    weighting: weightingSchema,
     banner: z.string().max(100),
     stubs: z.array(z.string().max(100)).min(1).max(200),
     confidence: z.union([z.literal(0.9), z.literal(0.95), z.literal(0.99)]).default(0.95),
@@ -53,7 +90,8 @@ export type ReportConfig = z.infer<typeof reportConfigSchema>;
 
 /**
  * Survey analysis (Milestone 10): loads the survey's respondent rows through the tenant-scoped
- * client (row-level security applies), then runs @zapx/analysis-core. Unweighted.
+ * client (row-level security applies), then runs @zapx/analysis-core. Optionally weighted by raking
+ * to targets (Milestone 15); the weights are computed per run on the selected interviews.
  */
 @Injectable()
 export class AnalysisService {
@@ -124,6 +162,26 @@ export class AnalysisService {
     return { survey, def, records, vars: variables(def, records) };
   }
 
+  /** Rake the records to the targets and attach the weights. Returns the diagnostics. */
+  private applyWeights(vars: Variable[], records: AnalysisRecord[], w: NonNullable<Weighting>): WeightingSummary {
+    const dims = w.dimensions.map((d) => ({ variable: this.pick(vars, d.variable), targets: d.targets }));
+    let result: RakeResult;
+    try {
+      result = rake(records, dims, { minWeight: w.minWeight, maxWeight: w.maxWeight });
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+    result.weights.forEach((x, i) => (records[i]!.weight = x));
+    const { weights: _weights, ...summary } = result;
+    return summary;
+  }
+
+  /** Preview a weighting scheme: efficiency, caps and achieved shares, without running tables. */
+  async weights(user: AuthUser, surveyId: string, filters: Filters, weighting: NonNullable<Weighting>) {
+    const { vars, records } = await this.load(user, surveyId, filters);
+    return { total: records.length, weighting: this.applyWeights(vars, records, weighting) };
+  }
+
   private pick(vars: Variable[], id: string) {
     const v = vars.find((x) => x.id === id);
     if (!v) throw new BadRequestException(`Unknown variable ${id}`);
@@ -135,14 +193,20 @@ export class AnalysisService {
     return { completes: records.length, variables: vars };
   }
 
-  async frequencies(user: AuthUser, surveyId: string, filters: Filters, ids?: string[]) {
+  async frequencies(user: AuthUser, surveyId: string, filters: Filters, ids?: string[], weighting?: Weighting) {
     const { vars, records } = await this.load(user, surveyId, filters);
+    const w = weighting ? this.applyWeights(vars, records, weighting) : null;
     const chosen = ids?.length ? ids.map((id) => this.pick(vars, id)) : vars.filter((v) => v.source !== 'system');
-    return { total: records.length, frequencies: chosen.map((v) => frequency(v, records)) };
+    return { total: records.length, weighting: w, frequencies: chosen.map((v) => frequency(v, records)) };
   }
 
-  async crosstabs(user: AuthUser, surveyId: string, cfg: { filters: Filters; banner: string; stubs: string[]; confidence: number }) {
+  async crosstabs(
+    user: AuthUser,
+    surveyId: string,
+    cfg: { filters: Filters; banner: string; stubs: string[]; confidence: number; weighting?: Weighting },
+  ) {
     const { vars, records } = await this.load(user, surveyId, cfg.filters);
+    const w = cfg.weighting ? this.applyWeights(vars, records, cfg.weighting) : null;
     const banner = this.pick(vars, cfg.banner);
     if (banner.kind !== 'single' && banner.kind !== 'multi')
       throw new BadRequestException('Choose a single or multiple choice question as the banner');
@@ -152,11 +216,13 @@ export class AnalysisService {
       if (stub.kind === 'open' || stub.id === banner.id) continue;
       tables.push(crosstab(banner, stub, records, { confidence: cfg.confidence }));
     }
-    return { total: records.length, tables };
+    return { total: records.length, weighting: w, tables };
   }
 
   run(user: AuthUser, surveyId: string, cfg: ReportConfig) {
-    return cfg.type === 'crosstab' ? this.crosstabs(user, surveyId, cfg) : this.frequencies(user, surveyId, cfg.filters, cfg.variables);
+    return cfg.type === 'crosstab'
+      ? this.crosstabs(user, surveyId, cfg)
+      : this.frequencies(user, surveyId, cfg.filters, cfg.variables, cfg.weighting);
   }
 
   // ---- Saved reports ----------------------------------------------------------------------------
@@ -199,6 +265,16 @@ export class AnalysisService {
     const ws = wb.addWorksheet('Report');
     ws.addRow([r.name]).font = { bold: true, size: 14 };
     ws.addRow([`Interviews: ${result.total}`, `Statuses: ${cfg.filters.statuses.join(', ')}`, `Run ${new Date().toISOString()}`]);
+    if (result.weighting) {
+      const w = result.weighting;
+      ws.addRow([
+        `Weighted by ${w.dimensions.map((d) => d.variable).join(', ')}`,
+        `Efficiency ${Math.round(w.efficiency)}%`,
+        `Effective base ${Math.round(w.effectiveBase)}`,
+        `Weights ${w.minWeight.toFixed(2)} to ${w.maxWeight.toFixed(2)}`,
+        w.converged ? 'Targets met' : 'Targets NOT fully met',
+      ]).font = { italic: true };
+    } else ws.addRow(['Unweighted']).font = { italic: true };
     ws.addRow([]);
     if ('tables' in result) {
       ws.addRow([
@@ -216,18 +292,21 @@ export class AnalysisService {
 }
 
 const pct = (n: number) => Math.round(n * 10) / 10;
+const round1 = pct;
+
+export type WeightingSummary = Omit<RakeResult, 'weights'>;
 
 function writeFrequency(ws: ExcelJS.Worksheet, f: Frequency) {
   ws.addRow([]);
   ws.addRow([`${f.variable.id}: ${f.variable.label}`]).font = { bold: true };
-  ws.addRow(['Base', f.base]);
+  ws.addRow(['Base', round1(f.base), ...(f.base !== f.unweightedBase ? [`unweighted ${f.unweightedBase}`] : [])]);
   if (f.nps) ws.addRow(['Net Promoter Score', Math.round(f.nps.score * 10) / 10]);
   if (f.rows.length) {
     ws.addRow(['', 'Count', '%']).font = { italic: true };
-    for (const row of f.rows) ws.addRow([row.label, row.count, pct(row.pct)]);
+    for (const row of f.rows) ws.addRow([row.label, round1(row.count), pct(row.pct)]);
   }
   if (f.stats) {
-    for (const [k, v] of Object.entries(f.stats)) ws.addRow([k, Math.round((v as number) * 100) / 100]);
+    for (const [k, v] of Object.entries(f.stats)) if (k !== 'neff') ws.addRow([k, Math.round((v as number) * 100) / 100]);
   } else if (f.samples) {
     ws.addRow(['Answered', f.base]);
   }
@@ -237,7 +316,8 @@ function writeCrosstab(ws: ExcelJS.Worksheet, t: Crosstab) {
   ws.addRow([]);
   ws.addRow([`${t.stub.id}: ${t.stub.label}  by  ${t.banner.id}: ${t.banner.label}`]).font = { bold: true };
   ws.addRow(['', ...t.columns.map((c) => (c.letter ? `${c.label} (${c.letter})` : c.label))]).font = { bold: true };
-  ws.addRow(['Base', ...t.columns.map((c) => (c.lowBase ? `${c.base} (low)` : c.base))]);
+  ws.addRow(['Base', ...t.columns.map((c) => (c.lowBase ? `${round1(c.base)} (low)` : round1(c.base)))]);
+  if (t.columns.some((c) => c.base !== c.unweightedBase)) ws.addRow(['Unweighted base', ...t.columns.map((c) => c.unweightedBase)]);
   if (t.means) {
     ws.addRow([
       'Mean',
