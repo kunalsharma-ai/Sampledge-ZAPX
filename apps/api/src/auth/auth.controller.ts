@@ -63,7 +63,7 @@ export class AuthController {
 
   /** Self-service sign-up creating a new tenant. Disabled unless ALLOW_SIGNUP=true. */
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle({ default: { limit: () => config().SIGNUP_RATE_PER_MINUTE, ttl: 60_000 } })
   @Post('register')
   async register(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     if (!config().ALLOW_SIGNUP) throw new ForbiddenException('Sign-up is disabled');
@@ -99,8 +99,9 @@ export class AuthController {
   async me(@CurrentUser() user: AuthUser) {
     const u = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { id: true, email: true, name: true, role: true, tenant: { select: { id: true, name: true } } },
+      select: { id: true, email: true, name: true, role: true, projectScope: true, tenant: { select: { id: true, name: true } } },
     });
-    return u;
+    // With an API key the effective role can be lower than the member's own.
+    return { ...u, role: user.role, viaApiKey: user.apiKeyId ?? null };
   }
 }

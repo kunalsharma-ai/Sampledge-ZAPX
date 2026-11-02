@@ -40,6 +40,24 @@ in `pnpm-workspace.yaml`.
   operating system's screen lock and storage encryption; remote wipe needs device management (not
   part of ZAPX yet).
 
+## Access, keys and tenant isolation (Milestone 6)
+
+- Members with assigned project access get 404 for anything outside their projects; the Milestone 6
+  tests walk every route family (projects, surveys, vendors, logs, exports, quality) as such a member.
+- The guard reads the member's role and access from the database on every request, so demotions and
+  removals from a project take effect immediately.
+- API keys: only the SHA-256 hash of the secret is stored; comparison is constant time; keys never
+  exceed their creator's current role or programmer, cannot reach admin endpoints and cannot manage
+  keys. Use is recorded (`lastUsedAt`, `viaApiKey` in audit events).
+- Webhook secrets are sealed with `SecretBox` (AES-256-GCM, key from `SECRETS_KEY`); requests are
+  signed with HMAC-SHA256 over timestamp and body; endpoints must be https and public (SSRF guard).
+  Payloads contain no answers.
+- Row-level security: `Response` has a forced RLS policy keyed on `app.tenant_id`, which the
+  tenant-scoped client sets for studio reads of respondent data. When the setting is absent the
+  policy allows all rows (system paths), so it is a second line of defence, not complete database
+  isolation. It is not applied at all if the API connects as a superuser or a `BYPASSRLS` role; the
+  API logs a warning at start-up and reports the state at `GET /api/audit/security`.
+
 ## Reporting
 
 Report vulnerabilities privately to the maintainer; do not open a public issue.

@@ -23,7 +23,8 @@ export class AuditService {
         action,
         entityType,
         entityId,
-        data: data as Prisma.InputJsonValue,
+        // Changes made with an organization API key say which key, next to the member it acts for.
+        data: ('apiKeyId' in actor && actor.apiKeyId ? { ...data, viaApiKey: actor.apiKeyId } : data) as Prisma.InputJsonValue,
       },
     });
   }

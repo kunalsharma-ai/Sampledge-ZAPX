@@ -37,5 +37,20 @@ database operation for now (`UPDATE ... SET "deletedAt" = NULL`), recorded in th
 
 ## Tenant isolation
 
-Every tenant-owned row has `tenantId`, and every studio query filters on it. Row-level security
-policies in PostgreSQL are planned as a second line of defence.
+Every tenant-owned row has `tenantId`, and every studio query filters on it. Since Milestone 6,
+`Response` also has a row-level security policy (ADR 0012): reads of respondent data from the studio
+run with `app.tenant_id` set, so Postgres itself hides other tenants' responses.
+
+Postgres never applies policies to superusers or roles with `BYPASSRLS`. The `postgres` image makes
+`POSTGRES_USER` a superuser, so in production run migrations as the owner and the API as a plain role:
+
+```sql
+CREATE ROLE zapx_app LOGIN PASSWORD '...';
+GRANT CONNECT ON DATABASE zapx TO zapx_app;
+GRANT USAGE ON SCHEMA public TO zapx_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO zapx_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO zapx_app;
+```
+
+Point the API's `DATABASE_URL` at `zapx_app` and keep the owner's URL for `prisma migrate deploy`.
+`GET /api/audit/security` (admins) answers `enforced` when the policy applies to the API's role.

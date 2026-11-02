@@ -1,29 +1,41 @@
 'use client';
-/** Team members of the organization (administrators): list and add, including field interviewers. */
+/**
+ * Team members of the organization (administrators): list, add, and change a member's role and
+ * project access. Changes apply to the member's next request.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
+
+type Role = 'ADMIN' | 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
+type Scope = 'ALL' | 'ASSIGNED';
 
 interface Member {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
+  role: Role;
+  projectScope: Scope;
   createdAt: string;
+  _count?: { projects: number };
 }
 
-const ROLE_HELP: Record<Member['role'], string> = {
+const ROLE_HELP: Record<Role, string> = {
   ADMIN: 'everything, including settings and team',
   PROGRAMMER: 'builds, publishes and reviews surveys',
   VIEWER: 'read only',
   INTERVIEWER: 'only the offline CAPI app, for surveys assigned to them',
 };
 
+const scoped = (role: Role) => role === 'PROGRAMMER' || role === 'VIEWER';
+
 export function Team() {
+  const me = useMe();
   const [members, setMembers] = useState<Member[]>([]);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'PROGRAMMER' as Member['role'] });
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'PROGRAMMER' as Role, projectScope: 'ALL' as Scope });
   const [error, setError] = useState<unknown>(null);
-  const [added, setAdded] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -36,8 +48,20 @@ export function Team() {
     void load();
   }, [load]);
 
+  const change = async (m: Member, body: Partial<Pick<Member, 'role' | 'projectScope'>>) => {
+    setError(null);
+    setNote(null);
+    try {
+      await api(`/users/${m.id}`, { method: 'PATCH', body });
+      setNote(`Updated ${m.name}. It applies to their next action.`);
+      await load();
+    } catch (e) {
+      setError(e);
+    }
+  };
+
   return (
-    <section className="panel stack" data-testid="team">
+    <section className="panel stack wide" data-testid="team">
       <h2>Team</h2>
       <table className="data">
         <thead>
@@ -45,6 +69,7 @@ export function Team() {
             <th>Name</th>
             <th>Email</th>
             <th>Role</th>
+            <th>Project access</th>
           </tr>
         </thead>
         <tbody>
@@ -53,23 +78,59 @@ export function Team() {
               <td>{m.name}</td>
               <td className="mono small">{m.email}</td>
               <td>
-                <span className="badge">{m.role.toLowerCase()}</span>
+                {m.id === me?.id ? (
+                  <span className="badge">{m.role.toLowerCase()} (you)</span>
+                ) : (
+                  <select
+                    aria-label={`Role of ${m.name}`}
+                    value={m.role}
+                    onChange={(e) => void change(m, { role: e.target.value as Role })}
+                  >
+                    {(Object.keys(ROLE_HELP) as Role[]).map((r) => (
+                      <option key={r} value={r}>
+                        {r.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </td>
+              <td>
+                {scoped(m.role) ? (
+                  <select
+                    aria-label={`Project access of ${m.name}`}
+                    value={m.projectScope}
+                    onChange={(e) => void change(m, { projectScope: e.target.value as Scope })}
+                  >
+                    <option value="ALL">All projects</option>
+                    <option value="ASSIGNED">Assigned projects ({m._count?.projects ?? 0})</option>
+                  </select>
+                ) : (
+                  <span className="muted small">{m.role === 'INTERVIEWER' ? 'Assigned surveys only' : 'All projects'}</span>
+                )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <p className="muted small" style={{ margin: 0 }}>
+        Members with assigned project access only see projects an administrator adds them to, on the project page under Project access.
+      </p>
+      {note ? (
+        <p className="ok-text small" role="status" style={{ margin: 0 }}>
+          {note}
+        </p>
+      ) : null}
       <form
         className="stack"
         style={{ gap: 6 }}
         onSubmit={async (e) => {
           e.preventDefault();
           setError(null);
-          setAdded(null);
+          setNote(null);
           try {
             const m = await api<Member>('/users', { body: form });
-            setAdded(m.email);
-            setForm({ name: '', email: '', password: '', role: form.role });
+            setNote(`Added ${m.email}`);
+            setForm({ ...form, name: '', email: '', password: '' });
             await load();
           } catch (err) {
             setError(err);
@@ -98,21 +159,33 @@ export function Team() {
           </label>
           <label className="field">
             Role
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Member['role'] })}>
-              {(Object.keys(ROLE_HELP) as Member['role'][]).map((r) => (
+            <select aria-label="Role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
+              {(Object.keys(ROLE_HELP) as Role[]).map((r) => (
                 <option key={r} value={r}>
                   {r.toLowerCase()}
                 </option>
               ))}
             </select>
           </label>
+          {scoped(form.role) ? (
+            <label className="field">
+              Project access
+              <select
+                aria-label="Project access"
+                value={form.projectScope}
+                onChange={(e) => setForm({ ...form, projectScope: e.target.value as Scope })}
+              >
+                <option value="ALL">All projects</option>
+                <option value="ASSIGNED">Assigned projects only</option>
+              </select>
+            </label>
+          ) : null}
         </div>
         <p className="muted small" style={{ margin: 0 }}>
           {form.role.toLowerCase()}: {ROLE_HELP[form.role]}. Passwords need at least 10 characters; share them privately.
         </p>
         <div className="row">
           <button className="primary">Add member</button>
-          {added ? <span className="ok-text small">Added {added}</span> : null}
         </div>
         <ErrorNote error={error} />
       </form>

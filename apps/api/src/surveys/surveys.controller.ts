@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AccessService } from '../common/access.service';
 import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
@@ -54,11 +55,12 @@ export class SurveysController {
     private readonly prisma: PrismaService,
     private readonly exporter: ExportService,
     private readonly audit: AuditService,
+    private readonly access: AccessService,
   ) {}
 
   @Get('projects/:projectId/surveys')
   list(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string) {
-    return this.prisma.survey.findMany({ where: { projectId, tenantId: user.tenantId, deletedAt: null }, orderBy: { createdAt: 'desc' } });
+    return this.prisma.survey.findMany({ where: { projectId, ...this.access.surveys(user) }, orderBy: { createdAt: 'desc' } });
   }
 
   @Post('projects/:projectId/surveys')
@@ -210,7 +212,7 @@ export class SurveysController {
       orderBy: { version: 'asc' },
     });
     const statusFilter = status ? (status.toUpperCase().split(',') as never[]) : undefined;
-    const rows = await this.prisma.response.findMany({
+    const rows = await this.prisma.forTenant(user.tenantId).response.findMany({
       where: {
         surveyId: id,
         ...(includeTest === 'true' ? {} : { isTest: false }),

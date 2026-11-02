@@ -16,6 +16,9 @@ import type { Answers, SurveyDefinition } from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { AccessService } from '../common/access.service';
+import { WebhookService } from '../integrations/webhook.service';
+import type { RedirectStatus } from '@zapx/redirect-core';
 import type { AuthUser } from '../auth/auth.types';
 import { QualityService } from '../quality/quality.service';
 
@@ -55,12 +58,14 @@ export class CapiService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly quality: QualityService,
+    private readonly access: AccessService,
+    private readonly webhooks: WebhookService,
   ) {}
 
   // ---- Assignments (studio) ---------------------------------------------------------------------
 
   private async survey(user: AuthUser, surveyId: string) {
-    const s = await this.prisma.survey.findFirst({ where: { id: surveyId, tenantId: user.tenantId, deletedAt: null } });
+    const s = await this.prisma.survey.findFirst({ where: { id: surveyId, ...this.access.surveys(user) } });
     if (!s) throw new NotFoundException('Survey not found');
     return s;
   }
@@ -291,6 +296,7 @@ export class CapiService {
     }
     if (status === 'COMPLETE')
       await this.quality.rememberOpenEnds({ id, surveyId: item.surveyId, isTest: false, ipHash: null }, def, answers);
+    await this.webhooks.responseFinished(id, status.toLowerCase() as RedirectStatus);
     return { clientId: item.clientId, result: 'stored', status: status.toLowerCase(), ...(reason ? { reason } : {}) };
   }
 }

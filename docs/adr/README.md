@@ -14,5 +14,8 @@ they are accepted; a later record supersedes an earlier one.
 | [0007](0007-data-quality.md)                     | Data quality scoring with human review                                 | Accepted                                               |
 | [0008](0008-capi-offline-app.md)                 | Offline CAPI app with server-side replay                               | Accepted                                               |
 | [0009](0009-local-quality-gates.md)              | Quality gates run locally; GitHub Actions is optional                  | Accepted                                               |
+| [0010](0010-project-access-and-api-keys.md)      | Project-level access and organization API keys                         | Accepted                                               |
+| [0011](0011-outbound-webhooks.md)                | Signed outbound webhooks                                               | Accepted                                               |
+| [0012](0012-row-level-security.md)               | PostgreSQL row-level security on respondent data                       | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

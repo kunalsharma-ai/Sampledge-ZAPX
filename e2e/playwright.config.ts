@@ -5,7 +5,8 @@ import { defineConfig } from '@playwright/test';
  * already running (set E2E_REUSE=1 to use servers you started yourself).
  * Requires a migrated database (DATABASE_URL) and `pnpm build` first.
  */
-const env = { ...process.env, ALLOW_SIGNUP: 'true' } as Record<string, string>;
+// Every spec signs up a fresh organization, so the run needs more than the default 5 sign-ups a minute.
+const env = { ...process.env, ALLOW_SIGNUP: 'true', SIGNUP_RATE_PER_MINUTE: '50' } as Record<string, string>;
 export default defineConfig({
   testDir: './tests',
   timeout: 90_000,

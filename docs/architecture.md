@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 5)
+# ZAPX architecture (Milestones 1 to 6)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -122,6 +122,21 @@ outcome, quotas and quality itself; uploads are idempotent by a device-generated
 have their own role and cannot reach the studio API. Details: [modules/capi.md](modules/capi.md),
 [ADR 0008](adr/0008-capi-offline-app.md).
 
+## Enterprise access and integration (Milestone 6)
+
+- **Project-level access.** Members are programmers or viewers with access to all projects or only
+  assigned ones; `AccessService` is the single source of the project, survey and vendor filters, and
+  the guard reads the member fresh on every request. [ADR 0010](adr/0010-project-access-and-api-keys.md)
+- **API keys.** Hashed bearer keys that act as their creator with at most programmer rights.
+- **Webhooks.** Signed JSON events from an outbox, delivered by the callback worker with the same
+  retries and SSRF guard. Payloads never carry answers. [ADR 0011](adr/0011-outbound-webhooks.md)
+- **Audit log viewer** with filters, paging and CSV export.
+- **Row-level security** on `Response`, applied to the studio's respondent-data reads through a
+  tenant-scoped Prisma client. [ADR 0012](adr/0012-row-level-security.md)
+
+Details: [modules/access-and-api-keys.md](modules/access-and-api-keys.md),
+[modules/webhooks.md](modules/webhooks.md).
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -134,8 +149,10 @@ have their own role and cannot reach the studio API. Details: [modules/capi.md](
 
 - Session cookie is httpOnly, SameSite=Lax; mutating requests with the cookie also require the
   `x-zapx-csrf` header. API clients can use `Authorization: Bearer`.
-- Every studio query is scoped by `tenantId` from the session. Postgres row-level security is
-  planned before external customers are onboarded.
+- Every studio query is scoped by `tenantId` from the session, and project, survey and vendor lookups
+  also by the member's project access. Postgres row-level security on `Response` backs up the
+  studio's respondent-data reads (not system paths, and not other tables yet; see ADR 0012). It only
+  applies when the API's database role is not a superuser; check `GET /api/audit/security`.
 - Rate limits on login, sign-up and respondent endpoints.
 - Survey text and piped answers are rendered as text, never HTML.
 - Exports neutralize spreadsheet formulas in respondent text.
@@ -154,5 +171,10 @@ have their own role and cannot reach the studio API. Details: [modules/capi.md](
   surveys need SQL aggregates or a reporting store.
 - CAPI quotas are only known at sync, so the field can exceed a quota (kept as quota full).
 - The CAPI app is a web app: no audio, photo or GPS capture, and no device management yet.
+- Row-level security covers `Response` for studio reads only, and is bypassed by the local
+  `docker compose` database role (a superuser). Other tables rely on application filters.
+- API keys are role-scoped only (no per-endpoint scopes or IP allow lists); there is no SSO or SCIM yet.
+- Webhook deliveries are kept indefinitely (no retention job yet) and are organization-wide (no
+  per-project webhooks).
 - Re-entry with the same UID resumes an unfinished interview. With unsigned links, anyone who knows a
   UID can do this, so vendors handling sensitive studies should use signed entry links.

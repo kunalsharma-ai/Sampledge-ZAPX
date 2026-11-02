@@ -90,6 +90,9 @@ export class QaController {
   async get(@CurrentUser() user: AuthUser, @Param('runId') runId: string) {
     const run = await this.prisma.qaRun.findFirst({ where: { id: runId, tenantId: user.tenantId } });
     if (!run) throw new NotFoundException('QA run not found');
+    await this.surveys.getSurvey(user, run.surveyId).catch(() => {
+      throw new NotFoundException('QA run not found');
+    });
     return run;
   }
 }
