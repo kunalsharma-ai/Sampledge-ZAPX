@@ -76,6 +76,14 @@ data "aws_iam_policy_document" "app" {
     actions   = ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey"]
     resources = [aws_kms_key.data.arn]
   }
+  dynamic "statement" {
+    for_each = var.ecs_exec_enabled ? [1] : []
+    content {
+      sid       = "EcsExec"
+      actions   = ["ssmmessages:CreateControlChannel", "ssmmessages:CreateDataChannel", "ssmmessages:OpenControlChannel", "ssmmessages:OpenDataChannel"]
+      resources = ["*"]
+    }
+  }
 }
 
 resource "aws_iam_role_policy" "app" {
@@ -233,7 +241,7 @@ resource "aws_ecs_service" "api" {
   desired_count                     = var.api_desired_count
   launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 60
-  enable_execute_command            = false
+  enable_execute_command            = var.ecs_exec_enabled
   network_configuration {
     subnets         = aws_subnet.private[*].id
     security_groups = [aws_security_group.tasks.id]
@@ -247,15 +255,20 @@ resource "aws_ecs_service" "api" {
     enable   = true
     rollback = true
   }
+  # Autoscaling owns the running count after the first apply.
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
   depends_on = [aws_lb_listener.https]
 }
 
 resource "aws_ecs_service" "worker" {
-  name            = "worker"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.worker.arn
-  desired_count   = var.worker_desired_count
-  launch_type     = "FARGATE"
+  name                   = "worker"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.worker.arn
+  desired_count          = var.worker_desired_count
+  launch_type            = "FARGATE"
+  enable_execute_command = var.ecs_exec_enabled
   network_configuration {
     subnets         = aws_subnet.private[*].id
     security_groups = [aws_security_group.tasks.id]
@@ -285,6 +298,10 @@ resource "aws_ecs_service" "studio" {
   deployment_circuit_breaker {
     enable   = true
     rollback = true
+  }
+  # Autoscaling owns the running count after the first apply.
+  lifecycle {
+    ignore_changes = [desired_count]
   }
   depends_on = [aws_lb_listener.https]
 }

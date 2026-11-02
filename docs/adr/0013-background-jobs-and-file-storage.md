@@ -45,7 +45,7 @@ does not have yet (no Redis, no SQS, and AWS is not provisioned).
 - No new infrastructure; jobs are transactional with the rest of the data and visible with SQL.
 - PostgreSQL polling (every `JOB_POLL_MS`, 2 seconds) is fine for hundreds of jobs an hour, not for
   thousands a second. If that changes, the `Job` table can be fed from SQS without changing callers.
-- **S3 is not implemented.** `LocalFileStore` needs a disk shared by the API and the worker (a
+- **S3 was not implemented at first** (since Milestone 13 it is: `FILE_STORE=s3`, ADR 0019). `LocalFileStore` needs a disk shared by the API and the worker (a
   volume in compose, EFS on AWS). An `S3FileStore` is the intended production store and plugs in
   behind `FileStore`; until it exists and is tested against a bucket, do not deploy more than one
   host without a shared disk.

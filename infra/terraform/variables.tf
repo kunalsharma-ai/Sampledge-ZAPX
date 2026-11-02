@@ -139,3 +139,64 @@ variable "edge_shared_secret" {
     error_message = "Use at least 32 random characters, e.g. openssl rand -hex 32."
   }
 }
+
+# ---- Protection, scaling and backups (Milestone 14) --------------------------------------------
+variable "waf_mode" {
+  description = "AWS WAF on CloudFront and the load balancer: \"count\" (log what the managed rules would block, block nothing), \"block\", or \"off\". Start with count and switch to block after reading the WAF logs for a week of real fieldwork."
+  type        = string
+  default     = "count"
+  validation {
+    condition     = contains(["off", "count", "block"], var.waf_mode)
+    error_message = "Use off, count or block."
+  }
+}
+
+variable "waf_rate_limit" {
+  description = "Requests per 5 minutes from one address before WAF blocks it (rate rules always block unless waf_mode is off). Interview centres behind one address need a higher value."
+  type        = number
+  default     = 3000
+  validation {
+    condition     = var.waf_rate_limit >= 100
+    error_message = "AWS WAF needs at least 100."
+  }
+}
+
+variable "waf_count_only_rules" {
+  description = "Managed rules that only count, even in block mode: large bodies (CAPI sync, uploads) and HTML in question text trip these."
+  type        = list(string)
+  default     = ["SizeRestrictions_BODY", "CrossSiteScripting_BODY", "NoUserAgent_HEADER"]
+}
+
+variable "api_max_count" {
+  description = "Most API tasks autoscaling may run (it never goes below api_desired_count)."
+  type        = number
+  default     = 6
+}
+
+variable "studio_max_count" {
+  type    = number
+  default = 4
+}
+
+variable "autoscaling_cpu_target" {
+  description = "Average CPU (percent) the API and studio services scale to keep."
+  type        = number
+  default     = 60
+}
+
+variable "backup_enabled" {
+  description = "AWS Backup of the database and the files bucket, in addition to the RDS automated backups."
+  type        = bool
+  default     = true
+}
+
+variable "backup_retention_days" {
+  type    = number
+  default = 35
+}
+
+variable "ecs_exec_enabled" {
+  description = "Allow `aws ecs execute-command` into the API and worker tasks (Session Manager, audited in CloudTrail). Off by default; turn on when someone needs to reach the database."
+  type        = bool
+  default     = false
+}
