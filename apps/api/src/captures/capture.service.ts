@@ -79,7 +79,7 @@ export class CaptureService {
   ) {
     const id = randomBytes(16).toString('base64url');
     const storageKey = `${row.tenantId}/captures/${id}`;
-    await this.store.put(storageKey, data);
+    await this.store.put(storageKey, data, contentType);
     try {
       return await this.prisma.capture.create({
         data: { ...row, id, kind, contentType, size: data.length, sha256: createHash('sha256').update(data).digest('hex'), storageKey },

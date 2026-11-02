@@ -16,6 +16,7 @@ export default tseslint.config(
       '**/next-env.d.ts',
       'e2e/test-results/**',
       'e2e/playwright-report/**',
+      '**/.terraform/**',
     ],
   },
   js.configs.recommended,

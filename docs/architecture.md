@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 9)
+# ZAPX architecture (Milestones 1 to 13)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -206,6 +206,18 @@ Details: [modules/rich-media.md](modules/rich-media.md).
 - **CAPI** stores the start and end location and the recording consent in `Response.location`; the
   sync checks for overlapping interviews by the same interviewer. [ADR 0018](adr/0018-fraud-detection-and-capi-capture.md)
 
+## Production readiness (Milestone 13)
+
+- **Files** go to S3 with `FILE_STORE=s3` (`S3FileStore`, SSE-KMS); local disk stays the default.
+- **SAML 2.0** sign-in (`SamlService`) beside OpenID Connect, sharing account linking, domains,
+  just-in-time roles and enforcement; requests are stored in `SsoRequest` and answered once.
+- **Billing** (`BillingService`, optional): Stripe Checkout and portal; signed webhooks re-read the
+  subscription and set `Tenant.plan`. [Guide](modules/billing.md)
+- **AWS** in `infra/terraform` with `infra/scripts/deploy-aws.sh`; the API builds `DATABASE_URL`
+  from the RDS secret and trusts viewer address and country only from CloudFront
+  (`EDGE_SHARED_SECRET`). [Guide](../infra/terraform/README.md)
+- **PROJEXA check** `scripts/projexa-check.mjs`. [ADR 0019](adr/0019-production-readiness.md)
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -229,8 +241,8 @@ Details: [modules/rich-media.md](modules/rich-media.md).
 
 ## Known limits
 
-- Background files are stored on a local disk shared by the API and the worker. The S3 store is
-  designed for but not built; jobs are polled from PostgreSQL (fine for hundreds an hour).
+- Files are on a shared local disk or in S3 (`FILE_STORE`); the S3 store is tested against a fake S3
+  server, not AWS yet. Jobs are polled from PostgreSQL (fine for hundreds an hour).
 - AI proposals return a full definition, so very long questionnaires may need to be imported in parts.
 - The Claude provider has been tested with a scripted fake; it needs an API key to be exercised live.
 - Grid questions are single choice per row; MaxDiff, conjoint, ranking and media questions come later.
@@ -243,12 +255,15 @@ Details: [modules/rich-media.md](modules/rich-media.md).
   `docker compose` database role (a superuser). Other tables rely on application filters.
 - API keys are role-scoped only (no per-endpoint scopes or IP allow lists).
 - CATI has no dialer, call recording, time-zone calling windows or do-not-call list.
-- Media are public by id and stored on the local file store (no S3 adapter yet); no recorded
+- Media are public by id and served by the API from the file store; no recorded
   voice-over, transcription, MaxDiff or conjoint.
 - Analysis is unweighted, reads rows in the API process (up to 200,000 interviews) and has no
   nets, banner books, charts or scheduled delivery yet.
-- SSO is OpenID Connect only (no SAML) and has been tested against a mock provider, not a real one.
-  SCIM covers users, not groups. Plans have no billing or self-service changes.
+- SSO (OpenID Connect and SAML) has been tested against test providers, not a real one; SAML has
+  no single logout or encrypted assertions. SCIM covers users, not groups. Billing (Stripe) is
+  tested against a fake Stripe only.
+- The AWS Terraform and release script are validated and plan-tested with a mocked provider, not
+  applied to an account yet. PROJEXA has been checked against its code, not a deployed PROJEXA.
 - Webhooks are organization-wide (no per-project webhooks). Deliveries are kept for
   `WEBHOOK_DELIVERY_RETENTION_DAYS` (30).
 - Re-entry with the same UID resumes an unfinished interview. With unsigned links, anyone who knows a

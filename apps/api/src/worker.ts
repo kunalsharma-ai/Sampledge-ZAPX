@@ -2,6 +2,7 @@
  * Background worker process (Milestone 7): runs jobs, vendor callbacks and webhooks, without the
  * HTTP server. Run the API with JOB_WORKER=off and CALLBACK_WORKER=off when this process runs.
  */
+import './database-url';
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

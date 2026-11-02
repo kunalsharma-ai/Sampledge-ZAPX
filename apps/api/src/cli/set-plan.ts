@@ -1,9 +1,10 @@
 /**
- * Operator command: set an organization's plan (Milestone 8). There is no billing integration, so a
- * person running ZAPX decides plans with this command, and it is recorded in the audit log.
+ * Operator command: set an organization's plan (Milestone 8), recorded in the audit log. With billing
+ * turned on (BILLING=stripe, Milestone 13) the next Stripe subscription change sets the plan again.
  *
  *   node apps/api/dist/cli/set-plan.js <organization id | member email> <free|team|business|enterprise>
  */
+import '../database-url';
 import { PrismaClient } from '@zapx/db';
 import { PLAN_CODES, PLANS, isPlanCode } from '../plans/plans';
 

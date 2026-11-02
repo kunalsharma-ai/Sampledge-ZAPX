@@ -110,6 +110,16 @@ const schema = z
     JOB_POLL_MS: z.coerce.number().int().min(100).max(600_000).default(2_000),
     /** Where the local file store keeps files (exports, uploads for AI jobs). */
     FILES_DIR: z.string().default('.data/files'),
+    /** Where file bytes live (Milestone 13): the local FILES_DIR, or a private S3 bucket. */
+    FILE_STORE: z.enum(['local', 's3']).default('local'),
+    S3_BUCKET: optionalString,
+    S3_REGION: z.string().default('eu-west-1'),
+    /** Key prefix inside the bucket, e.g. "zapx/production". */
+    S3_PREFIX: optionalString,
+    /** KMS key id or ARN for SSE-KMS. Without it objects use SSE-S3 (AES-256). */
+    S3_KMS_KEY_ID: optionalString,
+    /** S3-compatible endpoint for testing (MinIO, LocalStack). Leave unset on AWS. */
+    S3_ENDPOINT: optionalString,
     /** Export files are deleted after this many hours. */
     EXPORT_FILE_TTL_HOURS: z.coerce
       .number()
@@ -122,6 +132,31 @@ const schema = z
     WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
     /** Plan for organizations created by sign-up (Milestone 8): free, team, business or enterprise. */
     DEFAULT_PLAN: z.enum(['free', 'team', 'business', 'enterprise']).default('enterprise'),
+    /** Billing (Milestone 13): off, or stripe (Checkout, customer portal and webhooks). */
+    BILLING: z.enum(['off', 'stripe']).default('off'),
+    STRIPE_SECRET_KEY: optionalString,
+    STRIPE_WEBHOOK_SECRET: optionalString,
+    /** Plan code to Stripe price ID, as JSON: {"team": "price_...", "business": "price_..."}. */
+    STRIPE_PRICES: z
+      .string()
+      .optional()
+      .transform((v, ctx) => {
+        if (!v) return {} as Partial<Record<'free' | 'team' | 'business' | 'enterprise', string>>;
+        try {
+          return z
+            .record(z.enum(['free', 'team', 'business', 'enterprise']), z.string().regex(/^price_[A-Za-z0-9]+$/))
+            .parse(JSON.parse(v)) as Partial<Record<'free' | 'team' | 'business' | 'enterprise', string>>;
+        } catch {
+          ctx.addIssue({ code: 'custom', message: 'STRIPE_PRICES must be JSON: {"team": "price_..."}' });
+          return z.NEVER;
+        }
+      }),
+    /** Pin the Stripe API version (e.g. 2026-09-30.clover); unset uses the account's default. */
+    STRIPE_API_VERSION: optionalString,
+    /** Only for tests: a Stripe-compatible fake. */
+    STRIPE_API_BASE: z.string().url().default('https://api.stripe.com'),
+    /** Plan an organization falls back to when its subscription ends. */
+    BILLING_FALLBACK_PLAN: z.enum(['free', 'team', 'business', 'enterprise']).default('free'),
     /** Public address of the studio; SSO callbacks are ${STUDIO_URL}/api/auth/sso/callback. */
     STUDIO_URL: z.string().url().default('http://localhost:3000'),
     /** Development and tests only: allow http and private-network identity providers. */
@@ -129,6 +164,23 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true'),
+    /** Load balancers and proxies in front of the API that add X-Forwarded-For (1 behind one ALB). */
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
+    /**
+     * Shared secret the CDN sends as X-Zapx-Edge (Milestone 13). When set, the viewer's address
+     * (EDGE_CLIENT_ADDRESS_HEADER) and country (GEO_COUNTRY_HEADER) are believed only on requests
+     * that carry it, and those headers are removed from every other request.
+     */
+    EDGE_SHARED_SECRET: z
+      .string()
+      .min(32)
+      .optional()
+      .or(z.literal('').transform(() => undefined)),
+    EDGE_CLIENT_ADDRESS_HEADER: z
+      .string()
+      .regex(/^[a-z0-9-]*$/i)
+      .default('')
+      .transform((v) => v.toLowerCase()),
     COOKIE_SECURE: z
       .string()
       .optional()
@@ -140,6 +192,14 @@ const schema = z
     if (c.NODE_ENV === 'production' && c.CALLBACK_ALLOW_PRIVATE_HOSTS) {
       ctx.addIssue({ code: 'custom', path: ['CALLBACK_ALLOW_PRIVATE_HOSTS'], message: 'must be false in production' });
     }
+    if (c.BILLING === 'stripe') {
+      for (const k of ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'] as const)
+        if (!c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `BILLING=stripe needs ${k}` });
+      if (!Object.keys(c.STRIPE_PRICES).length)
+        ctx.addIssue({ code: 'custom', path: ['STRIPE_PRICES'], message: 'BILLING=stripe needs STRIPE_PRICES' });
+    }
+    if (c.FILE_STORE === 's3' && !c.S3_BUCKET)
+      ctx.addIssue({ code: 'custom', path: ['S3_BUCKET'], message: 'FILE_STORE=s3 needs S3_BUCKET' });
     if (c.NODE_ENV === 'production' && c.SSO_ALLOW_INSECURE_ISSUER) {
       ctx.addIssue({ code: 'custom', path: ['SSO_ALLOW_INSECURE_ISSUER'], message: 'must be false in production' });
     }

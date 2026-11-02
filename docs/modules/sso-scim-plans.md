@@ -86,8 +86,10 @@ Operators change a plan with:
 node apps/api/dist/cli/set-plan.js <member email or organization id> <free|team|business|enterprise>
 ```
 
-There is no billing: nobody is charged, and plan changes are only made with this command (recorded
-in the audit log as `plan.change`). New sign-ups get `DEFAULT_PLAN` (`enterprise` by default).
+Plan changes made with this command are recorded in the audit log as `plan.change`. New sign-ups
+get `DEFAULT_PLAN` (`enterprise` by default). With billing turned on (Milestone 13, see
+[billing.md](billing.md)) the organization's Stripe subscription sets the plan, and the next
+subscription change overrides a manual one.
 
 ## Settings
 
@@ -96,3 +98,34 @@ in the audit log as `plan.change`). New sign-ups get `DEFAULT_PLAN` (`enterprise
 | `STUDIO_URL`                | `http://localhost:3000` | Public studio address; used for the SSO redirect URI and SCIM URLs |
 | `DEFAULT_PLAN`              | `enterprise`            | Plan for organizations created by sign-up                          |
 | `SSO_ALLOW_INSECURE_ISSUER` | `false`                 | Development only: allow http and private-network providers         |
+
+## SAML 2.0 (Milestone 13)
+
+Choose **SAML 2.0** under Settings → Single sign-on for identity providers that use SAML (AD FS,
+Entra ID, Okta, OneLogin, PingFederate). The organization's email domains, just-in-time role and
+"require single sign-on" work as for OpenID Connect; an organization uses one protocol at a time.
+
+In the identity provider, add ZAPX as a SAML application:
+
+| Setting                    | Value                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| Entity ID / audience       | `${STUDIO_URL}/api/auth/sso/saml/metadata`                                        |
+| ACS (reply) URL, HTTP-POST | `${STUDIO_URL}/api/auth/sso/saml/acs`                                             |
+| Metadata                   | `GET ${STUDIO_URL}/api/auth/sso/saml/metadata`                                    |
+| Name ID                    | Persistent or email address (transient is refused)                                |
+| Attributes                 | `email` (or `mail`, or the Microsoft email claim), and a display name if you like |
+| Signing                    | Sign the assertion (RSA-SHA256)                                                   |
+
+Then enter the provider's sign-in URL, its entity ID and its signing certificate in ZAPX. During a
+certificate rotation paste both certificates; either is accepted until you remove the old one.
+
+What ZAPX checks on every response: the assertion is signed by one of the configured certificates,
+its issuer is the configured entity ID, the audience is ZAPX, the timestamps are current (60 s of
+clock skew), and it answers a sign-in ZAPX started in the last 10 minutes. Each sign-in request can
+be answered once, so a captured response cannot be replayed. Sign-ins started at the identity
+provider's portal (IdP-initiated) are refused: start from the ZAPX login page or link to
+`/login`. Not supported yet: single logout, encrypted assertions and signed AuthnRequests.
+
+**Tested** against a test identity provider in the API tests and in the browser
+(`e2e/tests/milestone13.spec.ts`), **not yet against a real one**. Sign in once through your
+provider from a private window before you turn on "require single sign-on".

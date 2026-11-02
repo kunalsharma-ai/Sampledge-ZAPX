@@ -63,7 +63,25 @@ callbacks. Callbacks to private or loopback addresses are blocked unless
 
 ## PROJEXA vendors
 
-Follows PROJEXA `docs/SURVEY_INTEGRATION.md`. **Not yet verified against a live PROJEXA.**
+Follows PROJEXA `docs/SURVEY_INTEGRATION.md`.
+
+**Verification (Milestone 13).** `scripts/projexa-check.mjs` runs one respondent through both
+systems over their public APIs: PROJEXA test entry link → ZAPX survey → back to PROJEXA's
+`/r/complete` → ZAPX's signed S2S confirmation, which PROJEXA must mark verified. On 2026-11-02 it
+passed all 10 steps against PROJEXA branch `claude/milestone-20-ai-copilot` (commit 9c51e45) run
+locally next to ZAPX. PROJEXA has not been deployed yet, so it has **not been run against a live
+PROJEXA**; run it against the real address before the first live project:
+
+```
+PROJEXA_URL=https://projexa.example PROJEXA_EMAIL=admin@... PROJEXA_PASSWORD=... \
+ZAPX_API_URL=https://zapx.example/api ZAPX_RUNTIME_URL=https://take.zapx.example \
+ZAPX_EMAIL=admin@... ZAPX_PASSWORD=... node scripts/projexa-check.mjs
+```
+
+It uses PROJEXA's test entry link (test sessions never count toward quotas, revenue, payout or vendor
+callbacks), creates a clearly named client, vendor and project on both sides and leaves them for
+inspection. The PROJEXA account must be an admin without two-step sign-in, and PROJEXA's
+organization must allow the ZAPX respondent host in its redirect domains.
 
 1. In PROJEXA, the client survey link is the ZAPX live link with `vid=<code>&uid={session_token}`.
 2. At the end ZAPX sends the browser to `{base}/r/{status}?token={session_token}` (primary slugs).

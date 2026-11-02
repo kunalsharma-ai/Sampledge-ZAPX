@@ -67,7 +67,7 @@ export class MediaService {
       throw new PayloadTooLargeException(`${type.kind[0]!.toUpperCase()}${type.kind.slice(1)} files can be up to ${max} MB`);
     const id = randomBytes(16).toString('base64url');
     const storageKey = `${user.tenantId}/media/${id}`;
-    await this.store.put(storageKey, data);
+    await this.store.put(storageKey, data, type.contentType);
     const m = await this.prisma.mediaAsset.create({
       data: {
         id,

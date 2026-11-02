@@ -1,7 +1,7 @@
 'use client';
 /**
- * Milestone 8 settings for administrators: single sign-on (OpenID Connect), SCIM provisioning, and
- * the organization's plan with its usage.
+ * Settings for administrators: single sign-on (OpenID Connect, Milestone 8; SAML 2.0, Milestone 13),
+ * SCIM provisioning, the organization's plan with its usage, and billing (Milestone 13).
  */
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -9,11 +9,18 @@ import { CopyField, ErrorNote } from './Shell';
 
 type Role = 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
 
+type Protocol = 'OIDC' | 'SAML';
+
 interface SsoState {
   available: boolean;
   callbackUrl: string;
+  saml: { entityId: string; acsUrl: string; metadataUrl: string };
   config: {
     enabled: boolean;
+    protocol: Protocol;
+    samlEntryPoint: string | null;
+    samlIdpIssuer: string | null;
+    samlCerts: string[];
     issuer: string;
     clientId: string;
     clientSecretSet: boolean;
@@ -28,6 +35,10 @@ export function SsoSettings() {
   const [state, setState] = useState<SsoState | null>(null);
   const [form, setForm] = useState({
     enabled: true,
+    protocol: 'OIDC' as Protocol,
+    samlEntryPoint: '',
+    samlIdpIssuer: '',
+    samlCert: '',
     issuer: '',
     clientId: '',
     clientSecret: '',
@@ -46,6 +57,10 @@ export function SsoSettings() {
       if (s.config)
         setForm({
           enabled: s.config.enabled,
+          protocol: s.config.protocol,
+          samlEntryPoint: s.config.samlEntryPoint ?? '',
+          samlIdpIssuer: s.config.samlIdpIssuer ?? '',
+          samlCert: s.config.samlCerts.join('\n'),
           issuer: s.config.issuer,
           clientId: s.config.clientId,
           clientSecret: '',
@@ -71,9 +86,18 @@ export function SsoSettings() {
         method: 'PUT',
         body: {
           enabled: form.enabled,
-          issuer: form.issuer.trim(),
-          clientId: form.clientId.trim(),
-          ...(form.clientSecret ? { clientSecret: form.clientSecret } : {}),
+          protocol: form.protocol,
+          ...(form.protocol === 'SAML'
+            ? {
+                samlEntryPoint: form.samlEntryPoint.trim(),
+                samlIdpIssuer: form.samlIdpIssuer.trim(),
+                samlCerts: splitCerts(form.samlCert),
+              }
+            : {
+                issuer: form.issuer.trim(),
+                clientId: form.clientId.trim(),
+                ...(form.clientSecret ? { clientSecret: form.clientSecret } : {}),
+              }),
           domains: form.domains
             .split(/[\s,]+/)
             .map((d) => d.trim())
@@ -82,7 +106,13 @@ export function SsoSettings() {
           jitRole: form.jitRole || null,
         },
       });
-      setNote(form.enabled ? 'Saved. The identity provider answered correctly.' : 'Saved. Single sign-on is off.');
+      setNote(
+        !form.enabled
+          ? 'Saved. Single sign-on is off.'
+          : form.protocol === 'SAML'
+            ? 'Saved. Sign in once from a private window to check the identity provider.'
+            : 'Saved. The identity provider answered correctly.',
+      );
       await load();
     } catch (err) {
       setError(err);
@@ -99,35 +129,104 @@ export function SsoSettings() {
         <p className="muted small">Single sign-on is not included in your plan.</p>
       ) : (
         <form className="stack" onSubmit={save}>
-          <p className="muted small" style={{ margin: 0 }}>
-            OpenID Connect (Microsoft Entra ID, Okta, Google Workspace, Keycloak and others). Register ZAPX as a web application at your
-            provider with this redirect address, then enter its details here.
-          </p>
-          <CopyField label="Redirect URI" value={state.callbackUrl} />
-          <label className="field">
-            Issuer URL
-            <input
-              value={form.issuer}
-              onChange={(e) => setForm({ ...form, issuer: e.target.value })}
-              placeholder="https://login.example.com"
-              required
-            />
-          </label>
-          <label className="field">
-            Client ID
-            <input value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} required />
-          </label>
-          <label className="field">
-            Client secret
-            <input
-              type="password"
-              autoComplete="off"
-              value={form.clientSecret}
-              onChange={(e) => setForm({ ...form, clientSecret: e.target.value })}
-              placeholder={state.config?.clientSecretSet ? 'Stored. Leave empty to keep it.' : ''}
-              required={!state.config?.clientSecretSet}
-            />
-          </label>
+          <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
+            <legend className="small">Protocol</legend>
+            <div className="row" role="radiogroup" aria-label="Protocol">
+              {(
+                [
+                  ['OIDC', 'OpenID Connect'],
+                  ['SAML', 'SAML 2.0'],
+                ] as const
+              ).map(([p, label]) => (
+                <label key={p} className="check small">
+                  <input
+                    type="radio"
+                    name="sso-protocol"
+                    checked={form.protocol === p}
+                    onChange={() => setForm({ ...form, protocol: p })}
+                  />{' '}
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {form.protocol === 'OIDC' ? (
+            <>
+              <p className="muted small" style={{ margin: 0 }}>
+                Microsoft Entra ID, Okta, Google Workspace, Keycloak and others. Register ZAPX as a web application at your provider with
+                this redirect address, then enter its details here.
+              </p>
+              <CopyField label="Redirect URI" value={state.callbackUrl} />
+              <label className="field">
+                Issuer URL
+                <input
+                  value={form.issuer}
+                  onChange={(e) => setForm({ ...form, issuer: e.target.value })}
+                  placeholder="https://login.example.com"
+                  required
+                />
+              </label>
+              <label className="field">
+                Client ID
+                <input value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })} required />
+              </label>
+              <label className="field">
+                Client secret
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={form.clientSecret}
+                  onChange={(e) => setForm({ ...form, clientSecret: e.target.value })}
+                  placeholder={state.config?.protocol === 'OIDC' && state.config.clientSecretSet ? 'Stored. Leave empty to keep it.' : ''}
+                  required={!(state.config?.protocol === 'OIDC' && state.config.clientSecretSet)}
+                />
+              </label>
+            </>
+          ) : (
+            <>
+              <p className="muted small" style={{ margin: 0 }}>
+                For identity providers that use SAML (AD FS, Entra ID, Okta, OneLogin, PingFederate). Add ZAPX as a SAML application with
+                these details or import the metadata, have it send the email address (as the name ID or an email attribute), and sign the
+                assertions. Sign-in starts from the ZAPX login page.
+              </p>
+              <CopyField label="Entity ID (audience)" value={state.saml.entityId} />
+              <CopyField label="Assertion consumer service (ACS) URL" value={state.saml.acsUrl} />
+              <p className="small" style={{ margin: 0 }}>
+                <a href="/api/auth/sso/saml/metadata" target="_blank" rel="noreferrer">
+                  Download ZAPX metadata (XML)
+                </a>
+              </p>
+              <label className="field">
+                Identity provider sign-in URL
+                <input
+                  value={form.samlEntryPoint}
+                  onChange={(e) => setForm({ ...form, samlEntryPoint: e.target.value })}
+                  placeholder="https://idp.example.com/saml/sso"
+                  required
+                />
+              </label>
+              <label className="field">
+                Identity provider entity ID (issuer)
+                <input
+                  value={form.samlIdpIssuer}
+                  onChange={(e) => setForm({ ...form, samlIdpIssuer: e.target.value })}
+                  placeholder="https://idp.example.com/saml"
+                  required
+                />
+              </label>
+              <label className="field">
+                Signing certificate (PEM). During a rotation, paste both, one after the other.
+                <textarea
+                  rows={5}
+                  className="mono small"
+                  value={form.samlCert}
+                  onChange={(e) => setForm({ ...form, samlCert: e.target.value })}
+                  placeholder="-----BEGIN CERTIFICATE-----"
+                  required
+                />
+              </label>
+            </>
+          )}
           <label className="field">
             Email domains
             <input
@@ -166,13 +265,19 @@ export function SsoSettings() {
           ) : null}
           <div>
             <button className="primary" disabled={busy}>
-              {busy ? 'Checking the provider…' : 'Save single sign-on'}
+              {busy ? (form.protocol === 'OIDC' ? 'Checking the provider…' : 'Saving…') : 'Save single sign-on'}
             </button>
           </div>
         </form>
       )}
     </section>
   );
+}
+
+/** Splits pasted PEM text into certificates (several during a rotation). */
+function splitCerts(text: string): string[] {
+  const found = text.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+  return found ?? (text.trim() ? [text.trim()] : []);
 }
 
 interface ScimState {
@@ -319,9 +424,122 @@ export function PlanUsage() {
       <Meter label={`Completes in ${month}`} used={s.usage.completesThisMonth} limit={s.limits.completesPerMonth} />
       <p className="muted small" style={{ margin: 0 }}>
         Single sign-on: {s.limits.sso ? 'included' : 'not included'} · SCIM: {s.limits.scim ? 'included' : 'not included'}. When the
-        month&apos;s completes are used, new respondents see the survey as closed; people already in an interview can finish. Plans are
-        changed by your ZAPX operator.
+        month&apos;s completes are used, new respondents see the survey as closed; people already in an interview can finish.
       </p>
+    </section>
+  );
+}
+
+interface BillingSummary {
+  enabled: boolean;
+  plan: string;
+  status: string | null;
+  periodEnd: string | null;
+  hasSubscription: boolean;
+  canManage: boolean;
+  purchasable: Array<{ code: string; name: string; limits: PlanSummary['limits'] }>;
+}
+
+const STATUS_TEXT: Record<string, string> = {
+  active: 'Active',
+  trialing: 'Trial',
+  past_due: 'Payment failed: Stripe is retrying. Update the payment method to keep the plan.',
+  canceled: 'Cancelled',
+  unpaid: 'Unpaid',
+  incomplete: 'Waiting for the first payment',
+  incomplete_expired: 'The first payment did not complete',
+};
+
+const limit = (n: number | null, what: string) => (n === null ? `unlimited ${what}` : `${n.toLocaleString()} ${what}`);
+
+/** Billing (Milestone 13): buy a plan with Stripe Checkout, manage it in the Stripe portal. */
+export function Billing() {
+  const [b, setB] = useState<BillingSummary | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [returned] = useState(() => (typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('billing')));
+  useEffect(() => {
+    void api<BillingSummary>('/billing').then(setB, setError);
+  }, []);
+
+  const go = async (path: string, body?: unknown, key = path) => {
+    setBusy(key);
+    setError(null);
+    try {
+      const { url } = await api<{ url: string }>(path, { method: 'POST', body });
+      window.location.assign(url);
+    } catch (e) {
+      setError(e);
+      setBusy(null);
+    }
+  };
+
+  if (!b) return error ? <ErrorNote error={error} /> : null;
+  if (!b.enabled) {
+    return (
+      <section className="panel stack" data-testid="billing">
+        <h2>Billing</h2>
+        <p className="muted small" style={{ margin: 0 }}>
+          Online billing is not turned on for this ZAPX installation. Your plan is set by your ZAPX operator.
+        </p>
+      </section>
+    );
+  }
+  return (
+    <section className="panel stack" data-testid="billing">
+      <h2>Billing</h2>
+      {returned === 'success' ? (
+        <p className="ok-text small" role="status" style={{ margin: 0 }}>
+          Thank you. Your plan changes as soon as Stripe confirms the payment, usually within a minute.
+        </p>
+      ) : returned === 'cancelled' ? (
+        <p className="muted small" role="status" style={{ margin: 0 }}>
+          Checkout was cancelled; nothing was charged.
+        </p>
+      ) : null}
+      {b.hasSubscription ? (
+        <p className="small" style={{ margin: 0 }}>
+          Subscription: <strong>{STATUS_TEXT[b.status ?? ''] ?? b.status}</strong>
+          {b.periodEnd && (b.status === 'active' || b.status === 'trialing')
+            ? ` · renews ${new Date(b.periodEnd).toLocaleDateString(undefined, { dateStyle: 'medium' })}`
+            : ''}
+        </p>
+      ) : null}
+      {!b.hasSubscription || b.status === 'canceled' || b.status === 'incomplete_expired' ? (
+        <div className="stack">
+          {b.purchasable.map((p) => (
+            <div key={p.code} className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <div className="small">
+                <strong>{p.name}</strong>
+                <span className="muted">
+                  {' '}
+                  · {limit(p.limits.seats, 'members')}, {limit(p.limits.completesPerMonth, 'completes a month')}
+                  {p.limits.sso ? ', single sign-on' : ''}
+                  {p.limits.scim ? ', SCIM' : ''}
+                </span>
+              </div>
+              <button
+                className="primary"
+                disabled={!!busy || p.code === b.plan}
+                onClick={() => void go('/billing/checkout', { plan: p.code }, p.code)}
+              >
+                {p.code === b.plan ? 'Current plan' : busy === p.code ? 'Opening Stripe…' : `Choose ${p.name}`}
+              </button>
+            </div>
+          ))}
+          <p className="muted small" style={{ margin: 0 }}>
+            Payment is handled by Stripe; ZAPX never sees card details. Prices are shown on the Stripe page before you pay.
+          </p>
+        </div>
+      ) : null}
+      {b.canManage ? (
+        <div>
+          <button disabled={!!busy} onClick={() => void go('/billing/portal')}>
+            {busy === '/billing/portal' ? 'Opening Stripe…' : 'Manage billing (plan, payment method, invoices)'}
+          </button>
+        </div>
+      ) : null}
+      <ErrorNote error={error} />
     </section>
   );
 }
