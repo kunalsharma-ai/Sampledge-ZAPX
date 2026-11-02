@@ -14,7 +14,15 @@ import {
   renderQuestion,
   validatePage,
 } from '@zapx/logic-engine';
-import { SurveyHeader, SurveyPage, answersToSubmit, defaultThemeCss, themeCss, type FieldErrors } from '@zapx/survey-renderer';
+import {
+  SurveyHeader,
+  SurveyPage,
+  answersToSubmit,
+  defaultThemeCss,
+  pendingMedia,
+  themeCss,
+  type FieldErrors,
+} from '@zapx/survey-renderer';
 import { defaultPresentation, parsePresentation, parseSurveyDefinition, type AnswerValue, type Answers } from '@zapx/survey-schema';
 import { interviews, type LocalInterview, type PackagedSurvey } from './store';
 
@@ -36,12 +44,16 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   const msg = useMemo(() => localizeMessages(presentation, lang), [presentation, lang]);
   const [pageAnswers, setPageAnswers] = useState<Answers>(() => pageAnswersOf(record));
   const [errors, setErrors] = useState<FieldErrors>({});
+  /** Video and audio played to the end, as "pageIndex:questionId". */
+  const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
   const shownAt = useRef(Date.now());
 
   if (!def) return <p className="capi-card">This survey package could not be read. Update your surveys and try again.</p>;
 
   const page = current.pageIndex >= 0 ? def.pages[current.pageIndex] : undefined;
   const questions = page ? page.questions.map((q) => renderQuestion(q, def, current.answers, current.clientId)) : [];
+  const playedHere = new Set([...played].filter((k) => k.startsWith(`${current.pageIndex}:`)).map((k) => k.slice(k.indexOf(':') + 1)));
+  const waiting = pendingMedia(questions, pageAnswers, current.answers, playedHere).length > 0;
 
   function pageAnswersOf(r: LocalInterview): Answers {
     const p = source?.pages[r.pageIndex];
@@ -164,7 +176,12 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
                 setPageAnswers((a) => ({ ...a, [id]: v }));
                 setErrors((e) => ({ ...e, [id]: undefined }));
               }}
+              onMediaPlayed={(id) => setPlayed((p) => new Set(p).add(`${current.pageIndex}:${id}`))}
+              readAloud={presentation.readAloud}
+              language={def.language}
+              messages={msg}
             />
+            {waiting ? <p className="zx-media-wait">{msg.playToEnd}</p> : null}
             <div className="zx-actions">
               {def.settings.allowBack && current.pageIndex > nextPageIndex(def, current.answers, -1) ? (
                 <button type="button" className="zx-button zx-secondary" onClick={() => void back()}>
@@ -173,7 +190,9 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
               ) : (
                 <span />
               )}
-              <button className="zx-button">{msg.next}</button>
+              <button className="zx-button" disabled={waiting}>
+                {msg.next}
+              </button>
             </div>
             <p style={{ marginTop: 16 }}>
               <button type="button" className="capi-link capi-danger" onClick={() => void breakOff()}>

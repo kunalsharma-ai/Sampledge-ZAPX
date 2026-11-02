@@ -5,21 +5,42 @@
  * offline CAPI app, so a survey behaves identically in every mode. The server never trusts the
  * client's idea of routing: it recomputes visibility and validation from the stored answers.
  */
-import type { AnswerValue, Answers, GridQuestion, Option, Page, Question, SurveyDefinition, Termination, Quota } from '@zapx/survey-schema';
+import {
+  scaleCodes,
+  type AnswerValue,
+  type Answers,
+  type GridQuestion,
+  type Option,
+  type Page,
+  type Question,
+  type SurveyDefinition,
+  type Termination,
+  type Quota,
+} from '@zapx/survey-schema';
 import { evaluate, parseCached, references, truthy, type EvalContext, type Value } from './expression.js';
 
-/** Build an evaluation context over a set of answers. Grid rows are addressable as Q.row. */
+/**
+ * The value of `Q.member`: a grid row's column code, a constant sum option's amount, or a ranked
+ * option's rank (1 = first; null when not ranked). Ranking answers are the only arrays with members.
+ */
+function memberOf(v: unknown, member: string): Value {
+  if (Array.isArray(v)) {
+    const i = v.findIndex((c) => String(c) === member);
+    return i < 0 ? null : i + 1;
+  }
+  if (v && typeof v === 'object') return (v as Record<string, number>)[member] ?? null;
+  return null;
+}
+
+/** Build an evaluation context over a set of answers. Grid rows are Q.row; ranks and sums Q.code. */
 export function contextFor(def: SurveyDefinition, answers: Answers): EvalContext {
   const known = new Set(def.pages.flatMap((p) => p.questions.map((q) => q.id)));
   return {
     lookup(name, member) {
       if (!known.has(name)) return undefined;
       const v = Object.hasOwn(answers, name) ? answers[name] : undefined;
-      if (v === undefined) return null;
-      if (member !== undefined) {
-        if (v && typeof v === 'object' && !Array.isArray(v)) return (v as Record<string, number>)[member] ?? null;
-        return null;
-      }
+      if (v === undefined || v === null) return null;
+      if (member !== undefined) return memberOf(v, member);
       return v as Value;
     },
   };
@@ -38,8 +59,7 @@ export function conditionHoldsFor(expr: string | undefined, answers: Answers): b
           if (!Object.hasOwn(answers, name)) return null;
           const v = answers[name];
           if (v === undefined || v === null) return null;
-          if (member !== undefined)
-            return typeof v === 'object' && !Array.isArray(v) ? ((v as Record<string, number>)[member] ?? null) : null;
+          if (member !== undefined) return memberOf(v, member);
           return v as Value;
         },
       }),
@@ -132,6 +152,18 @@ export const SYSTEM_MESSAGES = {
   max: 'Enter a number no greater than {n}.',
   answerRows: 'Answer every row.',
   gridListed: 'Choose one of the listed options in each row.',
+  chooseScale: 'Choose a point on the scale.',
+  rankAll: 'Rank all {n} items.',
+  rankTop: 'Rank your top {n}.',
+  rankListed: 'Rank only the listed items, each once.',
+  sumTotal: 'The amounts must add up to {n}.',
+  sumAmounts: 'Enter an amount of 0 or more for each item.',
+  sumRemaining: 'Remaining: {n}',
+  rankUp: 'Move up',
+  rankDown: 'Move down',
+  playToEnd: 'Please play the media to the end to continue.',
+  readAloud: 'Read aloud',
+  stopReading: 'Stop reading',
   next: 'Next',
   back: 'Back',
   saving: 'Saving…',
@@ -240,6 +272,42 @@ export function normalizeAnswer(
       }
       if (q.required && q.rows.some((r) => out[r.id] === undefined)) return { error: msg.answerRows };
       return { value: Object.keys(out).length ? out : null };
+    }
+    case 'scale': {
+      const n = typeof raw === 'string' ? Number(raw) : raw;
+      if (typeof n !== 'number' || !scaleCodes(q).includes(n)) return { error: msg.chooseScale };
+      return { value: n };
+    }
+    case 'ranking': {
+      if (!Array.isArray(raw)) return { error: msg.rankListed };
+      const codes = optionCodes(q.options);
+      const vals = raw.map((x) => (typeof x === 'string' ? Number(x) : x));
+      if (!vals.every((v): v is number => typeof v === 'number' && codes.has(v)) || new Set(vals).size !== vals.length)
+        return { error: msg.rankListed };
+      const need = Math.min(q.rankCount ?? q.options.length, q.options.length);
+      if (vals.length > need) return { error: msg.rankListed };
+      if (vals.length < need)
+        return { error: need === q.options.length ? fillMessage(msg.rankAll, { n: need }) : fillMessage(msg.rankTop, { n: need }) };
+      return { value: vals };
+    }
+    case 'sum': {
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { error: msg.sumAmounts };
+      const codes = new Set(q.options.map((o) => String(o.code)));
+      const out: Record<string, number> = {};
+      let total = 0;
+      for (const [code, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (!codes.has(code)) return { error: msg.sumAmounts };
+        if (v === null || v === undefined || v === '') continue;
+        const n = typeof v === 'string' ? Number(v.trim()) : v;
+        if (typeof n !== 'number' || !Number.isFinite(n) || n < 0) return { error: msg.sumAmounts };
+        if (q.integer && !Number.isInteger(n)) return { error: msg.wholeNumber };
+        out[code] = n;
+        total += n;
+      }
+      if (Math.abs(total - q.total) > 1e-9) return { error: fillMessage(msg.sumTotal, { n: q.total }) };
+      // Every option gets an amount (0 when left empty), so the data has no gaps.
+      for (const o of q.options) out[String(o.code)] ??= 0;
+      return { value: out };
     }
   }
 }
@@ -351,7 +419,7 @@ export type RenderedQuestion = Question & { renderedText: string };
 
 export function renderQuestion(q: Question, def: SurveyDefinition, answers: Answers, seed: string): RenderedQuestion {
   const renderedText = pipeText(q.text, def, answers);
-  if ((q.type === 'single' || q.type === 'multi') && q.randomize) {
+  if ((q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum') && q.randomize) {
     return { ...q, renderedText, options: seededOrder(q.options, `${seed}:${q.id}`, (o) => !!o.anchor) };
   }
   if (q.type === 'grid' && q.randomizeRows) {

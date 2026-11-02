@@ -33,13 +33,21 @@ Types:
 - "single": "options": Option[], "randomize": boolean
 - "multi": "options": Option[], "randomize": boolean, "minSelected"?: int, "maxSelected"?: int
 - "open": "multiline": boolean, "maxLength": int (default 2000)
-- "numeric": "min"?: number, "max"?: number, "integer": boolean, "unit"?: string
+- "numeric": "min"?: number, "max"?: number, "integer": boolean, "unit"?: string,
+  "display": "input" | "slider" (a slider needs min and max), "step"?: number, "minLabel"?, "maxLabel"?
+- "scale": rating scale, one whole number: "min" (default 0), "max" (default 10), "minLabel"?, "maxLabel"?,
+  "nps": boolean (Net Promoter Score, must be 0-10), "dontKnow"?: { "code": int outside the scale, "label" }
+- "ranking": "options": Option[] (2-30), "randomize": boolean, "rankCount"?: int (rank only the top N).
+  Stored as the codes in rank order. In expressions RANK.2 is the rank given to code 2 (1 = first).
+- "sum": constant sum: "options": Option[], "total": number (default 100), "integer": boolean, "unit"?,
+  "randomize": boolean. In expressions SPEND.1 is the amount given to code 1.
 - "grid": "rows": [{ "id": "r1", "label": string }], "columns": Option[] (single choice per row),
   "randomizeRows": boolean. Each row is stored as <questionId>_<rowId>.
 - "info": text only, no answer: { "id", "type": "info", "text", "condition"? }
 
 Option: { "code": integer, "label": string, "anchor"?: true (stays in place when randomized),
 "exclusive"?: true (multi only: clears the other answers, e.g. "None of these") }.
+Never add "media" or option "image" fields: files are uploaded by people in the studio.
 Answer codes are what is stored in the data. Keep the questionnaire's codes. Use 1..n when the
 questionnaire gives none, and the usual 97/98/99 style codes for Other / Don't know / None if the
 questionnaire uses them.
@@ -56,7 +64,7 @@ Piping: write {{Q1}} inside text to show the respondent's answer label for Q1.
 ## Expression language (Expr)
 
 Operators: == != < <= > >= and or not, arithmetic + - * /, parentheses, "x in [1, 2, 3]".
-Variables are question ids (grid rows as Q5_r1). Literals: numbers, "strings", true, false, null.
+Variables are question ids (grid rows as Q5.r1, ranking and constant sum items as Q7.3). Literals: numbers, "strings", true, false, null.
 Functions:
 - answered(Q)          true when Q has an answer
 - selected(Q, code)    multi choice: code was selected (use this, never Q == code, for multi)

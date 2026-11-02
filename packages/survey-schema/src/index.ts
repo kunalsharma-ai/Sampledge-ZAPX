@@ -24,6 +24,31 @@ const variableName = z
 /** An expression in the ZAPX logic language, e.g. `Q1 == 2 and AGE >= 18`. */
 const expression = z.string().min(1).max(2000);
 
+// ---- Media (Milestone 11) --------------------------------------------------------------------------
+// Media are uploaded to ZAPX and referenced by id. External URLs are not allowed: they would leak
+// respondents' network addresses to third parties and could change after the survey is approved.
+
+export const MEDIA_KINDS = ['image', 'video', 'audio'] as const;
+export type MediaKind = (typeof MEDIA_KINDS)[number];
+/** Id of an uploaded media file (served at /api/public/media/:id). */
+export const MEDIA_ID = /^[A-Za-z0-9_-]{10,64}$/;
+
+export const mediaRefSchema = z.object({
+  kind: z.enum(MEDIA_KINDS),
+  id: z.string().regex(MEDIA_ID, 'Upload the file in the studio'),
+  /** Text alternative: required for images, describes the content for screen readers. */
+  alt: z.string().max(300).default(''),
+  caption: z.string().max(500).optional(),
+});
+export type MediaRef = z.infer<typeof mediaRefSchema>;
+
+/** Media shown with a question or information element (an ad, a pack shot, a concept, an audio clip). */
+export const questionMediaSchema = mediaRefSchema.extend({
+  /** Video and audio: the respondent must play it to the end before continuing (the Next button waits). */
+  requireComplete: z.boolean().default(false),
+});
+export type QuestionMedia = z.infer<typeof questionMediaSchema>;
+
 export const optionSchema = z.object({
   /** Answer code stored in the data. Stable across languages and themes. */
   code: z.number().int(),
@@ -32,6 +57,8 @@ export const optionSchema = z.object({
   anchor: z.boolean().optional(),
   /** Multiple choice only: selecting this option clears and blocks all others (e.g. "None"). */
   exclusive: z.boolean().optional(),
+  /** Image choice: a picture shown with (or instead of) the label. The label stays the alternative text. */
+  image: z.string().regex(MEDIA_ID).optional(),
 });
 export type Option = z.infer<typeof optionSchema>;
 
@@ -52,6 +79,8 @@ const baseQuestion = {
   condition: expression.optional(),
   required: z.boolean().default(true),
   validations: z.array(validationRule).default([]),
+  /** Image, video or audio shown above the answers. */
+  media: questionMediaSchema.optional(),
 };
 
 export const singleQuestionSchema = z.object({
@@ -84,6 +113,47 @@ export const numericQuestionSchema = z.object({
   max: z.number().optional(),
   integer: z.boolean().default(true),
   unit: z.string().optional(),
+  /** slider: a slider between min and max (both required), moved in `step`s. */
+  display: z.enum(['input', 'slider']).default('input'),
+  step: z.number().positive().optional(),
+  /** Slider end labels. */
+  minLabel: z.string().max(200).optional(),
+  maxLabel: z.string().max(200).optional(),
+});
+
+/** Rating scale or NPS: one whole number between min and max, shown as a row of buttons. */
+export const scaleQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('scale'),
+  min: z.number().int().min(-10).max(10).default(0),
+  max: z.number().int().min(1).max(20).default(10),
+  minLabel: z.string().max(200).optional(),
+  maxLabel: z.string().max(200).optional(),
+  /** Net Promoter Score: 0-10, analysis reports promoters (9-10), passives and detractors (0-6). */
+  nps: z.boolean().default(false),
+  /** An answer outside the scale, such as "Don't know", stored as its own code. */
+  dontKnow: optionSchema.pick({ code: true, label: true }).optional(),
+});
+
+/** Ranking: put the options in order. Stored as the codes in rank order (first = rank 1). */
+export const rankingQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('ranking'),
+  options: z.array(optionSchema).min(2).max(30),
+  randomize: z.boolean().default(false),
+  /** Rank only the top N (default: all options). */
+  rankCount: z.number().int().min(1).max(30).optional(),
+});
+
+/** Constant sum: share a total (100 points, 10 visits, a budget) across the options. Stored as code -> amount. */
+export const sumQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('sum'),
+  options: z.array(optionSchema).min(2).max(30),
+  randomize: z.boolean().default(false),
+  total: z.number().positive().max(1_000_000).default(100),
+  integer: z.boolean().default(true),
+  unit: z.string().max(20).optional(),
 });
 
 export const gridRowSchema = z.object({
@@ -107,6 +177,7 @@ export const infoElementSchema = z.object({
   type: z.literal('info'),
   text: z.string().min(1),
   condition: expression.optional(),
+  media: questionMediaSchema.optional(),
 });
 
 export const questionSchema = z.discriminatedUnion('type', [
@@ -115,6 +186,9 @@ export const questionSchema = z.discriminatedUnion('type', [
   openQuestionSchema,
   numericQuestionSchema,
   gridQuestionSchema,
+  scaleQuestionSchema,
+  rankingQuestionSchema,
+  sumQuestionSchema,
   infoElementSchema,
 ]);
 export type Question = z.infer<typeof questionSchema>;
@@ -126,6 +200,28 @@ export type OpenQuestion = z.infer<typeof openQuestionSchema>;
 export type NumericQuestion = z.infer<typeof numericQuestionSchema>;
 export type GridQuestion = z.infer<typeof gridQuestionSchema>;
 export type InfoElement = z.infer<typeof infoElementSchema>;
+export type ScaleQuestion = z.infer<typeof scaleQuestionSchema>;
+export type RankingQuestion = z.infer<typeof rankingQuestionSchema>;
+export type SumQuestion = z.infer<typeof sumQuestionSchema>;
+
+/** Codes a scale question can store: every point of the scale, plus "don't know" when offered. */
+export function scaleCodes(q: Pick<ScaleQuestion, 'min' | 'max' | 'dontKnow'>): number[] {
+  const out: number[] = [];
+  for (let i = q.min; i <= q.max; i++) out.push(i);
+  if (q.dontKnow) out.push(q.dontKnow.code);
+  return out;
+}
+
+/** Media ids used anywhere in a definition (question media and option images). */
+export function mediaIdsOf(def: { pages: Array<{ questions: Question[] }> }): string[] {
+  const ids = new Set<string>();
+  for (const p of def.pages)
+    for (const q of p.questions) {
+      if (q.media) ids.add(q.media.id);
+      if ('options' in q) for (const o of q.options) if (o.image) ids.add(o.image);
+    }
+  return [...ids];
+}
 
 export const pageSchema = z.object({
   id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
@@ -256,9 +352,9 @@ export function parseSurveyDefinition(input: unknown): { ok: true; definition: S
 /** Answer value shapes stored per question type. */
 export type AnswerValue =
   | number // single, numeric
-  | number[] // multi
+  | number[] // multi; ranking (codes in rank order)
   | string // open
-  | Record<string, number> // grid: rowId -> column code
+  | Record<string, number> // grid: rowId -> column code; sum: option code -> amount
   | null;
 
 export type Answers = Record<string, AnswerValue>;
@@ -368,6 +464,8 @@ export const presentationSchema = z.object({
   /** Name of the source language, shown in the respondent language menu. */
   sourceLanguageName: z.string().max(60).optional(),
   languages: z.array(languageSchema).max(60).default([]),
+  /** Offer a "Read aloud" button that speaks the question with the device's own voices (no upload). */
+  readAloud: z.boolean().default(false),
 });
 export type Presentation = z.infer<typeof presentationSchema>;
 export type PresentationInput = z.input<typeof presentationSchema>;

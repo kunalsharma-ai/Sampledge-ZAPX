@@ -62,7 +62,22 @@ export interface Look {
   gridOnMobile: 'cards' | 'scroll';
   language: string;
   languages: Array<{ tag: string; name: string }>;
-  ui: Pick<SystemMessages, 'next' | 'back' | 'saving' | 'language' | 'fixErrors'>;
+  ui: Pick<
+    SystemMessages,
+    | 'next'
+    | 'back'
+    | 'saving'
+    | 'language'
+    | 'fixErrors'
+    | 'rankUp'
+    | 'rankDown'
+    | 'sumRemaining'
+    | 'playToEnd'
+    | 'readAloud'
+    | 'stopReading'
+  >;
+  /** Offer "Read aloud" on each question (the respondent's own device voices). */
+  readAloud: boolean;
 }
 
 export type InterviewState =
@@ -134,7 +149,20 @@ export function interviewContext(version: { definition: unknown; presentation: u
             ...offered.map((l) => ({ tag: l.tag, name: l.name })),
           ]
         : [],
-      ui: { next: msg.next, back: msg.back, saving: msg.saving, language: msg.language, fixErrors: msg.fixErrors },
+      ui: {
+        next: msg.next,
+        back: msg.back,
+        saving: msg.saving,
+        language: msg.language,
+        fixErrors: msg.fixErrors,
+        rankUp: msg.rankUp,
+        rankDown: msg.rankDown,
+        sumRemaining: msg.sumRemaining,
+        playToEnd: msg.playToEnd,
+        readAloud: msg.readAloud,
+        stopReading: msg.stopReading,
+      },
+      readAloud: presentation.readAloud,
     },
   };
 }

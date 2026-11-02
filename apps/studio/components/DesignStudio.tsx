@@ -252,6 +252,17 @@ export function DesignStudio({
               <option value="scroll">Full table, scroll sideways</option>
             </select>
           </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={presentation.readAloud}
+              onChange={(e) => onChange({ ...presentation, readAloud: e.target.checked })}
+            />
+            Offer “Read aloud” on every question
+          </label>
+          <span className="muted small">
+            Uses the speech voices on the respondent’s own device, in the survey language when one is installed. Nothing is uploaded.
+          </span>
         </fieldset>
       </div>
       <Preview key={`${def.pages.length}-${presentation.languages.length}`} def={def} presentation={presentation} />

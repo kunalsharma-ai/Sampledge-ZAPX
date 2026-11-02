@@ -11,7 +11,7 @@
  *
  * It is deterministic for a given seed, so a QA report can be reproduced exactly.
  */
-import type { Answers, AnswerValue, Option, Question, SurveyDefinition } from '@zapx/survey-schema';
+import { scaleCodes, type Answers, type AnswerValue, type Option, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 import { analyzeSurvey, type AnalysisReport } from './analyze.js';
 import { parseCached, references, type Node } from './expression.js';
 import { conditionHolds, renderQuestion, validatePage } from './interview.js';
@@ -200,6 +200,31 @@ function generateAnswer(q: Question, g: GenContext): AnswerValue | undefined {
       return `Synthetic answer ${++g.serial}`.slice(0, q.maxLength);
     case 'grid':
       return Object.fromEntries(q.rows.map((r) => [r.id, pickOption(q, q.columns, g).code]));
+    case 'scale': {
+      const codes = scaleCodes(q);
+      const hinted = (g.hints.get(q.id) ?? []).filter((n) => codes.includes(n));
+      return hinted.length && g.rng.chance(0.4) ? g.rng.pick(hinted) : g.rng.pick(codes);
+    }
+    case 'ranking': {
+      // The least-covered option first, the rest shuffled.
+      const first = pickOption(q, q.options, g);
+      const rest = q.options.filter((o) => o.code !== first.code).map((o) => o.code);
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = g.rng.int(0, i);
+        [rest[i], rest[j]] = [rest[j]!, rest[i]!];
+      }
+      return [first.code, ...rest].slice(0, Math.min(q.rankCount ?? q.options.length, q.options.length));
+    }
+    case 'sum': {
+      // Split the total at random cut points; whole numbers when required.
+      const n = q.options.length;
+      const cuts = Array.from({ length: n - 1 }, () => g.rng.next() * q.total).sort((a, b) => a - b);
+      const parts = [...cuts, q.total].map((c, i) => c - (i ? cuts[i - 1]! : 0));
+      let amounts = q.integer ? parts.map((p) => Math.floor(p)) : parts.map((p) => Math.round(p * 100) / 100);
+      const diff = Math.round((q.total - amounts.reduce((a, b) => a + b, 0)) * 100) / 100;
+      amounts = amounts.map((a, i) => (i === 0 ? Math.round((a + diff) * 100) / 100 : a));
+      return Object.fromEntries(q.options.map((o, i) => [String(o.code), amounts[i]!]));
+    }
   }
 }
 
@@ -240,6 +265,7 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
       }
       if (q.type === 'single' || q.type === 'multi')
         for (const o of q.options) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" chosen`);
+      if (q.type === 'ranking') for (const o of q.options) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" ranked first`);
       if (q.type === 'grid') for (const o of q.columns) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" chosen in a row`);
     }
   }
@@ -335,7 +361,9 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
           if (v !== undefined && v !== null && q.type !== 'info') {
             hit('question', q.id);
             const codes = Array.isArray(v)
-              ? v
+              ? q.type === 'ranking'
+                ? v.slice(0, 1)
+                : v
               : typeof v === 'number' && q.type === 'single'
                 ? [v]
                 : q.type === 'grid' && typeof v === 'object'

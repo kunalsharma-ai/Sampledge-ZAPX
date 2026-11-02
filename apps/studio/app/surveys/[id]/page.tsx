@@ -259,7 +259,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         <div className="editor" style={{ gridTemplateColumns: 'minmax(0,1fr) 320px' }}>
           <div>
             {tab === 'build' ? (
-              <VisualEditor def={def} onChange={edit} readOnly={readOnly} />
+              <VisualEditor def={def} onChange={edit} readOnly={readOnly} surveyId={id} />
             ) : (
               <JsonEditor def={def} onApply={edit} readOnly={readOnly} />
             )}

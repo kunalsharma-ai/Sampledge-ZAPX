@@ -42,7 +42,15 @@ describe('diffSurveys', () => {
     next.pages[0]!.questions[0] = { ...next.pages[0]!.questions[0]!, text: 'Your gender', options: [{ code: 1, label: 'M' }] } as never;
     next.pages[0]!.questions.push(next.pages[1]!.questions[0]!);
     next.pages.pop();
-    next.pages[0]!.questions.push({ id: 'Q3', type: 'numeric', text: 'Age', required: true, validations: [], integer: true });
+    next.pages[0]!.questions.push({
+      id: 'Q3',
+      type: 'numeric',
+      text: 'Age',
+      required: true,
+      validations: [],
+      integer: true,
+      display: 'input',
+    });
     next.quotas.push({ id: 'QT1', condition: 'Q1 == 1', target: 10 });
     const d = diffSurveys(base, next);
     const by = (id: string) => d.items.find((i) => i.id === id);

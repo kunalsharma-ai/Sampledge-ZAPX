@@ -68,7 +68,19 @@ const TYPE_SYNONYMS: Record<string, string> = {
   integer: 'numeric',
   grid: 'grid',
   matrix: 'grid',
-  scale: 'grid',
+  // "scale" with rows is a grid; without rows it is a rating scale (resolved below).
+  scale: 'scale',
+  rating: 'scale',
+  'rating scale': 'scale',
+  nps: 'nps',
+  'net promoter': 'nps',
+  ranking: 'ranking',
+  rank: 'ranking',
+  'rank order': 'ranking',
+  sum: 'sum',
+  'constant sum': 'sum',
+  allocation: 'sum',
+  slider: 'slider',
   info: 'info',
   'text block': 'info',
   intro: 'info',
@@ -242,6 +254,17 @@ export function importTemplateRows(table: string[][], title: string): TemplateIm
       issues.push(`No type given; treated as ${type === 'single' ? 'single choice (it has options)' : 'open text'}`);
       confidence -= 0.3;
     }
+    if (type === 'scale' && get(row, 'Rows')) type = 'grid';
+    let nps = false;
+    let slider = false;
+    if (type === 'nps') {
+      type = 'scale';
+      nps = true;
+    }
+    if (type === 'slider') {
+      type = 'numeric';
+      slider = true;
+    }
 
     if (type === 'terminate' || type === 'quality_fail') {
       if (!condition) {
@@ -300,7 +323,40 @@ export function importTemplateRows(table: string[][], title: string): TemplateIm
       const req = yes(get(row, 'Required'));
       if (req === false) q.required = false;
     }
-    if (type === 'single' || type === 'multi' || type === 'grid') {
+    if (type === 'scale') {
+      const min = num(get(row, 'Min'), 'Min', issues);
+      const max = num(get(row, 'Max'), 'Max', issues);
+      if (nps) {
+        q.nps = true;
+        q.min = 0;
+        q.max = 10;
+      } else {
+        q.min = min !== undefined ? Math.round(min) : 1;
+        q.max = max !== undefined ? Math.round(max) : 5;
+        if (min === undefined || max === undefined) issues.push(`Scale range not given; used ${String(q.min)} to ${String(q.max)}`);
+      }
+      // Options on a scale row label its ends (lowest and highest code).
+      const { options } = optionsCell ? parseOptions(optionsCell, issues) : { options: [] };
+      const lo = options.find((o) => o.code === q.min);
+      const hi = options.find((o) => o.code === q.max);
+      if (lo) q.minLabel = lo.label;
+      if (hi) q.maxLabel = hi.label;
+      const outside = options.find((o) => (o.code as number) < (q.min as number) || (o.code as number) > (q.max as number));
+      if (outside) q.dontKnow = { code: outside.code, label: outside.label };
+    } else if (type === 'ranking' || type === 'sum') {
+      const { options } = parseOptions(optionsCell, issues);
+      if (options.length < 2) issues.push('No answer options given');
+      q.options = options.map(({ exclusive: _e, ...o }) => o);
+      if (/random/.test(notes)) q.randomize = true;
+      if (type === 'ranking') {
+        const max = num(get(row, 'Max'), 'Max', issues);
+        if (max !== undefined) q.rankCount = Math.round(max);
+      } else {
+        const total = num(get(row, 'Max'), 'Max', issues);
+        if (total !== undefined) q.total = total;
+        if (/decimal/.test(notes)) q.integer = false;
+      }
+    } else if (type === 'single' || type === 'multi' || type === 'grid') {
       const { options, autoCoded } = parseOptions(optionsCell, issues);
       if (!options.length) issues.push('No answer options given');
       if (autoCoded) {
@@ -332,6 +388,10 @@ export function importTemplateRows(table: string[][], title: string): TemplateIm
       if (min !== undefined) q.min = min;
       if (max !== undefined) q.max = max;
       if (/decimal/.test(notes)) q.integer = false;
+      if (slider) {
+        q.display = 'slider';
+        if (min === undefined || max === undefined) issues.push('A slider needs Min and Max');
+      }
     } else if (type === 'open') {
       if (/multi.?line|long/.test(notes)) q.multiline = true;
       const max = num(get(row, 'Max'), 'Max', issues);
@@ -504,7 +564,9 @@ export async function buildTemplateWorkbook(): Promise<Buffer> {
     'One row per question, termination or quota. Replace the example rows with your own.',
     'Page: rows with the same Page value appear on one page. Leave it empty to give the question its own page.',
     'ID: the variable name in the data (letters, digits, _). Leave empty to number automatically.',
-    'Type: single, multi, open, numeric, grid, info, terminate, quality, quota.',
+    'Type: single, multi, open, numeric, slider, grid, scale (rating scale; with Rows it is a grid), nps, ranking, sum (constant sum), info, terminate, quality, quota.',
+    'Scale: Min and Max give the range; options label the ends (e.g. 1=Poor;5=Excellent) and a code outside the range is "don\'t know".',
+    'Ranking: Max ranks only the top N. Sum: Max is the total to share (default 100).',
     'Options: one per line (or separated by ;) as code=label. Add [exclusive] or [anchor] after a label.',
     'Rows: grid rows, one per line, as id=label.',
     'Condition: for questions, show only when true. For terminate rows, end the interview when true. For quotas, who counts.',

@@ -6,9 +6,10 @@
  *
  * Pure functions, no framework or database. Unweighted.
  */
-import type { SurveyDefinition } from '@zapx/survey-schema';
+import { scaleCodes, type SurveyDefinition } from '@zapx/survey-schema';
 
-export type VariableKind = 'single' | 'multi' | 'numeric' | 'open';
+/** scale: a rating scale; reported like single choice, plus mean (and NPS when it is one). */
+export type VariableKind = 'single' | 'multi' | 'numeric' | 'open' | 'scale';
 
 export interface Category {
   code: number | string;
@@ -21,9 +22,15 @@ export interface Variable {
   kind: VariableKind;
   categories: Category[];
   /** Where it comes from: a question, a grid row, or the interview record (status, vendor, mode). */
-  source: 'question' | 'grid_row' | 'system';
+  source: 'question' | 'grid_row' | 'item' | 'system';
   /** Grid rows: the grid question and row the answer is stored under (answers[question][row]). */
   grid?: { question: string; row: string };
+  /** Ranking and constant sum items: the question and item code (value = rank or amount). */
+  item?: { question: string; code: number; of: 'rank' | 'amount' };
+  /** Scale: codes that are not points on the scale (e.g. "don't know"), left out of means. */
+  excludeFromStats?: Array<number | string>;
+  /** Scale: report the Net Promoter Score. */
+  nps?: boolean;
 }
 
 export interface AnalysisRecord {
@@ -63,6 +70,38 @@ export function variables(def: SurveyDefinition, records: AnalysisRecord[] = [])
           categories: q.options.map((o) => ({ code: o.code, label: o.label })),
           source: 'question',
         });
+      } else if (q.type === 'scale') {
+        const categories = scaleCodes(q).map((code) => ({
+          code,
+          label:
+            q.dontKnow && code === q.dontKnow.code
+              ? q.dontKnow.label
+              : code === q.min && q.minLabel
+                ? `${code} ${q.minLabel}`
+                : code === q.max && q.maxLabel
+                  ? `${code} ${q.maxLabel}`
+                  : String(code),
+        }));
+        out.push({
+          id: q.id,
+          label: strip(q.text),
+          kind: 'scale',
+          categories,
+          source: 'question',
+          ...(q.dontKnow ? { excludeFromStats: [q.dontKnow.code] } : {}),
+          ...(q.nps ? { nps: true } : {}),
+        });
+      } else if (q.type === 'ranking' || q.type === 'sum') {
+        for (const o of q.options) {
+          out.push({
+            id: `${q.id}_${o.code}`,
+            label: `${strip(q.text)}: ${o.label}${q.type === 'ranking' ? ' (rank)' : q.unit ? ` (${q.unit})` : ''}`,
+            kind: 'numeric',
+            categories: [],
+            source: 'item',
+            item: { question: q.id, code: o.code, of: q.type === 'ranking' ? 'rank' : 'amount' },
+          });
+        }
       } else if (q.type === 'numeric') {
         out.push({ id: q.id, label: strip(q.text), kind: 'numeric', categories: [], source: 'question' });
       } else if (q.type === 'open') {
@@ -91,6 +130,15 @@ export function variables(def: SurveyDefinition, records: AnalysisRecord[] = [])
 /** The record's value(s) for a variable, as a list of category codes (empty when not answered). */
 function rawValue(v: Variable, r: AnalysisRecord): unknown {
   if (v.source === 'system') return r.system[v.id];
+  if (v.item) {
+    const a = r.answers[v.item.question];
+    if (v.item.of === 'rank') {
+      if (!Array.isArray(a)) return undefined;
+      const i = a.findIndex((c) => String(c) === String(v.item!.code));
+      return i < 0 ? undefined : i + 1;
+    }
+    return a && typeof a === 'object' && !Array.isArray(a) ? (a as Record<string, unknown>)[String(v.item.code)] : undefined;
+  }
   if (v.grid) {
     const g = r.answers[v.grid.question];
     return g && typeof g === 'object' && !Array.isArray(g) ? (g as Record<string, unknown>)[v.grid.row] : undefined;
@@ -146,6 +194,8 @@ export interface Frequency {
   stats: NumericStats | null;
   /** Open answers: a sample of the latest non-empty answers. */
   samples?: string[];
+  /** NPS questions: % promoters (9-10) minus % detractors (0-6), of people who gave a score. */
+  nps?: { score: number; promoters: number; passives: number; detractors: number; base: number };
 }
 
 export function frequency(v: Variable, records: AnalysisRecord[]): Frequency {
@@ -174,7 +224,29 @@ export function frequency(v: Variable, records: AnalysisRecord[]): Frequency {
     if (!v.categories.some((c) => same(c.code, code)))
       rows.push({ code, label: `Code ${code} (not in the current version)`, count, pct: base ? (count / base) * 100 : 0 });
   }
-  return { variable: v, total: records.length, base, rows, stats: null };
+  if (v.kind !== 'scale') return { variable: v, total: records.length, base, rows, stats: null };
+  const scores = scaleValues(v, records);
+  return { variable: v, total: records.length, base, rows, stats: numericStats(scores), ...(v.nps ? { nps: npsOf(scores) } : {}) };
+}
+
+/** Scale answers that are points on the scale (not "don't know"), as numbers. */
+function scaleValues(v: Variable, records: AnalysisRecord[]): number[] {
+  const skip = new Set((v.excludeFromStats ?? []).map(String));
+  return records.map((r) => rawValue(v, r)).filter((x): x is number => typeof x === 'number' && !skip.has(String(x)));
+}
+
+export function npsOf(scores: number[]) {
+  const base = scores.length;
+  const promoters = scores.filter((s) => s >= 9).length;
+  const detractors = scores.filter((s) => s <= 6).length;
+  const pct = (n: number) => (base ? (n / base) * 100 : 0);
+  return {
+    score: pct(promoters) - pct(detractors),
+    promoters: pct(promoters),
+    passives: pct(base - promoters - detractors),
+    detractors: pct(detractors),
+    base,
+  };
 }
 
 // ---- Significance ---------------------------------------------------------------------------
@@ -246,7 +318,8 @@ export interface Crosstab {
  * each banner column. Significance compares each banner column with every other banner column.
  */
 export function crosstab(banner: Variable, stub: Variable, records: AnalysisRecord[], opts: CrosstabOptions = {}): Crosstab {
-  if (banner.kind !== 'single' && banner.kind !== 'multi') throw new Error('The banner must be a single or multiple choice variable');
+  if (banner.kind !== 'single' && banner.kind !== 'multi' && banner.kind !== 'scale')
+    throw new Error('The banner must be a single choice, multiple choice or scale variable');
   if (stub.kind === 'open') throw new Error('Open answers cannot be crosstabulated');
   const confidence = opts.confidence ?? 0.95;
   const crit = CRITICAL_Z[confidence];
@@ -258,7 +331,7 @@ export function crosstab(banner: Variable, stub: Variable, records: AnalysisReco
   for (const c of banner.categories) {
     groups.push({ key: String(c.code), label: c.label, records: records.filter((r) => codes(banner, r).some((x) => same(x, c.code))) });
   }
-  const testable = banner.kind === 'single';
+  const testable = banner.kind !== 'multi';
   const testNote = testable ? null : 'Not tested: people can be in more than one column of a multiple choice banner.';
 
   const freq = groups.map((g) => frequency(stub, g.records));
@@ -272,17 +345,17 @@ export function crosstab(banner: Variable, stub: Variable, records: AnalysisReco
 
   const sigAgainst = (i: number, j: number) => testable && i > 0 && j > 0 && i !== j && !columns[i]!.lowBase && !columns[j]!.lowBase;
 
-  if (stub.kind === 'numeric') {
+  const meanRow = () => {
     const stats = freq.map((f) => f.stats);
-    const means = stats.map((s, i) => ({
+    return stats.map((s, i) => ({
       stats: s,
       higherThan: columns
         .map((_, j) => j)
         .filter((j) => sigAgainst(i, j) && s && stats[j] && meanZ(s, stats[j]!) > crit)
         .map((j) => columns[j]!.letter),
     }));
-    return { banner, stub, confidence, minBase, columns, rows: [], means, testNote };
-  }
+  };
+  if (stub.kind === 'numeric') return { banner, stub, confidence, minBase, columns, rows: [], means: meanRow(), testNote };
 
   const rowKeys = freq[0]!.rows.map((r) => ({ code: r.code, label: r.label }));
   const rows: CrosstabRow[] = rowKeys.map((rk) => {
@@ -298,5 +371,6 @@ export function crosstab(banner: Variable, stub: Variable, records: AnalysisReco
     });
     return { code: rk.code, label: rk.label, cells };
   });
-  return { banner, stub, confidence, minBase, columns, rows, testNote };
+  // Scales show the share per point and the mean score (points on the scale only).
+  return { banner, stub, confidence, minBase, columns, rows, ...(stub.kind === 'scale' ? { means: meanRow() } : {}), testNote };
 }

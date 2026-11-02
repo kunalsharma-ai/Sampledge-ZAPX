@@ -83,7 +83,7 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
     })();
   }, [surveyId, loadReports]);
 
-  const bannerOptions = useMemo(() => (vars ?? []).filter((v) => v.kind === 'single' || v.kind === 'multi'), [vars]);
+  const bannerOptions = useMemo(() => (vars ?? []).filter((v) => v.kind === 'single' || v.kind === 'multi' || v.kind === 'scale'), [vars]);
   const stubOptions = useMemo(
     () => (vars ?? []).filter((v) => (kind === 'crosstab' ? v.kind !== 'open' && v.id !== banner : true)),
     [vars, kind, banner],
@@ -386,6 +386,16 @@ function FrequencyCard({ f }: { f: Frequency }) {
         Base: {f.base.toLocaleString()} answered
         {f.variable.kind === 'multi' ? ' · more than one answer allowed, so shares can add up to more than 100%' : ''}
       </p>
+      {f.nps ? (
+        <p className="nps" data-testid={`nps-${f.variable.id}`}>
+          <span className="nps-score">{fmt(f.nps.score)}</span> Net Promoter Score
+          <span className="small muted">
+            {' '}
+            · promoters {fmt(f.nps.promoters)}%, passives {fmt(f.nps.passives)}%, detractors {fmt(f.nps.detractors)}% of{' '}
+            {f.nps.base.toLocaleString()} who gave a score
+          </span>
+        </p>
+      ) : null}
       {f.stats ? (
         <dl className="stats">
           {(
@@ -403,7 +413,8 @@ function FrequencyCard({ f }: { f: Frequency }) {
             </div>
           ))}
         </dl>
-      ) : f.samples ? (
+      ) : null}
+      {f.samples ? (
         f.samples.length ? (
           <ul className="samples">
             {f.samples.map((s, i) => (
@@ -413,7 +424,8 @@ function FrequencyCard({ f }: { f: Frequency }) {
         ) : (
           <p className="muted small">No answers yet.</p>
         )
-      ) : (
+      ) : null}
+      {f.rows.length ? (
         <table className="data freq">
           <thead>
             <tr>
@@ -436,7 +448,7 @@ function FrequencyCard({ f }: { f: Frequency }) {
             ))}
           </tbody>
         </table>
-      )}
+      ) : null}
     </article>
   );
 }
@@ -472,8 +484,18 @@ function CrosstabTable({ t }: { t: Crosstab }) {
             </tr>
           </thead>
           <tbody>
+            {t.rows.map((r) => (
+              <tr key={String(r.code)}>
+                <th>{r.label}</th>
+                {r.cells.map((c, i) => (
+                  <td key={i} className="num" title={`${c.count} of ${t.columns[i]!.base}`}>
+                    {t.columns[i]!.base ? `${fmt(c.pct)}%` : '–'} {sig(c.higherThan)}
+                  </td>
+                ))}
+              </tr>
+            ))}
             {t.means ? (
-              <tr>
+              <tr className="mean-row">
                 <th>Mean</th>
                 {t.means.map((m, i) => (
                   <td key={i} className="num">
@@ -481,18 +503,7 @@ function CrosstabTable({ t }: { t: Crosstab }) {
                   </td>
                 ))}
               </tr>
-            ) : (
-              t.rows.map((r) => (
-                <tr key={String(r.code)}>
-                  <th>{r.label}</th>
-                  {r.cells.map((c, i) => (
-                    <td key={i} className="num" title={`${c.count} of ${t.columns[i]!.base}`}>
-                      {t.columns[i]!.base ? `${fmt(c.pct)}%` : '–'} {sig(c.higherThan)}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
+            ) : null}
           </tbody>
         </table>
       </div>
