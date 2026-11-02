@@ -33,6 +33,14 @@ import { CapiService } from './capi/capi.service';
 import { ProjectMembersController } from './projects/members.controller';
 import { ApiKeysController } from './enterprise/api-keys.controller';
 import { AuditLogController } from './enterprise/audit-log.controller';
+import { QaService } from './qa/qa.service';
+import { ExportRunner } from './exports/export-runner.service';
+import { ProposeService } from './ai/propose.service';
+import { JobsController } from './jobs/jobs.controller';
+import { JobsService } from './jobs/jobs.service';
+import { JobWorker } from './jobs/job.worker';
+import { FilesService } from './jobs/files.service';
+import { FileStore, LocalFileStore } from './jobs/file-store';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -63,6 +71,7 @@ import { AuditLogController } from './enterprise/audit-log.controller';
     ProjectMembersController,
     ApiKeysController,
     AuditLogController,
+    JobsController,
   ],
   providers: [
     SurveysService,
@@ -74,6 +83,13 @@ import { AuditLogController } from './enterprise/audit-log.controller';
     AiUsageRepository,
     QualityService,
     CapiService,
+    QaService,
+    ExportRunner,
+    ProposeService,
+    JobsService,
+    JobWorker,
+    FilesService,
+    { provide: FileStore, useClass: LocalFileStore },
     {
       // Provider registry: AI_PROVIDER picks the implementation. Adding OpenAI or Gemini means
       // one more AiProvider subclass and one more case here (docs/modules/ai-gateway.md).

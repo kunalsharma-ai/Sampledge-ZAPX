@@ -22,7 +22,7 @@ import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { SurveysService } from '../surveys/surveys.service';
 import { ChangeSetsService } from './changesets.service';
-import { ArchitectService } from '../ai/architect.service';
+import { ProposeService } from '../ai/propose.service';
 import { AiGateway } from '../ai/ai-gateway';
 import { notConfigured } from '../ai/claude.provider';
 import { AiError } from '../ai/ai-provider';
@@ -44,7 +44,7 @@ export class ChangeSetsController {
   constructor(
     private readonly changeSets: ChangeSetsService,
     private readonly surveys: SurveysService,
-    private readonly architect: ArchitectService,
+    private readonly proposer: ProposeService,
     private readonly gateway: AiGateway,
   ) {}
 
@@ -71,34 +71,14 @@ export class ChangeSetsController {
   async propose(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown, @UploadedFileParam() file?: UploadedFile) {
     const { instruction } = parseBody(proposeSchema, body ?? {});
     if (!instruction.trim() && !file) throw new BadRequestException('Describe what to build or change, or attach a questionnaire.');
-    if (!this.architect.configured) aiHttpError(notConfigured());
-    const draft = await this.surveys.draft(user, id);
-    const current = parseSurveyDefinition(draft.definition);
+    if (!this.proposer.configured) aiHttpError(notConfigured());
     const documents = [];
     if (file) {
       const kind = classifyFile(file);
       if (kind === 'xlsx') throw new BadRequestException('Excel files are imported with the template importer. Use Import file instead.');
       documents.push(await toAiDocument(file, kind));
     }
-    const outcome = await this.architect
-      .propose(
-        { tenantId: user.tenantId, userId: user.id },
-        { instruction, current: current.ok ? current.definition : null, documents, surveyId: id },
-      )
-      .catch(aiHttpError);
-    const assumptions = [...outcome.assumptions];
-    if (outcome.servedByFallback) assumptions.unshift(`The primary model declined; this proposal was written by ${outcome.model}.`);
-    if (outcome.remainingProblems.length) assumptions.push(`Logic problems the AI did not fix: ${outcome.remainingProblems.join('; ')}`);
-    return this.changeSets.create(user, id, {
-      source: 'AI',
-      title: outcome.summary.split(/(?<=\.)\s/)[0]?.slice(0, 200) || 'AI proposal',
-      prompt: instruction || undefined,
-      sourceFileName: file?.originalname,
-      proposed: outcome.definition,
-      assumptions,
-      confidence: { summary: outcome.summary, attempts: outcome.attempts, redactions: outcome.redactions },
-      producer: outcome.model,
-    });
+    return this.proposer.propose(user, id, { instruction, documents, fileName: file?.originalname }).catch(aiHttpError);
   }
 
   /**

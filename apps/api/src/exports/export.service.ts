@@ -14,7 +14,7 @@ interface Column {
   get(r: ExportRow): string | number | null;
 }
 
-type ExportRow = Pick<
+export type ExportRow = Pick<
   Response,
   | 'id'
   | 'uid'

@@ -16,7 +16,7 @@ x-api-env: &api-env
   AI_MODEL: ${AI_MODEL:-}
   AI_PRICING: ${AI_PRICING:-}
   NODE_ENV: production
-  CALLBACK_WORKER: 'on'
+  FILES_DIR: /data/files
 
 services:
   postgres:
@@ -42,8 +42,20 @@ services:
 
   api:
     build: { context: ., target: api }
-    environment: *api-env
+    environment:
+      <<: *api-env
+      # The worker service below runs jobs, callbacks and webhooks.
+      JOB_WORKER: 'off'
+      CALLBACK_WORKER: 'off'
     ports: ['4000:4000']
+    volumes: [files:/data/files]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+  worker:
+    build: { context: ., target: worker }
+    environment: *api-env
+    volumes: [files:/data/files]
     depends_on:
       migrate: { condition: service_completed_successfully }
 
@@ -67,3 +79,4 @@ services:
 
 volumes:
   pgdata:
+  files:

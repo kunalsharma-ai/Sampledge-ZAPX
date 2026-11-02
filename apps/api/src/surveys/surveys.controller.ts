@@ -24,7 +24,7 @@ import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { SurveysService } from './surveys.service';
-import { ExportService } from '../exports/export.service';
+import { ExportRunner } from '../exports/export-runner.service';
 import { signParams } from '@zapx/redirect-core';
 import { testSignature } from '../interview/interview.service';
 
@@ -53,7 +53,7 @@ export class SurveysController {
   constructor(
     private readonly surveys: SurveysService,
     private readonly prisma: PrismaService,
-    private readonly exporter: ExportService,
+    private readonly exports: ExportRunner,
     private readonly audit: AuditService,
     private readonly access: AccessService,
   ) {}
@@ -197,6 +197,7 @@ export class SurveysController {
     return { url, template };
   }
 
+  /** Direct download for small exports (up to EXPORT_SYNC_MAX_ROWS rows); larger ones run as jobs. */
   @Get('surveys/:id/export')
   async export(
     @CurrentUser() user: AuthUser,
@@ -206,34 +207,18 @@ export class SurveysController {
     @Query('includeTest') includeTest?: string,
     @Query('status') status?: string,
   ) {
-    const survey = await this.surveys.getSurvey(user, id);
-    const versions = await this.prisma.surveyVersion.findMany({
-      where: { surveyId: id, status: { not: 'DRAFT' } },
-      orderBy: { version: 'asc' },
-    });
-    const statusFilter = status ? (status.toUpperCase().split(',') as never[]) : undefined;
-    const rows = await this.prisma.forTenant(user.tenantId).response.findMany({
-      where: {
-        surveyId: id,
-        ...(includeTest === 'true' ? {} : { isTest: false }),
-        ...(statusFilter ? { status: { in: statusFilter } } : {}),
+    const out = await this.exports.build(
+      user,
+      id,
+      {
+        format: format === 'xlsx' ? 'xlsx' : 'csv',
+        includeTest: includeTest === 'true',
+        statuses: status ? status.toUpperCase().split(',') : undefined,
       },
-      orderBy: { startedAt: 'asc' },
-      include: { vendor: { select: { code: true } }, version: { select: { version: true } }, interviewer: { select: { email: true } } },
-    });
-    const columns = this.exporter.columns(versions);
-    const name = survey.name.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60) || 'survey';
-    await this.audit.record(user, 'survey.export', 'survey', id, { format, rows: rows.length });
-    if (format === 'xlsx') {
-      if (versions.length === 0) throw new NotFoundException('Publish the survey before exporting');
-      const buf = await this.exporter.toXlsx(columns, rows, versions);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', `attachment; filename="${name}.xlsx"`);
-      res.send(buf);
-      return;
-    }
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${name}.csv"`);
-    res.send(this.exporter.toCsv(columns, rows));
+      { maxRows: ExportRunner.syncLimit() },
+    );
+    res.setHeader('Content-Type', out.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${out.name}"`);
+    res.send(out.data);
   }
 }

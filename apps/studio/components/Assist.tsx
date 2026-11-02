@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DiffItem, SurveyDiff } from '@zapx/logic-engine';
-import { api, upload } from '@/lib/api';
+import { api, upload, waitForJob, type Job } from '@/lib/api';
+import { JobProgress } from './ExportJobs';
 import { ErrorNote } from './Shell';
 
 interface ChangeSetSummary {
@@ -88,6 +89,7 @@ export function Assist({
   const [selected, setSelected] = useState<ChangeSet | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [job, setJob] = useState<Job<unknown> | null>(null);
   const [listening, setListening] = useState(false);
   const recognizer = useRef<SpeechRecognitionLike | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -120,6 +122,14 @@ export function Assist({
     await open(cs.id);
   };
 
+  /** AI drafts run on the job worker, so a slow model call never holds the browser request open. */
+  const draftInBackground = async (form: FormData) => {
+    const queued = await upload<Job<{ changeSetId: string }>>(`/surveys/${surveyId}/jobs/ai`, form);
+    setJob(queued);
+    const done = await waitForJob<{ changeSetId: string }>(queued.id, setJob);
+    return { id: done.result!.changeSetId } as ChangeSet;
+  };
+
   const propose = async () => {
     setBusy('ai');
     setError(null);
@@ -127,7 +137,7 @@ export function Assist({
       const form = new FormData();
       form.append('instruction', instruction);
       if (file) form.append('file', file);
-      const cs = await upload<ChangeSet>(`/surveys/${surveyId}/ai/propose`, form);
+      const cs = await draftInBackground(form);
       setInstruction('');
       setFile(null);
       if (fileInput.current) fileInput.current.value = '';
@@ -136,6 +146,7 @@ export function Assist({
       setError(e);
     } finally {
       setBusy(null);
+      setJob(null);
     }
   };
 
@@ -146,7 +157,14 @@ export function Assist({
     try {
       const form = new FormData();
       form.append('file', importFile);
-      const cs = await upload<ChangeSet>(`/surveys/${surveyId}/import`, form);
+      // The template (Excel, CSV) imports exactly and quickly; documents are read by the AI in the background.
+      let cs: ChangeSet;
+      if (/\.(xlsx|csv)$/i.test(importFile.name)) {
+        cs = await upload<ChangeSet>(`/surveys/${surveyId}/import`, form);
+      } else {
+        form.append('instruction', 'Program this questionnaire as a new survey, replacing the current draft.');
+        cs = await draftInBackground(form);
+      }
       setImportFile(null);
       if (importInput.current) importInput.current.value = '';
       await after(cs);
@@ -154,6 +172,7 @@ export function Assist({
       setError(e);
     } finally {
       setBusy(null);
+      setJob(null);
     }
   };
 
@@ -244,7 +263,7 @@ export function Assist({
               {listening ? <p className="muted small">Listening… your browser's speech service converts speech to text.</p> : null}
               <div>
                 <button className="primary" onClick={propose} disabled={!ai?.configured || busy !== null || (!instruction.trim() && !file)}>
-                  {busy === 'ai' ? 'Drafting… (this can take a minute)' : 'Draft proposal'}
+                  {busy === 'ai' ? 'Drafting… (you can leave this page)' : 'Draft proposal'}
                 </button>
               </div>
             </div>
@@ -272,6 +291,7 @@ export function Assist({
             </div>
           </div>
         ) : null}
+        {job ? <JobProgress job={job} /> : null}
         <ErrorNote error={error} />
         {selected ? (
           <Review cs={selected} readOnly={readOnly} dirty={dirty} busy={busy} onDecide={decide} />

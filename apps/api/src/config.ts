@@ -87,6 +87,23 @@ const schema = z
       .default(24 * 60),
     /** Max upload size for questionnaire files, in megabytes. */
     UPLOAD_MAX_MB: z.coerce.number().min(1).max(50).default(15),
+    /** Exports with more rows than this are refused by the download endpoint and run as background jobs. */
+    EXPORT_SYNC_MAX_ROWS: z.coerce.number().int().min(1).default(10_000),
+    /** Background jobs (Milestone 7): run the job worker in this process. Turn off in the API when a separate worker runs. */
+    JOB_WORKER: z.enum(['on', 'off']).default('on'),
+    JOB_POLL_MS: z.coerce.number().int().min(100).max(600_000).default(2_000),
+    /** Where the local file store keeps files (exports, uploads for AI jobs). */
+    FILES_DIR: z.string().default('.data/files'),
+    /** Export files are deleted after this many hours. */
+    EXPORT_FILE_TTL_HOURS: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 90)
+      .default(72),
+    /** Retention: finished jobs, and delivered or failed webhook deliveries, are deleted after this many days. */
+    JOB_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
+    WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
     COOKIE_SECURE: z
       .string()
       .optional()

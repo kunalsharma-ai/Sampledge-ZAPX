@@ -24,6 +24,9 @@ RUN pnpm build
 FROM base AS api
 ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app /app
+# Local file store for exports (FILES_DIR). Shared with the worker through a volume; S3 is not implemented yet.
+ENV FILES_DIR=/data/files
+RUN mkdir -p /data/files && chown -R node:node /data
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=10s --timeout=3s --retries=6 CMD node -e "fetch('http://localhost:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
@@ -33,6 +36,11 @@ CMD ["node", "apps/api/dist/main.js"]
 FROM api AS migrate
 HEALTHCHECK NONE
 CMD ["packages/db/node_modules/.bin/prisma", "migrate", "deploy", "--schema", "packages/db/prisma/schema.prisma"]
+
+# Background worker: jobs (exports, large QA runs, AI drafts), vendor callbacks and webhooks.
+FROM api AS worker
+HEALTHCHECK NONE
+CMD ["node", "apps/api/dist/worker.js"]
 
 # ---- Studio ----------------------------------------------------------------------------------
 FROM base AS studio
