@@ -7,6 +7,8 @@ import { CommonModule } from './common/common.module';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { UsersController } from './users/users.controller';
+import { AnalysisController } from './analysis/analysis.controller';
+import { AnalysisService } from './analysis/analysis.service';
 import { CatiController } from './cati/cati.controller';
 import { CatiService } from './cati/cati.service';
 import { SsoController } from './auth/sso.controller';
@@ -65,6 +67,7 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     AuthController,
     UsersController,
     CatiController,
+    AnalysisController,
     SsoController,
     ScimController,
     ScimAdminController,
@@ -86,6 +89,7 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
   ],
   providers: [
     CatiService,
+    AnalysisService,
     SsoService,
     ScimGuard,
     SurveysService,

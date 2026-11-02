@@ -1,0 +1,501 @@
+'use client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Crosstab, Frequency, Variable } from '@zapx/analysis-core';
+import { api } from '@/lib/api';
+import { ErrorNote } from './Shell';
+
+type Status = 'COMPLETE' | 'TERMINATE' | 'QUOTA_FULL' | 'QUALITY_FAIL' | 'PARTIAL' | 'IN_PROGRESS';
+type Mode = 'CAWI' | 'CAPI' | 'CATI';
+interface Filters {
+  statuses: Status[];
+  includeTest: boolean;
+  includeRejected: boolean;
+  modes?: Mode[];
+  from?: string;
+  to?: string;
+}
+type ReportConfig =
+  | { type: 'frequencies'; filters: Filters; variables?: string[] }
+  | { type: 'crosstab'; filters: Filters; banner: string; stubs: string[]; confidence: 0.9 | 0.95 | 0.99 };
+interface Report {
+  id: string;
+  name: string;
+  config: ReportConfig;
+  updatedAt: string;
+}
+type Result = { total: number; frequencies: Frequency[] } | { total: number; tables: Crosstab[] };
+
+const STATUS_OPTIONS: Array<[Status, string]> = [
+  ['COMPLETE', 'Completes'],
+  ['TERMINATE', 'Terminates'],
+  ['QUOTA_FULL', 'Quota full'],
+  ['QUALITY_FAIL', 'Quality fails'],
+  ['PARTIAL', 'Partials'],
+  ['IN_PROGRESS', 'In progress'],
+];
+const MODE_LABEL: Record<Mode, string> = { CAWI: 'Online', CAPI: 'Face to face', CATI: 'Phone' };
+const DEFAULT_FILTERS: Filters = { statuses: ['COMPLETE'], includeTest: false, includeRejected: false };
+
+const fmt = (n: number, d = 1) => n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+
+/** Strips empty optional filters so saved reports stay small and readable. */
+function cleanFilters(f: Filters): Filters {
+  return {
+    statuses: f.statuses,
+    includeTest: f.includeTest,
+    includeRejected: f.includeRejected,
+    ...(f.modes?.length ? { modes: f.modes } : {}),
+    ...(f.from ? { from: f.from } : {}),
+    ...(f.to ? { to: `${f.to}${f.to.length === 10 ? 'T23:59:59.999Z' : ''}` } : {}),
+  };
+}
+
+/**
+ * Analysis (Milestone 10): frequencies and crosstabs on the live data, with column significance
+ * letters, plus saved reports that anyone on the team can rerun or download as Excel.
+ */
+export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: boolean }) {
+  const [vars, setVars] = useState<Variable[] | null>(null);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [kind, setKind] = useState<'frequencies' | 'crosstab'>('frequencies');
+  const [picked, setPicked] = useState<string[]>([]);
+  const [banner, setBanner] = useState('');
+  const [confidence, setConfidence] = useState<0.9 | 0.95 | 0.99>(0.95);
+  const [result, setResult] = useState<Result | null>(null);
+  const [reports, setReports] = useState<Report[]>([]);
+  const [openReport, setOpenReport] = useState<Report | null>(null);
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+
+  const loadReports = useCallback(async () => setReports(await api<Report[]>(`/surveys/${surveyId}/reports`)), [surveyId]);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const v = await api<{ variables: Variable[] }>(`/surveys/${surveyId}/analysis/variables`);
+        setVars(v.variables);
+        setBanner(v.variables.find((x) => x.kind === 'single' && x.source === 'question')?.id ?? '');
+        await loadReports();
+      } catch (e) {
+        setError(e);
+      }
+    })();
+  }, [surveyId, loadReports]);
+
+  const bannerOptions = useMemo(() => (vars ?? []).filter((v) => v.kind === 'single' || v.kind === 'multi'), [vars]);
+  const stubOptions = useMemo(
+    () => (vars ?? []).filter((v) => (kind === 'crosstab' ? v.kind !== 'open' && v.id !== banner : true)),
+    [vars, kind, banner],
+  );
+
+  const config = (): ReportConfig =>
+    kind === 'crosstab'
+      ? {
+          type: 'crosstab',
+          filters: cleanFilters(filters),
+          banner,
+          stubs: picked.length ? picked.filter((p) => p !== banner) : stubOptions.filter((v) => v.source !== 'system').map((v) => v.id),
+          confidence,
+        }
+      : { type: 'frequencies', filters: cleanFilters(filters), ...(picked.length ? { variables: picked } : {}) };
+
+  const run = async (cfg = config()) => {
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const path = cfg.type === 'crosstab' ? 'crosstab' : 'frequencies';
+      const { type: _t, ...body } = cfg;
+      setResult(await api<Result>(`/surveys/${surveyId}/analysis/${path}`, { body }));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const apply = (r: Report) => {
+    const c = r.config;
+    setOpenReport(r);
+    setName(r.name);
+    setKind(c.type);
+    setFilters({
+      ...DEFAULT_FILTERS,
+      ...c.filters,
+      from: c.filters.from?.slice(0, 10),
+      to: c.filters.to?.slice(0, 10),
+    });
+    if (c.type === 'crosstab') {
+      setBanner(c.banner);
+      setPicked(c.stubs);
+      setConfidence(c.confidence);
+    } else setPicked(c.variables ?? []);
+    void run(c);
+  };
+
+  const save = async (asNew: boolean) => {
+    setError(null);
+    try {
+      const body = { name: name.trim(), config: config() };
+      const r =
+        openReport && !asNew
+          ? await api<Report>(`/reports/${openReport.id}`, { method: 'PUT', body })
+          : await api<Report>(`/surveys/${surveyId}/reports`, { body });
+      setOpenReport(r);
+      setNotice(`Saved “${r.name}”.`);
+      await loadReports();
+    } catch (e) {
+      setError(e);
+    }
+  };
+
+  const remove = async (r: Report) => {
+    if (!window.confirm(`Delete the report “${r.name}”?`)) return;
+    try {
+      await api(`/reports/${r.id}`, { method: 'DELETE' });
+      if (openReport?.id === r.id) setOpenReport(null);
+      await loadReports();
+    } catch (e) {
+      setError(e);
+    }
+  };
+
+  const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+
+  if (!vars) return error ? <ErrorNote error={error} /> : <p className="muted">Loading variables…</p>;
+
+  return (
+    <div className="analysis">
+      <aside className="stack">
+        <section className="panel stack" aria-label="Saved reports" data-testid="saved-reports">
+          <h2>Saved reports</h2>
+          {reports.length ? (
+            <ul className="report-list">
+              {reports.map((r) => (
+                <li key={r.id} className={openReport?.id === r.id ? 'selected' : ''}>
+                  <button className="link" onClick={() => apply(r)}>
+                    {r.name}
+                  </button>
+                  <span className="small muted">{r.config.type === 'crosstab' ? 'Crosstab' : 'Frequencies'}</span>
+                  <span className="row" style={{ gap: 4 }}>
+                    <a className="small" href={`/api/reports/${r.id}/export.xlsx`} aria-label={`Download ${r.name} as Excel`}>
+                      Excel
+                    </a>
+                    {!readOnly ? (
+                      <button className="link danger small" onClick={() => void remove(r)} aria-label={`Delete ${r.name}`}>
+                        Delete
+                      </button>
+                    ) : null}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="muted small">No saved reports yet.{readOnly ? '' : ' Set up a table and save it to rerun it later.'}</p>
+          )}
+        </section>
+
+        <section className="panel stack" aria-label="Filters">
+          <h2>Who to include</h2>
+          <fieldset className="plain">
+            <legend className="small muted">Interview status</legend>
+            {STATUS_OPTIONS.map(([s, label]) => (
+              <label key={s} className="check">
+                <input
+                  type="checkbox"
+                  checked={filters.statuses.includes(s)}
+                  onChange={() => setFilters((f) => ({ ...f, statuses: toggle(f.statuses, s) as Status[] }))}
+                />
+                {label}
+              </label>
+            ))}
+          </fieldset>
+          <fieldset className="plain">
+            <legend className="small muted">Mode</legend>
+            {(Object.keys(MODE_LABEL) as Mode[]).map((m) => (
+              <label key={m} className="check">
+                <input
+                  type="checkbox"
+                  checked={!!filters.modes?.includes(m)}
+                  onChange={() => setFilters((f) => ({ ...f, modes: toggle(f.modes ?? [], m) as Mode[] }))}
+                />
+                {MODE_LABEL[m]}
+              </label>
+            ))}
+            <span className="small muted">None ticked means all modes.</span>
+          </fieldset>
+          <div className="row">
+            <label className="field">
+              Started from
+              <input
+                type="date"
+                value={filters.from ?? ''}
+                onChange={(e) => setFilters((f) => ({ ...f, from: e.target.value || undefined }))}
+              />
+            </label>
+            <label className="field">
+              to
+              <input
+                type="date"
+                value={filters.to ?? ''}
+                onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value || undefined }))}
+              />
+            </label>
+          </div>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={filters.includeTest}
+              onChange={(e) => setFilters((f) => ({ ...f, includeTest: e.target.checked }))}
+            />
+            Include test interviews
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={filters.includeRejected}
+              onChange={(e) => setFilters((f) => ({ ...f, includeRejected: e.target.checked }))}
+            />
+            Include interviews rejected in quality review
+          </label>
+        </section>
+      </aside>
+
+      <div className="stack" style={{ minWidth: 0 }}>
+        <section className="panel stack" aria-label="Table setup">
+          <div className="row">
+            <div className="segmented" role="radiogroup" aria-label="Table type">
+              {(
+                [
+                  ['frequencies', 'Frequencies'],
+                  ['crosstab', 'Crosstab'],
+                ] as const
+              ).map(([k, label]) => (
+                <button key={k} role="radio" aria-checked={kind === k} onClick={() => setKind(k)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {kind === 'crosstab' ? (
+              <>
+                <label className="field">
+                  Banner (columns)
+                  <select value={banner} onChange={(e) => setBanner(e.target.value)}>
+                    {bannerOptions.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.id}: {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  Significance
+                  <select value={confidence} onChange={(e) => setConfidence(Number(e.target.value) as 0.9 | 0.95 | 0.99)}>
+                    <option value={0.9}>90% confidence</option>
+                    <option value={0.95}>95% confidence</option>
+                    <option value={0.99}>99% confidence</option>
+                  </select>
+                </label>
+              </>
+            ) : null}
+          </div>
+          <fieldset className="plain">
+            <legend className="small muted">
+              {kind === 'crosstab' ? 'Rows (stubs)' : 'Questions'}: {picked.length ? `${picked.length} chosen` : 'all questions'}
+              {picked.length ? (
+                <button className="link small" onClick={() => setPicked([])}>
+                  Clear
+                </button>
+              ) : null}
+            </legend>
+            <div className="var-picker">
+              {stubOptions.map((v) => (
+                <label key={v.id} className="check" title={v.label}>
+                  <input type="checkbox" checked={picked.includes(v.id)} onChange={() => setPicked((p) => toggle(p, v.id))} />
+                  <span className="mono small">{v.id}</span>
+                  <span className="ellipsis">{v.label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <div className="row">
+            <button
+              className="primary"
+              disabled={busy || !filters.statuses.length || (kind === 'crosstab' && !banner)}
+              onClick={() => void run()}
+            >
+              {busy ? 'Running…' : 'Run'}
+            </button>
+            {!readOnly ? (
+              <>
+                <input
+                  aria-label="Report name"
+                  placeholder="Report name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={120}
+                />
+                <button disabled={!name.trim()} onClick={() => void save(false)}>
+                  {openReport ? 'Save changes' : 'Save report'}
+                </button>
+                {openReport ? (
+                  <button disabled={!name.trim()} onClick={() => void save(true)}>
+                    Save as new
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+            {notice ? (
+              <span role="status" className="ok-text">
+                {notice}
+              </span>
+            ) : null}
+          </div>
+          <ErrorNote error={error} />
+        </section>
+
+        {result ? (
+          <section aria-label="Results" className="stack" data-testid="analysis-results">
+            <p className="muted small">
+              {result.total.toLocaleString()} interviews · unweighted
+              {'tables' in result && result.tables[0]
+                ? ` · letters mark a column significantly higher than the column with that letter, at ${Math.round(result.tables[0].confidence * 100)}% confidence; columns with a base under ${result.tables[0].minBase} are not tested`
+                : ''}
+            </p>
+            {result.total === 0 ? <p className="panel muted">No interviews match these filters yet.</p> : null}
+            {result.total > 0 && 'frequencies' in result
+              ? result.frequencies.map((f) => <FrequencyCard key={f.variable.id} f={f} />)
+              : null}
+            {result.total > 0 && 'tables' in result ? result.tables.map((t) => <CrosstabTable key={t.stub.id} t={t} />) : null}
+          </section>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function FrequencyCard({ f }: { f: Frequency }) {
+  const max = Math.max(1, ...f.rows.map((r) => r.pct));
+  return (
+    <article className="panel" data-testid={`freq-${f.variable.id}`}>
+      <h3>
+        <span className="mono">{f.variable.id}</span> {f.variable.label}
+      </h3>
+      <p className="small muted">
+        Base: {f.base.toLocaleString()} answered
+        {f.variable.kind === 'multi' ? ' · more than one answer allowed, so shares can add up to more than 100%' : ''}
+      </p>
+      {f.stats ? (
+        <dl className="stats">
+          {(
+            [
+              ['Mean', f.stats.mean],
+              ['Median', f.stats.median],
+              ['Std. dev.', f.stats.sd],
+              ['Min', f.stats.min],
+              ['Max', f.stats.max],
+            ] as const
+          ).map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{Number.isInteger(v) && k !== 'Mean' && k !== 'Std. dev.' ? v.toLocaleString() : fmt(v, 2)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : f.samples ? (
+        f.samples.length ? (
+          <ul className="samples">
+            {f.samples.map((s, i) => (
+              <li key={i}>{s}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">No answers yet.</p>
+        )
+      ) : (
+        <table className="data freq">
+          <thead>
+            <tr>
+              <th>Answer</th>
+              <th className="num">Count</th>
+              <th className="num">%</th>
+              <th aria-hidden="true" />
+            </tr>
+          </thead>
+          <tbody>
+            {f.rows.map((r) => (
+              <tr key={String(r.code)}>
+                <td>{r.label}</td>
+                <td className="num">{r.count.toLocaleString()}</td>
+                <td className="num">{fmt(r.pct)}%</td>
+                <td className="bar-cell" aria-hidden="true">
+                  {r.count ? <div className="hbar" style={{ width: `${(r.pct / max) * 100}%` }} /> : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </article>
+  );
+}
+
+function CrosstabTable({ t }: { t: Crosstab }) {
+  const sig = (letters: string[]) => (letters.length ? <span className="sig">{letters.join('')}</span> : null);
+  return (
+    <article className="panel" data-testid={`xtab-${t.stub.id}`}>
+      <h3>
+        <span className="mono">{t.stub.id}</span> {t.stub.label} <span className="muted">by {t.banner.label}</span>
+      </h3>
+      {t.testNote ? <p className="small warn-text">{t.testNote}</p> : null}
+      <div className="scroll-x">
+        <table className="data xtab">
+          <thead>
+            <tr>
+              <th />
+              {t.columns.map((c) => (
+                <th key={c.key} className="num">
+                  {c.label}
+                  {c.letter ? <span className="col-letter">({c.letter})</span> : null}
+                </th>
+              ))}
+            </tr>
+            <tr className="base">
+              <th>Base</th>
+              {t.columns.map((c) => (
+                <td key={c.key} className="num">
+                  {c.base.toLocaleString()}
+                  {c.lowBase && c.base > 0 ? <span className="small warn-text"> low</span> : null}
+                </td>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {t.means ? (
+              <tr>
+                <th>Mean</th>
+                {t.means.map((m, i) => (
+                  <td key={i} className="num">
+                    {m.stats ? fmt(m.stats.mean, 2) : '–'} {sig(m.higherThan)}
+                  </td>
+                ))}
+              </tr>
+            ) : (
+              t.rows.map((r) => (
+                <tr key={String(r.code)}>
+                  <th>{r.label}</th>
+                  {r.cells.map((c, i) => (
+                    <td key={i} className="num" title={`${c.count} of ${t.columns[i]!.base}`}>
+                      {t.columns[i]!.base ? `${fmt(c.pct)}%` : '–'} {sig(c.higherThan)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </article>
+  );
+}
