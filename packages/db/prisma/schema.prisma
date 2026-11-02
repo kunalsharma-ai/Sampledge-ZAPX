@@ -678,10 +678,45 @@ model CatiCase {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   calls           CatiCall[]
+  /// Milestone 18: the respondent's time zone (IANA, from the sample), else the survey's.
+  timeZone        String?
+  /// Keyed hash of the number, matched against the do-not-call list. Null on cases from before M18.
+  phoneHash       String?
 
   @@unique([surveyId, code])
   @@index([surveyId, status, nextCallAt])
   @@index([tenantId, surveyId])
+  @@index([tenantId, phoneHash])
+}
+
+/// Milestone 18: when a survey's cases may be called, in the respondent's local time.
+model CatiSettings {
+  surveyId  String   @id
+  tenantId  String
+  /// Used for cases without their own time zone.
+  timeZone  String   @default("UTC")
+  /// Minutes after local midnight: calls from callFrom up to (not including) callUntil.
+  callFrom  Int      @default(540)
+  callUntil Int      @default(1260)
+  /// ISO weekdays allowed: 1 = Monday ... 7 = Sunday.
+  days      Int[]    @default([1, 2, 3, 4, 5, 6])
+  updatedAt DateTime @updatedAt
+}
+
+/// Milestone 18: numbers the organization must not call, as keyed hashes (never the number).
+model DoNotCall {
+  id          String   @id @default(cuid())
+  tenantId    String
+  phoneHash   String
+  /// Last three digits, so an administrator can tell entries apart.
+  hint        String
+  /// respondent (asked on a call) | upload | manual
+  source      String
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, phoneHash])
 }
 
 /// One call attempt on a case, with its disposition.
