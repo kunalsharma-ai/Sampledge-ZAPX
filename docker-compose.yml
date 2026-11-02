@@ -10,6 +10,7 @@ x-api-env: &api-env
   SECRETS_KEY: ${SECRETS_KEY:-local-compose-secrets-key-change-me-012345}
   RUNTIME_BASE_URL: ${RUNTIME_BASE_URL:-http://localhost:5173}
   CAPI_APP_URL: ${CAPI_APP_URL:-http://localhost:5174}
+  STUDIO_URL: ${STUDIO_URL:-http://localhost:3000}
   ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
   COOKIE_SECURE: 'false'
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}

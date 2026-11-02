@@ -104,6 +104,15 @@ const schema = z
     /** Retention: finished jobs, and delivered or failed webhook deliveries, are deleted after this many days. */
     JOB_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
     WEBHOOK_DELIVERY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
+    /** Plan for organizations created by sign-up (Milestone 8): free, team, business or enterprise. */
+    DEFAULT_PLAN: z.enum(['free', 'team', 'business', 'enterprise']).default('enterprise'),
+    /** Public address of the studio; SSO callbacks are ${STUDIO_URL}/api/auth/sso/callback. */
+    STUDIO_URL: z.string().url().default('http://localhost:3000'),
+    /** Development and tests only: allow http and private-network identity providers. */
+    SSO_ALLOW_INSECURE_ISSUER: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true'),
     COOKIE_SECURE: z
       .string()
       .optional()
@@ -114,6 +123,9 @@ const schema = z
       ctx.addIssue({ code: 'custom', path: ['SECRETS_KEY'], message: 'SECRETS_KEY is required in production' });
     if (c.NODE_ENV === 'production' && c.CALLBACK_ALLOW_PRIVATE_HOSTS) {
       ctx.addIssue({ code: 'custom', path: ['CALLBACK_ALLOW_PRIVATE_HOSTS'], message: 'must be false in production' });
+    }
+    if (c.NODE_ENV === 'production' && c.SSO_ALLOW_INSECURE_ISSUER) {
+      ctx.addIssue({ code: 'custom', path: ['SSO_ALLOW_INSECURE_ISSUER'], message: 'must be false in production' });
     }
   });
 

@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 7)
+# ZAPX architecture (Milestones 1 to 8)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -151,6 +151,18 @@ Details: [modules/access-and-api-keys.md](modules/access-and-api-keys.md),
 
 Details: [modules/jobs-and-files.md](modules/jobs-and-files.md).
 
+## Identity, provisioning and plans (Milestone 8)
+
+- **Single sign-on** with OpenID Connect (PKCE, nonce, JWKS-verified ID tokens), one provider per
+  organization chosen by email domain, optional just-in-time accounts and "require SSO".
+- **SCIM 2.0** user provisioning with a per-organization token; deleting a user disables them.
+- **Disabled members** are refused on every request.
+- **Plans** (`plans.ts`) limit team members, interviewers, live surveys and monthly completes, and
+  gate SSO and SCIM. Operators set plans with `dist/cli/set-plan.js`; there is no billing.
+  [ADR 0014](adr/0014-sso-scim-and-plans.md)
+
+Details: [modules/sso-scim-plans.md](modules/sso-scim-plans.md).
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -186,7 +198,9 @@ Details: [modules/jobs-and-files.md](modules/jobs-and-files.md).
 - The CAPI app is a web app: no audio, photo or GPS capture, and no device management yet.
 - Row-level security covers `Response` for studio reads only, and is bypassed by the local
   `docker compose` database role (a superuser). Other tables rely on application filters.
-- API keys are role-scoped only (no per-endpoint scopes or IP allow lists); there is no SSO or SCIM yet.
+- API keys are role-scoped only (no per-endpoint scopes or IP allow lists).
+- SSO is OpenID Connect only (no SAML) and has been tested against a mock provider, not a real one.
+  SCIM covers users, not groups. Plans have no billing or self-service changes.
 - Webhooks are organization-wide (no per-project webhooks). Deliveries are kept for
   `WEBHOOK_DELIVERY_RETENTION_DAYS` (30).
 - Re-entry with the same UID resumes an unfinished interview. With unsigned links, anyone who knows a

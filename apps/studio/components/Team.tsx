@@ -17,6 +17,9 @@ interface Member {
   email: string;
   role: Role;
   projectScope: Scope;
+  disabledAt: string | null;
+  ssoSubject: string | null;
+  scimExternalId: string | null;
   createdAt: string;
   _count?: { projects: number };
 }
@@ -48,12 +51,18 @@ export function Team() {
     void load();
   }, [load]);
 
-  const change = async (m: Member, body: Partial<Pick<Member, 'role' | 'projectScope'>>) => {
+  const change = async (m: Member, body: Partial<Pick<Member, 'role' | 'projectScope'>> & { disabled?: boolean }) => {
     setError(null);
     setNote(null);
     try {
       await api(`/users/${m.id}`, { method: 'PATCH', body });
-      setNote(`Updated ${m.name}. It applies to their next action.`);
+      setNote(
+        body.disabled === true
+          ? `Disabled ${m.name}. They are signed out and their API keys stop working.`
+          : body.disabled === false
+            ? `Enabled ${m.name}.`
+            : `Updated ${m.name}. It applies to their next action.`,
+      );
       await load();
     } catch (e) {
       setError(e);
@@ -70,12 +79,25 @@ export function Team() {
             <th>Email</th>
             <th>Role</th>
             <th>Project access</th>
+            <th>Status</th>
           </tr>
         </thead>
         <tbody>
           {members.map((m) => (
-            <tr key={m.id}>
-              <td>{m.name}</td>
+            <tr key={m.id} className={m.disabledAt ? 'muted' : undefined}>
+              <td>
+                {m.name}
+                {m.ssoSubject ? (
+                  <span className="badge" title="Has signed in with single sign-on">
+                    SSO
+                  </span>
+                ) : null}
+                {m.scimExternalId ? (
+                  <span className="badge" title="Managed by your identity provider (SCIM)">
+                    SCIM
+                  </span>
+                ) : null}
+              </td>
               <td className="mono small">{m.email}</td>
               <td>
                 {m.id === me?.id ? (
@@ -106,6 +128,14 @@ export function Team() {
                   </select>
                 ) : (
                   <span className="muted small">{m.role === 'INTERVIEWER' ? 'Assigned surveys only' : 'All projects'}</span>
+                )}
+              </td>
+              <td>
+                {m.disabledAt ? <span className="badge bad">disabled</span> : <span className="badge good">active</span>}{' '}
+                {m.id === me?.id ? null : (
+                  <button className="link" onClick={() => void change(m, { disabled: !m.disabledAt })}>
+                    {m.disabledAt ? `Enable ${m.name}` : `Disable ${m.name}`}
+                  </button>
                 )}
               </td>
             </tr>

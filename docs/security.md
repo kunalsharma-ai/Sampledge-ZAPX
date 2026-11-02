@@ -58,6 +58,21 @@ in `pnpm-workspace.yaml`.
   isolation. It is not applied at all if the API connects as a superuser or a `BYPASSRLS` role; the
   API logs a warning at start-up and reports the state at `GET /api/audit/security`.
 
+## Identity, provisioning and plans (Milestone 8)
+
+- Single sign-on uses OpenID Connect with PKCE, `state` and `nonce`; ID tokens are verified against
+  the provider's published keys (issuer, audience, expiry, nonce). The flow state is a signed,
+  httpOnly cookie valid for 10 minutes. After sign-in only same-site relative paths are followed.
+- Provider addresses must be https and public unless `SSO_ALLOW_INSECURE_ISSUER=true` (refused in
+  production). Client secrets are sealed with `SecretBox` and never returned by the API.
+- A provider can only sign people into its own organization's email domains; an email that belongs
+  to another organization is refused, and just-in-time provisioning never creates admins.
+- When SSO is required, admins keep password sign-in as the way back in. Protect admin passwords.
+- Disabled members are refused on every request (sessions and their API keys stop at once).
+- SCIM tokens are stored as SHA-256 hashes, shown once, scoped to one organization, and rotatable;
+  SCIM can create admins if the directory says so, so treat the token like an admin password.
+- SSO has been tested only against a mock provider; see ADR 0014.
+
 ## Reporting
 
 Report vulnerabilities privately to the maintainer; do not open a public issue.

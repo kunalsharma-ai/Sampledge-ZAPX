@@ -12,6 +12,7 @@ import { LayerEditor, emptyLayer, type Layer } from '@/components/RedirectRules'
 import { Team } from '@/components/Team';
 import { ApiKeys } from '@/components/ApiKeys';
 import { Webhooks } from '@/components/Webhooks';
+import { PlanUsage, ScimSettings, SsoSettings } from '@/components/Identity';
 
 type Task = 'architect' | 'translate';
 const TASK_NAMES: Record<Task, string> = { architect: 'AI Survey Architect (build and edit surveys)', translate: 'AI translation' };
@@ -262,7 +263,10 @@ export default function SettingsPage() {
           ) : null}
         </section>
 
+        <PlanUsage />
         <Team />
+        <SsoSettings />
+        <ScimSettings />
         <ApiKeys isAdmin />
         <Webhooks />
       </div>

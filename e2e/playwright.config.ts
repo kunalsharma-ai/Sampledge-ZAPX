@@ -6,7 +6,10 @@ import { defineConfig } from '@playwright/test';
  * Requires a migrated database (DATABASE_URL) and `pnpm build` first.
  */
 // Every spec signs up a fresh organization, so the run needs more than the default 5 sign-ups a minute.
-const env = { ...process.env, ALLOW_SIGNUP: 'true', SIGNUP_RATE_PER_MINUTE: '50' } as Record<string, string>;
+const env = { ...process.env, ALLOW_SIGNUP: 'true', SIGNUP_RATE_PER_MINUTE: '50', SSO_ALLOW_INSECURE_ISSUER: 'true' } as Record<
+  string,
+  string
+>;
 export default defineConfig({
   testDir: './tests',
   timeout: 90_000,

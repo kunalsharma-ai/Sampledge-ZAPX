@@ -8,7 +8,8 @@ function LoginForm() {
   const params = useSearchParams();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [form, setForm] = useState({ email: '', password: '', name: '', organization: '' });
-  const [error, setError] = useState<unknown>(null);
+  const ssoError = params.get('sso_error');
+  const [error, setError] = useState<unknown>(ssoError ? new Error(ssoError) : null);
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: e.target.value });
 
@@ -24,6 +25,23 @@ function LoginForm() {
     } catch (err) {
       setError(err);
     } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Single sign-on: the organization is found from the email domain, then the browser goes to its provider. */
+  const sso = async () => {
+    setError(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      setError(new Error('Enter your work email first.'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const { url } = await api<{ url: string }>('/auth/sso/start', { body: { email: form.email, next: params.get('next') ?? '/' } });
+      window.location.href = url;
+    } catch (err) {
+      setError(err);
       setBusy(false);
     }
   };
@@ -64,6 +82,11 @@ function LoginForm() {
       <button className="primary" disabled={busy}>
         {busy ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
       </button>
+      {mode === 'login' ? (
+        <button type="button" onClick={sso} disabled={busy}>
+          Sign in with SSO
+        </button>
+      ) : null}
       <button type="button" className="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
         {mode === 'login' ? 'New here? Create an organization' : 'Have an account? Sign in'}
       </button>
