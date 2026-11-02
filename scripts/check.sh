@@ -27,6 +27,7 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 passed=()
 
 step "Install dependencies (frozen lockfile)"; pnpm install --frozen-lockfile; passed+=("install")
+step "Secret scan";                 node scripts/secret-scan.mjs; passed+=("secrets")
 step "Formatting";                    pnpm format:check;  passed+=("format")
 step "Lint";                          pnpm lint;          passed+=("lint")
 step "Build";                         pnpm build;         passed+=("build")

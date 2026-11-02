@@ -10,7 +10,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { PlanService } from '../plans/plan.service';
 import { SecretBox } from '../platform/secret-box';
-import { isPrivateAddress } from '../integrations/http-delivery';
+import { guardedFetch, isPrivateAddress } from '../common/net-guard';
 import type { AuthUser } from './auth.types';
 
 import { SsoError } from './sso-error';
@@ -56,8 +56,22 @@ const DISCOVERY_TTL_MS = 10 * 60_000;
 const b64url = (b: Buffer) => b.toString('base64url');
 export const emailDomain = (email: string) => email.split('@')[1]?.toLowerCase() ?? '';
 /** Only same-site relative paths are allowed after sign-in (no open redirects). */
-export const safeNext = (next: unknown) =>
-  typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\') ? next : '/';
+/**
+ * Where to go after sign-in: a path on this site only. Browsers drop tabs and newlines from
+ * addresses, so "/\t/evil.example" would become "//evil.example"; control characters and spaces
+ * are refused, and the result must still be on this site once parsed.
+ */
+export const safeNext = (next: unknown) => {
+  if (typeof next !== 'string' || next.length > 500 || !next.startsWith('/') || next.startsWith('//')) return '/';
+  // eslint-disable-next-line no-control-regex -- refusing control characters is the point
+  if (next.includes('\\') || /[\u0000-\u0020\u007f-\u009f\u2028\u2029]/.test(next)) return '/';
+  try {
+    const u = new URL(next, 'https://zapx.invalid');
+    return u.origin === 'https://zapx.invalid' ? `${u.pathname}${u.search}${u.hash}` : '/';
+  } catch {
+    return '/';
+  }
+};
 
 /**
  * OpenID Connect single sign-on (Milestone 8): authorization code flow with PKCE, a nonce, and
@@ -108,7 +122,11 @@ export class SsoService {
     const cached = this.discoveries.get(issuer);
     if (cached && Date.now() - cached.at < DISCOVERY_TTL_MS) return cached.doc;
     const url = await this.checkUrl(`${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`, 'issuer');
-    const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(10_000) }).catch((e: Error) => {
+    const res = await guardedFetch(url, {
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
+      allowPrivate: config().SSO_ALLOW_INSECURE_ISSUER,
+    }).catch((e: Error) => {
       throw new SsoError(`Could not reach the identity provider (${e.message})`);
     });
     if (!res.ok) throw new SsoError(`The identity provider's discovery document answered HTTP ${res.status}`);
@@ -323,8 +341,9 @@ export class SsoService {
     if (!c?.enabled || c.protocol !== 'OIDC') throw new SsoError('Single sign-on is turned off for this organization');
     const doc = await this.discover(c.issuer);
 
-    const tokenRes = await fetch(doc.token_endpoint, {
+    const tokenRes = await guardedFetch(doc.token_endpoint, {
       method: 'POST',
+      allowPrivate: config().SSO_ALLOW_INSECURE_ISSUER,
       redirect: 'error',
       signal: AbortSignal.timeout(10_000),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },

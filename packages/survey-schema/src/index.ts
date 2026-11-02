@@ -376,10 +376,10 @@ export const surveyDefinitionSchema = z.object({
     .object({
       allowBack: z.boolean().default(false),
       showProgress: z.boolean().default(true),
-      quality: qualitySettingsSchema.default({}),
-      capi: capiSettingsSchema.default({}),
+      quality: qualitySettingsSchema.prefault({}),
+      capi: capiSettingsSchema.prefault({}),
     })
-    .default({}),
+    .prefault({}),
 });
 export type SurveyDefinition = z.infer<typeof surveyDefinitionSchema>;
 export type SurveyDefinitionInput = z.input<typeof surveyDefinitionSchema>;
@@ -504,13 +504,13 @@ export const languageSchema = z.object({
   name: z.string().min(1).max(60),
   /** Offered to respondents only when enabled (publishing then requires it to be complete and reviewed). */
   enabled: z.boolean().default(false),
-  texts: z.record(z.string().max(200), translationEntrySchema).default({}),
+  texts: z.record(z.string().max(200), translationEntrySchema).prefault({}),
 });
 export type Language = z.infer<typeof languageSchema>;
 
 export const presentationSchema = z.object({
-  theme: themeSchema.default({}),
-  devices: deviceSettingsSchema.default({}),
+  theme: themeSchema.prefault({}),
+  devices: deviceSettingsSchema.prefault({}),
   /** Name of the source language, shown in the respondent language menu. */
   sourceLanguageName: z.string().max(60).optional(),
   languages: z.array(languageSchema).max(60).default([]),

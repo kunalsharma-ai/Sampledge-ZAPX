@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Milestone 20: last check before anything leaves this machine: no secrets in any tracked file.
+exec node scripts/secret-scan.mjs

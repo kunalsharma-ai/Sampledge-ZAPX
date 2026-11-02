@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Milestone 20: refuse a commit that contains a secret (see scripts/secret-scan.mjs).
+# Installed by `pnpm install` (or `pnpm hooks:install`). Bypass only for a confirmed false positive.
+exec node scripts/secret-scan.mjs --staged

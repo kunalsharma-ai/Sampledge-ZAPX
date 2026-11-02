@@ -1,8 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
-import type { ZodType, ZodTypeDef } from 'zod';
+import type { ZodType } from 'zod';
 
 /** Parse an untrusted request body with a zod schema, or throw a 400 listing every problem. */
-export function parseBody<T>(schema: ZodType<T, ZodTypeDef, unknown>, body: unknown): T {
+export function parseBody<T>(schema: ZodType<T, unknown>, body: unknown): T {
   const r = schema.safeParse(body);
   if (!r.success) {
     throw new BadRequestException({

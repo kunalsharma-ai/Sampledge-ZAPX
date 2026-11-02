@@ -572,7 +572,7 @@ describe('running on AWS', () => {
       DB_NAME: 'zapx',
       DB_SSLMODE: 'require',
     })!;
-    expect(url).toBe('postgresql://zapx:p%40ss%3Aw%2Frd%3F%23%25@zapx.abc.eu-west-1.rds.amazonaws.com:5432/zapx?sslmode=require');
+    expect(url).toBe('postgresql://zapx:p%40ss%3Aw%2Frd%3F%23%25@zapx.abc.eu-west-1.rds.amazonaws.com:5432/zapx?sslmode=require'); // secret-scan:allow (made-up test password)
     expect(decodeURIComponent(new URL(url).password)).toBe('p@ss:w/rd?#%');
   });
 

@@ -10,3 +10,24 @@ playwright-report/
 next-env.d.ts
 *.tsbuildinfo
 .data/
+
+# Secrets and credentials (Milestone 20; scripts/secret-scan.mjs refuses them too)
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+credentials.json
+service-account*.json
+.npmrc
+# Terraform: state holds secrets; only the example variables file is shared
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!infra/terraform/example.tfvars
+backend.hcl
+crash.log

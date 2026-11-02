@@ -177,7 +177,61 @@ resource "aws_cloudfront_function" "spa" {
 data "aws_cloudfront_cache_policy" "optimized" { name = "Managed-CachingOptimized" }
 data "aws_cloudfront_cache_policy" "disabled" { name = "Managed-CachingDisabled" }
 data "aws_cloudfront_origin_request_policy" "all_viewer" { name = "Managed-AllViewerExceptHostHeader" }
-data "aws_cloudfront_response_headers_policy" "security" { name = "Managed-SecurityHeadersPolicy" }
+# Milestone 20: security headers for the two static apps, including a content security policy
+# (the managed SecurityHeadersPolicy has none). Matches infra/nginx/*-headers.conf. The runtime may be
+# embedded by customers, so only the interviewer app refuses to be framed.
+locals {
+  static_csp = {
+    runtime = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: blob: https:; media-src 'self' blob:; font-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    capi    = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+  }
+  static_permissions = {
+    runtime = "geolocation=(), payment=(), usb=(), camera=(self), microphone=(self)"
+    capi    = "geolocation=(self), microphone=(self), camera=(self), payment=(), usb=()"
+  }
+}
+
+resource "aws_cloudfront_response_headers_policy" "static" {
+  for_each = local.static_sites
+  name     = "${local.name}-${each.key}-security"
+  security_headers_config {
+    content_security_policy {
+      content_security_policy = local.static_csp[each.key]
+      override                = true
+    }
+    content_type_options {
+      override = true
+    }
+    referrer_policy {
+      referrer_policy = "no-referrer"
+      override        = true
+    }
+    strict_transport_security {
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      override                   = true
+    }
+    dynamic "frame_options" {
+      for_each = each.key == "capi" ? [1] : []
+      content {
+        frame_option = "DENY"
+        override     = true
+      }
+    }
+  }
+  custom_headers_config {
+    items {
+      header   = "Permissions-Policy"
+      value    = local.static_permissions[each.key]
+      override = true
+    }
+    items {
+      header   = "Cross-Origin-Opener-Policy"
+      value    = "same-origin"
+      override = true
+    }
+  }
+}
 
 # Forward the viewer's country and address to the API (GEO_COUNTRY_HEADER, EDGE_CLIENT_ADDRESS_HEADER).
 resource "aws_cloudfront_origin_request_policy" "api" {
@@ -231,7 +285,7 @@ resource "aws_cloudfront_distribution" "static" {
     cached_methods             = ["GET", "HEAD"]
     compress                   = true
     cache_policy_id            = data.aws_cloudfront_cache_policy.optimized.id
-    response_headers_policy_id = data.aws_cloudfront_response_headers_policy.security.id
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.static[each.key].id
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.spa.arn

@@ -6,6 +6,7 @@ import { PrismaService } from '../common/prisma.service';
 import { parseApiKey, secretMatches } from './api-keys';
 import { API_KEY_PREFIX, AUTH_COOKIE, CSRF_HEADER, lowerRole, type AuthUser, type RoleName } from './auth.types';
 import { IS_PUBLIC, ROLES } from './decorators';
+import { SESSION_ALGORITHMS } from './session';
 
 /** lastUsedAt is written at most this often per key, so busy integrations do not write on every call. */
 const LAST_USED_GRANULARITY_MS = 60_000;
@@ -52,19 +53,20 @@ export class AuthGuard implements CanActivate {
   }
 
   private async fromSession(token: string): Promise<AuthUser> {
-    let payload: { sub: string; tid: string };
-    try {
-      payload = await this.jwt.verifyAsync(token);
-    } catch {
-      throw new UnauthorizedException('Session expired');
-    }
+    const payload = await verifySession(this.jwt, token);
+    if (!payload) throw new UnauthorizedException('Session expired');
     const u = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, tenantId: true, role: true, email: true, projectScope: true, disabledAt: true },
+      select: { id: true, tenantId: true, role: true, email: true, projectScope: true, disabledAt: true, sessionsRevokedAt: true },
     });
     if (!u || u.tenantId !== payload.tid) throw new UnauthorizedException('Session expired');
     if (u.disabledAt) throw new UnauthorizedException('Your account is disabled');
-    const { disabledAt: _disabled, ...member } = u;
+    // Signed out on the server (Milestone 20): "sign out everywhere", or this one session signed out.
+    if (u.sessionsRevokedAt && (payload.iat ?? 0) * 1000 <= u.sessionsRevokedAt.getTime())
+      throw new UnauthorizedException('Session expired');
+    if (payload.jti && (await this.prisma.revokedSession.findUnique({ where: { jti: payload.jti }, select: { jti: true } })))
+      throw new UnauthorizedException('Session expired');
+    const { disabledAt: _disabled, sessionsRevokedAt: _revoked, ...member } = u;
     return member;
   }
 
@@ -87,5 +89,23 @@ export class AuthGuard implements CanActivate {
       await this.prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
     }
     return { ...creator, role: lowerRole(key.role, creator.role), apiKeyId: key.id };
+  }
+}
+
+export interface SessionPayload {
+  sub: string;
+  tid: string;
+  iat?: number;
+  exp?: number;
+  jti?: string;
+}
+
+/** The payload of a valid, unexpired session token signed with HS256, or null. */
+export async function verifySession(jwt: JwtService, token: string): Promise<SessionPayload | null> {
+  try {
+    const p = await jwt.verifyAsync<SessionPayload>(token, { algorithms: [...SESSION_ALGORITHMS] });
+    return typeof p.sub === 'string' && typeof p.tid === 'string' ? p : null;
+  } catch {
+    return null;
   }
 }

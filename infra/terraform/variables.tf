@@ -161,6 +161,16 @@ variable "waf_rate_limit" {
   }
 }
 
+variable "waf_sign_in_rate_limit" {
+  description = "Requests per 5 minutes from one address to /api/auth/ (sign-in, SSO) before WAF blocks it. Rate rules always block unless waf_mode is off."
+  type        = number
+  default     = 100
+  validation {
+    condition     = var.waf_sign_in_rate_limit >= 10 && var.waf_sign_in_rate_limit <= var.waf_rate_limit
+    error_message = "Use at least 10 (the WAF minimum) and no more than waf_rate_limit."
+  }
+}
+
 variable "waf_count_only_rules" {
   description = "Managed rules that only count, even in block mode: large bodies (CAPI sync, uploads) and HTML in question text trip these."
   type        = list(string)

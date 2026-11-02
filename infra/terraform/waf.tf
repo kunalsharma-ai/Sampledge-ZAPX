@@ -9,6 +9,9 @@ locals {
     common        = { priority = 10, name = "AWSManagedRulesCommonRuleSet" }
     bad_inputs    = { priority = 20, name = "AWSManagedRulesKnownBadInputsRuleSet" }
     ip_reputation = { priority = 30, name = "AWSManagedRulesAmazonIpReputationList" }
+    # Milestone 20: SQL injection signatures. The API only uses parameterised queries; this stops
+    # probing traffic before it reaches the application at all.
+    sqli = { priority = 40, name = "AWSManagedRulesSQLiRuleSet" }
   }
 }
 
@@ -36,6 +39,40 @@ resource "aws_wafv2_web_acl" "edge" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${local.name}-edge-rate"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # Milestone 20: password guessing. Sign-in endpoints get a much lower limit per address than the
+  # rest of the site; the API also locks an account after repeated wrong passwords.
+  rule {
+    name     = "sign-in-rate-per-viewer"
+    priority = 2
+    action {
+      block {}
+    }
+    statement {
+      rate_based_statement {
+        limit              = var.waf_sign_in_rate_limit
+        aggregate_key_type = "IP"
+        scope_down_statement {
+          byte_match_statement {
+            search_string         = "/api/auth/"
+            positional_constraint = "STARTS_WITH"
+            field_to_match {
+              uri_path {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "LOWERCASE"
+            }
+          }
+        }
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.name}-edge-sign-in-rate"
       sampled_requests_enabled   = true
     }
   }
@@ -125,6 +162,59 @@ resource "aws_wafv2_web_acl" "alb" {
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${local.name}-alb-rate"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "sign-in-rate-per-address"
+    priority = 2
+    action {
+      block {}
+    }
+    statement {
+      rate_based_statement {
+        limit              = var.waf_sign_in_rate_limit
+        aggregate_key_type = "IP"
+        scope_down_statement {
+          and_statement {
+            statement {
+              byte_match_statement {
+                search_string         = "/api/auth/"
+                positional_constraint = "STARTS_WITH"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "LOWERCASE"
+                }
+              }
+            }
+            statement {
+              not_statement {
+                statement {
+                  byte_match_statement {
+                    search_string         = var.edge_shared_secret
+                    positional_constraint = "EXACTLY"
+                    field_to_match {
+                      single_header { name = "x-zapx-edge" }
+                    }
+                    text_transformation {
+                      priority = 0
+                      type     = "NONE"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "${local.name}-alb-sign-in-rate"
       sampled_requests_enabled   = true
     }
   }

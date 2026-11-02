@@ -129,6 +129,26 @@ run "plan" {
     condition     = !aws_ecs_service.api.enable_execute_command
     error_message = "ECS Exec is off unless asked for"
   }
+  assert {
+    condition     = alltrue([for acl in [aws_wafv2_web_acl.edge[0], aws_wafv2_web_acl.alb[0]] : length([for r in acl.rule : r if startswith(r.name, "sign-in-rate")]) == 1 && length([for r in acl.rule : r if r.name == "AWSManagedRulesSQLiRuleSet"]) == 1])
+    error_message = "Both web ACLs rate-limit sign-in and carry the SQL injection rules"
+  }
+  assert {
+    condition     = alltrue([for k, p in aws_cloudfront_response_headers_policy.static : length(p.security_headers_config[0].content_security_policy) == 1 && strcontains(p.security_headers_config[0].content_security_policy[0].content_security_policy, "object-src 'none'")])
+    error_message = "Both static apps send a content security policy"
+  }
+  assert {
+    condition     = length(aws_cloudfront_response_headers_policy.static["capi"].security_headers_config[0].frame_options) == 1 && length(aws_cloudfront_response_headers_policy.static["runtime"].security_headers_config[0].frame_options) == 0
+    error_message = "Only the interviewer app refuses framing"
+  }
+}
+
+run "bad_sign_in_rate_is_refused" {
+  command = plan
+  variables {
+    waf_sign_in_rate_limit = 5
+  }
+  expect_failures = [var.waf_sign_in_rate_limit]
 }
 
 run "waf_block" {

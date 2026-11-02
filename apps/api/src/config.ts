@@ -17,6 +17,9 @@ const pricingSchema = z.record(
 );
 export type ModelPrice = z.infer<typeof pricingSchema>[string];
 
+/** Parts of the example secrets in .env.example and the test setup; never acceptable in production. */
+const KNOWN_DEV_SECRETS = ['dev-only-secret', 'change-me', 'changeme', 'test-secret'];
+
 const schema = z
   .object({
     DATABASE_URL: z.string().min(1),
@@ -178,7 +181,7 @@ const schema = z
         if (!v) return {} as Partial<Record<'free' | 'team' | 'business' | 'enterprise', string>>;
         try {
           return z
-            .record(z.enum(['free', 'team', 'business', 'enterprise']), z.string().regex(/^price_[A-Za-z0-9]+$/))
+            .partialRecord(z.enum(['free', 'team', 'business', 'enterprise']), z.string().regex(/^price_[A-Za-z0-9]+$/))
             .parse(JSON.parse(v)) as Partial<Record<'free' | 'team' | 'business' | 'enterprise', string>>;
         } catch {
           ctx.addIssue({ code: 'custom', message: 'STRIPE_PRICES must be JSON: {"team": "price_..."}' });
@@ -219,6 +222,11 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true'),
+    /** Sign-in attempts allowed per minute from one address (raise only for automated test runs). */
+    LOGIN_RATE_PER_MINUTE: z.coerce.number().int().min(1).max(1000).default(10),
+    /** Milestone 20: wrong passwords in a row before an account is locked, and for how long. */
+    LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(100).default(10),
+    LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   })
   .superRefine((c, ctx) => {
     if (c.TRANSCRIPTION === 'deepgram' && (!c.DEEPGRAM_API_KEY || !c.DEEPGRAM_MODEL))
@@ -237,6 +245,15 @@ const schema = z
     }
     if (c.NETWORK_REPUTATION === 'ipinfo' && !c.IPINFO_TOKEN)
       ctx.addIssue({ code: 'custom', path: ['IPINFO_TOKEN'], message: 'IPINFO_TOKEN is required when NETWORK_REPUTATION=ipinfo' });
+    // Milestone 20: refuse to start in production with settings that are only safe on a laptop.
+    if (c.NODE_ENV === 'production') {
+      if (!c.COOKIE_SECURE)
+        ctx.addIssue({ code: 'custom', path: ['COOKIE_SECURE'], message: 'must be true in production (sessions only over https)' });
+      if (KNOWN_DEV_SECRETS.some((d) => c.JWT_SECRET.includes(d)))
+        ctx.addIssue({ code: 'custom', path: ['JWT_SECRET'], message: 'is the example value; generate one with openssl rand -hex 32' });
+      if (c.SECRETS_KEY && (c.SECRETS_KEY === c.JWT_SECRET || KNOWN_DEV_SECRETS.some((d) => c.SECRETS_KEY!.includes(d))))
+        ctx.addIssue({ code: 'custom', path: ['SECRETS_KEY'], message: 'must be its own random value, not JWT_SECRET or the example' });
+    }
     if (c.NODE_ENV === 'production' && !c.SECRETS_KEY)
       ctx.addIssue({ code: 'custom', path: ['SECRETS_KEY'], message: 'SECRETS_KEY is required in production' });
     if (c.NODE_ENV === 'production' && c.CALLBACK_ALLOW_PRIVATE_HOSTS) {
