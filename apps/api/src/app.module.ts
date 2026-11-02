@@ -7,6 +7,11 @@ import { CommonModule } from './common/common.module';
 import { AuthController } from './auth/auth.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { UsersController } from './users/users.controller';
+import { SsoController } from './auth/sso.controller';
+import { SsoService } from './auth/sso.service';
+import { ScimController } from './scim/scim.controller';
+import { ScimAdminController } from './scim/scim-admin.controller';
+import { ScimGuard } from './scim/scim.guard';
 import { ProjectsController } from './projects/projects.controller';
 import { SurveysController } from './surveys/surveys.controller';
 import { SurveysService } from './surveys/surveys.service';
@@ -57,6 +62,9 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     HealthController,
     AuthController,
     UsersController,
+    SsoController,
+    ScimController,
+    ScimAdminController,
     ProjectsController,
     SurveysController,
     VendorsController,
@@ -74,6 +82,8 @@ import { FileStore, LocalFileStore } from './jobs/file-store';
     JobsController,
   ],
   providers: [
+    SsoService,
+    ScimGuard,
     SurveysService,
     ExportService,
     InterviewService,

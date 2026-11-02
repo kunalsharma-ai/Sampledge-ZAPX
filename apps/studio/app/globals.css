@@ -468,3 +468,11 @@ table.data th {
   gap: 4px;
   min-width: 160px;
 }
+
+/* Milestone 8: plan usage meters */
+.bar.near > div {
+  background: var(--warn);
+}
+.bar.full > div {
+  background: var(--bad);
+}

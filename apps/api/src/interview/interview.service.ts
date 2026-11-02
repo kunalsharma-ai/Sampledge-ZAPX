@@ -43,6 +43,7 @@ import { AuditService } from '../common/audit.service';
 import { isAllowedReturnUrl, verifySignedParams } from '@zapx/redirect-core';
 import { RedirectService } from '../integrations/redirect.service';
 import { MAX_PAGE_MS, QualityService } from '../quality/quality.service';
+import { PlanService } from '../plans/plan.service';
 
 const MAX_PARAMS = 30;
 const MAX_PARAM_LENGTH = 2000;
@@ -178,6 +179,7 @@ export class InterviewService {
     private readonly audit: AuditService,
     private readonly redirects: RedirectService,
     private readonly quality: QualityService,
+    private readonly plans: PlanService,
   ) {}
 
   // ---- Entry --------------------------------------------------------------------------------
@@ -239,6 +241,12 @@ export class InterviewService {
       ? await this.prisma.response.findUnique({ where: { surveyId_vendorId_uid: { surveyId, vendorId: vendor.id, uid } } })
       : await this.prisma.response.findFirst({ where: { surveyId, vendorId: null, uid } });
     if (existing) return this.reenter(existing, vendor);
+
+    // The organization has used this month's completes on its plan: new interviews are turned away
+    // like a closed survey. Respondents resuming an interview (above) can still finish.
+    if (!isTest && (await this.plans.completesExhausted(survey.tenantId))) {
+      return this.rejectWithoutRecord(survey, vendor, uid, params, 'quota_full', 'plan_completes_exhausted', ctx);
+    }
 
     // Device rules apply to new interviews; a respondent resuming elsewhere is not cut off.
     const device: DeviceType = classifyDevice(meta.userAgent, meta.client);

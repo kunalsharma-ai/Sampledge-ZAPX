@@ -6,6 +6,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccessService } from '../common/access.service';
 import { WebhookService } from '../integrations/webhook.service';
+import { PlanService } from '../plans/plan.service';
 import type { AuthUser } from '../auth/auth.types';
 
 export interface CheckResult {
@@ -31,6 +32,7 @@ export class SurveysService {
     private readonly audit: AuditService,
     private readonly access: AccessService,
     private readonly webhooks: WebhookService,
+    private readonly plans: PlanService,
   ) {}
 
   async getSurvey(user: AuthUser, id: string): Promise<Survey> {
@@ -183,6 +185,8 @@ export class SurveysService {
           : 'Fix the logic errors before publishing';
       throw new UnprocessableEntityException({ message, check });
     }
+    // A first publish puts the survey live, which counts against the plan.
+    if (survey.status === 'DRAFT') await this.plans.assertLiveSurvey(user.tenantId);
     const def = draft.definition as unknown as SurveyDefinition;
     const published = await this.prisma.$transaction(async (tx) => {
       await tx.surveyVersion.updateMany({ where: { surveyId: id, status: 'PUBLISHED' }, data: { status: 'SUPERSEDED' } });
@@ -212,6 +216,7 @@ export class SurveysService {
   async setStatus(user: AuthUser, id: string, status: 'LIVE' | 'PAUSED' | 'CLOSED') {
     const survey = await this.getSurvey(user, id);
     if (status === 'LIVE' && !survey.liveVersionId) throw new ConflictException('Publish a version before going live');
+    if (status === 'LIVE' && survey.status !== 'LIVE') await this.plans.assertLiveSurvey(user.tenantId);
     const updated = await this.prisma.survey.update({ where: { id }, data: { status } });
     await this.audit.record(user, 'survey.status', 'survey', id, { from: survey.status, to: status });
     if (survey.status !== status)

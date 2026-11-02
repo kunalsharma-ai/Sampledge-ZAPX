@@ -60,10 +60,12 @@ export class AuthGuard implements CanActivate {
     }
     const u = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { id: true, tenantId: true, role: true, email: true, projectScope: true },
+      select: { id: true, tenantId: true, role: true, email: true, projectScope: true, disabledAt: true },
     });
     if (!u || u.tenantId !== payload.tid) throw new UnauthorizedException('Session expired');
-    return u;
+    if (u.disabledAt) throw new UnauthorizedException('Your account is disabled');
+    const { disabledAt: _disabled, ...member } = u;
+    return member;
   }
 
   private async fromApiKey(token: string): Promise<AuthUser> {
@@ -71,15 +73,16 @@ export class AuthGuard implements CanActivate {
     const key = parsed
       ? await this.prisma.apiKey.findUnique({
           where: { prefix: parsed.prefix },
-          include: { createdBy: { select: { id: true, tenantId: true, role: true, email: true, projectScope: true } } },
+          include: { createdBy: { select: { id: true, tenantId: true, role: true, email: true, projectScope: true, disabledAt: true } } },
         })
       : null;
     if (!parsed || !key || !secretMatches(parsed.secret, key.secretHash)) throw new UnauthorizedException('Invalid API key');
     if (key.revokedAt) throw new UnauthorizedException('This API key was revoked');
     if (key.expiresAt && key.expiresAt.getTime() <= Date.now()) throw new UnauthorizedException('This API key has expired');
-    const creator = key.createdBy;
-    // A key never outranks the member who made it, and stops working for interviewers.
+    const { disabledAt, ...creator } = key.createdBy;
+    // A key never outranks the member who made it, and stops working for interviewers and disabled members.
     if (creator.tenantId !== key.tenantId || creator.role === 'INTERVIEWER') throw new UnauthorizedException('Invalid API key');
+    if (disabledAt) throw new UnauthorizedException('The member who created this API key is disabled');
     if (!key.lastUsedAt || Date.now() - key.lastUsedAt.getTime() > LAST_USED_GRANULARITY_MS) {
       await this.prisma.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);
     }

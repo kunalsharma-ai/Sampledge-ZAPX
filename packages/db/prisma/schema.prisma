@@ -108,10 +108,44 @@ model Tenant {
   name             String
   /// Organization-level redirect defaults: {urls, words, countries} (lowest precedence).
   redirectDefaults Json            @default("{}")
+  /// Plan code (Milestone 8): free, team, business or enterprise. Limits live in code (plans.ts).
+  plan             String          @default("enterprise")
   createdAt        DateTime        @default(now())
   users            User[]
   projects         Project[]
   aiPolicy         TenantAiPolicy?
+  sso              TenantSso?
+  scim             TenantScim?
+}
+
+/// OpenID Connect single sign-on for one organization (Milestone 8).
+model TenantSso {
+  tenantId           String   @id
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  enabled            Boolean  @default(false)
+  issuer             String
+  clientId           String
+  /// Client secret sealed with SecretBox.
+  clientSecretSealed String
+  /// Email domains that sign in through this organization's identity provider (lower case).
+  domains            String[]
+  /// When true, members other than admins cannot sign in with a password.
+  enforced           Boolean  @default(false)
+  /// Create a member on first sign-in (just-in-time provisioning) with this role. Null = only existing members.
+  jitRole            Role?
+  updatedById        String?
+  updatedAt          DateTime @updatedAt
+}
+
+/// SCIM 2.0 provisioning token for one organization (Milestone 8). Stored hashed like API keys.
+model TenantScim {
+  tenantId    String    @id
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  prefix      String    @unique
+  secretHash  String
+  createdById String
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
 }
 
 model User {
@@ -123,12 +157,19 @@ model User {
   passwordHash    String
   role            Role             @default(PROGRAMMER)
   projectScope    ProjectScope     @default(ALL)
+  /// Disabled members cannot sign in, and their sessions and API keys stop working at once.
+  disabledAt      DateTime?
+  /// Subject from the organization's identity provider (OIDC `sub`), set on first SSO sign-in.
+  ssoSubject      String?
+  /// The identity provider's id for this member when provisioned through SCIM.
+  scimExternalId  String?
   createdAt       DateTime         @default(now())
   capiAssignments CapiAssignment[]
   capiInterviews  Response[]       @relation("CapiInterviewer")
   projects        ProjectMember[]
   apiKeys         ApiKey[]
 
+  @@unique([tenantId, ssoSubject])
   @@index([tenantId])
 }
 
@@ -323,6 +364,8 @@ model Response {
   @@index([surveyId, ipHash])
   @@index([tenantId, surveyId, status])
   @@index([vendorId, completedAt])
+  /// Plan usage: completes per organization per month.
+  @@index([tenantId, status, completedAt])
   @@index([status, updatedAt])
 }
 

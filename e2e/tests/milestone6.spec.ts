@@ -87,7 +87,7 @@ test('project access, API keys, webhooks and the audit log', async ({ page, brow
   await pat.goto('/login');
   await pat.getByLabel('Email').fill(patEmail);
   await pat.getByLabel('Password').fill('member-password-1');
-  await pat.getByRole('button', { name: 'Sign in' }).click();
+  await pat.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(pat.getByRole('heading', { name: 'Projects' })).toBeVisible();
   await expect(pat.getByRole('link', { name: 'Alpha study' })).toBeVisible();
   await expect(pat.getByRole('link', { name: 'Beta study' })).toHaveCount(0);
