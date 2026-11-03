@@ -1,9 +1,10 @@
 'use client';
 import Link from 'next/link';
-import { Palette, Zap } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
+import { ThemeMenu } from '@/components/quantum/ThemeMenu';
 
 /** `forInterviewers`: the page is also for the interviewer role (the phone calling screen). */
 export function Shell({ children, crumbs, forInterviewers }: { children: ReactNode; crumbs?: ReactNode; forInterviewers?: boolean }) {
@@ -33,10 +34,7 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
             API keys
           </Link>
         ) : null}
-        <Link href="/appearance" className="small" title="Theme, mode, density and motion" data-testid="appearance-link">
-          <Palette size={14} aria-hidden style={{ verticalAlign: -2, marginRight: 4 }} />
-          Appearance
-        </Link>
+        <ThemeMenu />
         {me ? (
           <span className="muted small">
             {me.name} · {me.role.toLowerCase()} · {me.tenant.name}

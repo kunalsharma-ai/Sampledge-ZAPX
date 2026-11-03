@@ -18,6 +18,17 @@ test('appearance settings apply live, follow the member and fall back to the org
   await page.getByRole('button', { name: 'Create account' }).click();
   await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
 
+  // Quick switcher in the top bar: every theme and the colour mode, one click each.
+  await page.getByTestId('theme-menu').click();
+  await page.getByRole('dialog', { name: 'Theme' }).getByRole('radio', { name: 'Solar Titanium' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-q-theme', 'solar-titanium');
+  await page.getByRole('dialog', { name: 'Theme' }).getByRole('radio', { name: 'Dark' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-q-scheme', 'dark');
+  await expect(page.getByTestId('theme-menu')).toHaveAccessibleName('Theme: Solar Titanium');
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Theme' })).toBeHidden();
+
+  await page.getByTestId('theme-menu').click();
   await page.getByTestId('appearance-link').click();
   await expect(page.getByRole('heading', { name: 'Appearance' })).toBeVisible();
   const html = page.locator('html');
@@ -81,6 +92,7 @@ test('appearance settings apply live, follow the member and fall back to the org
   await m.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(m.getByRole('heading', { name: 'Projects' })).toBeVisible();
   await expect(m.locator('html')).toHaveAttribute('data-q-theme', 'royal-amethyst');
+  await m.getByTestId('theme-menu').click();
   await m.getByTestId('appearance-link').click();
   await expect(m.getByTestId('appearance-source')).toContainText('organization’s default');
   await member.close();

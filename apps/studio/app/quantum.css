@@ -854,3 +854,110 @@ button.q-choice[aria-checked='true'] .q-choice-mark {
 .q-section-title svg {
   color: var(--q-accent-text);
 }
+
+/* ---- Theme menu (top bar) ---- */
+.q-theme-menu {
+  position: relative;
+}
+button.q-theme-trigger {
+  min-height: 30px;
+  padding: 3px 10px;
+  gap: 6px;
+  font-size: var(--q-text-sm);
+  font-weight: 550;
+  border-radius: 99px;
+  border-color: var(--q-border);
+  background: var(--q-glass-2);
+}
+.q-theme-chevron {
+  transition: transform var(--q-dur-base) var(--q-ease);
+}
+button.q-theme-trigger[aria-expanded='true'] .q-theme-chevron {
+  transform: rotate(180deg);
+}
+.q-theme-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--q-border);
+  background: var(--q-surface);
+  box-shadow: var(--q-shadow-pop);
+  transform-origin: top right;
+  animation: q-pop var(--q-dur-base) var(--q-ease);
+}
+.q-theme-panel .q-segmented {
+  width: 100%;
+}
+@keyframes q-pop {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-4px * var(--q-move))) scale(calc(1 - 0.03 * var(--q-move)));
+  }
+}
+.q-theme-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: min(60vh, 380px);
+  overflow-y: auto;
+}
+button.q-theme-item {
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-weight: 500;
+  text-align: left;
+}
+button.q-theme-item:hover:not(:disabled) {
+  background: var(--q-surface-2);
+}
+button.q-theme-item[aria-checked='true'] {
+  background: var(--q-accent-soft);
+  font-weight: 600;
+}
+.q-theme-check {
+  margin-left: auto;
+  color: var(--q-accent-text);
+}
+.q-preset-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid var(--q-border);
+}
+.q-theme-more {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 8px 2px;
+  border-top: 1px solid var(--q-border);
+  font-size: var(--q-text-sm);
+  font-weight: 550;
+}
+@media (max-width: 720px) {
+  .q-theme-trigger-name {
+    display: none;
+  }
+  .q-theme-panel {
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    top: 64px;
+    width: auto;
+  }
+}
+.q-theme-panel .q-segmented button {
+  gap: 5px;
+}

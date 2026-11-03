@@ -12,3 +12,4 @@ export { ProgressMeter, type ProgressMeterProps } from './ProgressMeter';
 export { Skeleton } from './Skeleton';
 export { Slider, type SliderProps } from './Slider';
 export { ColorField, type ColorFieldProps } from './ColorField';
+export { ThemeMenu } from './ThemeMenu';
