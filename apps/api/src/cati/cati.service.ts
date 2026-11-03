@@ -6,6 +6,7 @@ import { AccessService } from '../common/access.service';
 import { SecretBox } from '../platform/secret-box';
 import { InterviewService } from '../interview/interview.service';
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 import type { AuthUser } from '../auth/auth.types';
 import { hhmm, isTimeZone, phoneHash, withinHours, type CallingHours } from './calling-rules';
 
@@ -416,7 +417,7 @@ export class CatiService {
     const calls = await this.prisma.catiCall.findMany({ where: { caseId: c.id }, orderBy: { endedAt: 'desc' }, take: 20 });
     // Milestone 19: on surveys that use the dialer the interviewer never sees the number.
     const dialer = await this.prisma.catiDialer.findUnique({ where: { surveyId: c.surveyId } });
-    const dialed = config().TELEPHONY !== 'off' && !!dialer?.enabled;
+    const dialed = integration('twilio').enabled && !!dialer?.enabled;
     return {
       ...this.present(c, !dialed),
       dialer: dialed ? { record: dialer.recordCalls } : null,

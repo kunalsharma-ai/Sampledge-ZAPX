@@ -80,11 +80,16 @@ export class ClaudeAiProvider extends AiProvider {
   constructor(
     apiKey: string,
     readonly model: string,
-    opts: { maxRetries: number; timeoutMs: number },
+    opts: { maxRetries: number; timeoutMs: number; baseURL?: string },
   ) {
     super();
     // The SDK retries 408/409/429/5xx and connection errors with backoff.
-    this.client = new Anthropic({ apiKey, maxRetries: opts.maxRetries, timeout: opts.timeoutMs });
+    this.client = new Anthropic({
+      apiKey,
+      maxRetries: opts.maxRetries,
+      timeout: opts.timeoutMs,
+      ...(opts.baseURL ? { baseURL: opts.baseURL } : {}),
+    });
   }
 
   async architect(req: ArchitectRequest, model = this.model): Promise<ArchitectResult> {
@@ -198,7 +203,11 @@ function finalText(message: BetaMessage): string {
 function mapError(err: unknown): AiError {
   if (err instanceof AiError) return err;
   if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError) {
-    return new AiError('The AI key was rejected. An administrator needs to check ANTHROPIC_API_KEY.', 503, 'NOT_CONFIGURED');
+    return new AiError(
+      'The AI key was rejected. An administrator needs to check the Claude API key in Settings > Integrations.',
+      503,
+      'NOT_CONFIGURED',
+    );
   }
   if (err instanceof Anthropic.RateLimitError) return new AiError('The AI service is busy. Try again in a minute.', 429, 'RATE_LIMITED');
   if (err instanceof Anthropic.BadRequestError) {
@@ -213,7 +222,7 @@ function mapError(err: unknown): AiError {
 export class UnconfiguredAiProvider extends AiProvider {
   readonly configured = false;
   readonly model = '';
-  constructor(private readonly reason = 'An administrator needs to set ANTHROPIC_API_KEY and AI_MODEL.') {
+  constructor(private readonly reason = 'An administrator needs to set up Claude in Settings > Integrations.') {
     super();
   }
   architect(): Promise<ArchitectResult> {
@@ -224,6 +233,6 @@ export class UnconfiguredAiProvider extends AiProvider {
   }
 }
 
-export function notConfigured(reason = 'An administrator needs to set ANTHROPIC_API_KEY and AI_MODEL.'): AiError {
+export function notConfigured(reason = 'An administrator needs to set up Claude in Settings > Integrations.'): AiError {
   return new AiError(`AI is not configured on this server. ${reason}`, 503, 'NOT_CONFIGURED');
 }

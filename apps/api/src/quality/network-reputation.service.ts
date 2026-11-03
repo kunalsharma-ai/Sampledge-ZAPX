@@ -17,6 +17,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { isIP } from 'node:net';
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 import { PrismaService } from '../common/prisma.service';
 
 export const NETWORK_KINDS = ['vpn', 'proxy', 'tor', 'relay', 'hosting'] as const;
@@ -88,11 +89,20 @@ export class NetworkReputationService {
     this.cache.clear();
   }
 
+  /** Built from Settings > Integrations (or NETWORK_REPUTATION and IPINFO_TOKEN), rebuilt when they change. */
+  private built?: { fingerprint: string; provider: NetworkReputationProvider | null };
+
   private current(): NetworkReputationProvider | null {
     if (this.provider !== undefined) return this.provider;
-    const c = config();
-    this.provider = c.NETWORK_REPUTATION === 'ipinfo' ? new IpinfoProvider(c.IPINFO_TOKEN, c.IPINFO_API_BASE) : null;
-    return this.provider;
+    const s = integration('ipinfo');
+    if (this.built?.fingerprint !== s.fingerprint) {
+      this.built = {
+        fingerprint: s.fingerprint,
+        provider: s.enabled ? new IpinfoProvider(s.values.token!, config().IPINFO_API_BASE) : null,
+      };
+      this.cache.clear();
+    }
+    return this.built.provider;
   }
 
   enabled() {
