@@ -32,5 +32,6 @@ they are accepted; a later record supersedes an earlier one.
 | [0025](0025-dialer.md)                           | Phone dialer and call recording through a provider adapter              | Accepted                                               |
 | [0026](0026-security-hardening.md)               | Security hardening: SSRF guard, lockout, sign-out, headers, secret scan | Accepted                                               |
 | [0027](0027-quantum-design-system.md)            | Quantum Design System and theme engine                                  | Accepted                                               |
+| [0028](0028-integrations-in-the-crm.md)          | Integrations set up in the CRM: sealed keys, env fallback, no restart   | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

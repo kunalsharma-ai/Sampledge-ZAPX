@@ -48,6 +48,10 @@ const schema = z
     AI_MODEL_TRANSLATE: optionalString,
     /** Provider per task (only "anthropic" is implemented; see docs/modules/ai-gateway.md). */
     AI_PROVIDER: z.enum(['anthropic']).default('anthropic'),
+    /** Only for tests: an Anthropic-compatible stand-in. */
+    ANTHROPIC_API_BASE: z.string().url().default('https://api.anthropic.com'),
+    /** How often each process re-reads the integrations saved in the CRM (Settings > Integrations). */
+    INTEGRATIONS_REFRESH_MS: z.coerce.number().int().min(1_000).max(600_000).default(15_000),
     /** Price list in USD per million tokens: {"<model>": {"input": n, "output": n, "cacheRead": n, "cacheWrite": n}}. */
     AI_PRICING: z
       .string()

@@ -23,6 +23,7 @@ import { SurveysService } from '../surveys/surveys.service';
 import { FileStore } from '../jobs/file-store';
 import { sniffMedia } from '../media/media.service';
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 import type { AuthUser } from '../auth/auth.types';
 
 export type CaptureKind = 'photo' | 'audio';
@@ -283,7 +284,7 @@ export class CaptureService {
       bytes: rows.reduce((n, r) => n + (r._sum.size ?? 0), 0),
       retentionDays: config().CAPTURE_RETENTION_DAYS,
       transcription: {
-        enabled: config().TRANSCRIPTION !== 'off',
+        enabled: integration('deepgram').enabled,
         transcribed: await this.prisma.capture.count({
           where: { tenantId: user.tenantId, surveyId, kind: 'audio', deletedAt: null, transcribedAt: { not: null } },
         }),

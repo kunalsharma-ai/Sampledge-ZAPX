@@ -228,7 +228,8 @@ export function Assist({
               <h2>AI Survey Architect</h2>
               {ai && !ai.configured ? (
                 <p className="small" style={{ color: 'var(--warn)' }} data-testid="ai-not-configured">
-                  AI is not configured on this server. An administrator needs to set ANTHROPIC_API_KEY. File import below works without it.
+                  Claude is not connected yet. An administrator can connect it in Settings › Integrations. File import below works without
+                  it.
                 </p>
               ) : (
                 <p className="muted small">

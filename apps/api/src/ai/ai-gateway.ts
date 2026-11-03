@@ -15,6 +15,7 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { config, type ModelPrice } from '../config';
+import { integration } from '../platform/integrations';
 import { AuditService } from '../common/audit.service';
 import { AiError, AiProvider, type AiTokenUsage } from './ai-provider';
 import { notConfigured } from './claude.provider';
@@ -52,6 +53,16 @@ export function costMicroUsd(price: ModelPrice | undefined, u: AiTokenUsage | un
   return BigInt(Math.round(usd * 1_000_000));
 }
 
+/** Price list from Settings > Integrations, else AI_PRICING. */
+function aiPricing(): Record<string, ModelPrice> {
+  const raw = integration('anthropic').values.pricing;
+  try {
+    return raw ? (JSON.parse(raw) as Record<string, ModelPrice>) : config().AI_PRICING;
+  } catch {
+    return config().AI_PRICING;
+  }
+}
+
 const startOfMonth = (d = new Date()) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
 
 @Injectable()
@@ -68,11 +79,11 @@ export class AiGateway {
     this.breaker = new CircuitBreaker(cfg.AI_BREAKER_FAILURES, cfg.AI_BREAKER_OPEN_MS);
   }
 
-  /** Model for a task: AI_MODEL_<TASK>, else AI_MODEL (the provider's default). */
+  /** Model for a task: the per-task model (Settings > Integrations or AI_MODEL_<TASK>), else the default model. */
   modelFor(task: AiTask): string {
-    const cfg = config();
-    const perTask = { architect: cfg.AI_MODEL_ARCHITECT, translate: cfg.AI_MODEL_TRANSLATE }[task];
-    return perTask ?? this.provider.model;
+    const s = integration('anthropic').values;
+    const perTask = { architect: s.modelArchitect, translate: s.modelTranslate }[task];
+    return perTask || this.provider.model;
   }
 
   get configured(): boolean {
@@ -244,7 +255,7 @@ export class AiGateway {
         outputTokens: u?.outputTokens ?? 0,
         cacheReadTokens: u?.cacheReadTokens ?? 0,
         cacheWriteTokens: u?.cacheWriteTokens ?? 0,
-        costMicroUsd: costMicroUsd(config().AI_PRICING[model], u),
+        costMicroUsd: costMicroUsd(aiPricing()[model], u),
         latencyMs,
         surveyId: surveyId ?? null,
         redactions,

@@ -133,6 +133,9 @@ model Tenant {
   billingPeriodEnd      DateTime?
   /// Quantum Design System: the organization's default appearance for members who have not chosen their own.
   appearanceDefaults    Json            @default("{}")
+  /// The organization that runs this installation (Integrations in the CRM). Its administrators set
+  /// the platform-wide integrations: AI, IPinfo, Deepgram, Twilio, Stripe and file storage.
+  platformOperator      Boolean         @default(false)
   createdAt             DateTime        @default(now())
   users                 User[]
   projects              Project[]
@@ -458,6 +461,20 @@ model QuotaCount {
   count    Int    @default(0)
 
   @@unique([surveyId, quotaId])
+}
+
+/// A platform-wide integration set up in the CRM (Settings > Integrations). When a row exists it
+/// wins over the environment; a field left empty falls back to the environment variable.
+model PlatformIntegration {
+  /// anthropic, ipinfo, deepgram, twilio, stripe or s3
+  key           String   @id
+  enabled       Boolean  @default(false)
+  /// Non-secret fields, e.g. {"model": "...", "callerId": "+44..."}.
+  settings      Json     @default("{}")
+  /// Secret fields as one JSON object sealed with SecretBox (SECRETS_KEY). Never sent back in full.
+  secretsSealed String?
+  updatedById   String?
+  updatedAt     DateTime @updatedAt
 }
 
 model AuditEvent {

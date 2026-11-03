@@ -28,6 +28,7 @@ import {
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { CatiDial } from '@zapx/db';
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { SecretBox } from '../platform/secret-box';
@@ -161,15 +162,22 @@ export class TelephonyService {
     this.provider = p;
   }
 
+  /** Built from Settings > Integrations (or TELEPHONY and TWILIO_*), rebuilt when they change. */
+  private built?: { fingerprint: string; provider: TelephonyProvider | null };
+
   current(): TelephonyProvider | null {
     if (this.provider !== undefined) return this.provider;
-    const c = config();
-    this.provider = c.TELEPHONY === 'twilio' ? new TwilioProvider(c.TWILIO_ACCOUNT_SID, c.TWILIO_AUTH_TOKEN, c.TWILIO_API_BASE) : null;
-    return this.provider;
+    const s = integration('twilio');
+    if (this.built?.fingerprint !== s.fingerprint)
+      this.built = {
+        fingerprint: s.fingerprint,
+        provider: s.enabled ? new TwilioProvider(s.values.accountSid!, s.values.authToken!, config().TWILIO_API_BASE) : null,
+      };
+    return this.built.provider;
   }
 
   private hook(name: string, dialId: string) {
-    return `${config().TELEPHONY_WEBHOOK_BASE.replace(/\/$/, '')}/telephony/twilio/${name}?d=${encodeURIComponent(dialId)}`;
+    return `${integration('twilio').values.webhookBase!.replace(/\/$/, '')}/telephony/twilio/${name}?d=${encodeURIComponent(dialId)}`;
   }
 
   // ---- Settings ----------------------------------------------------------------------------------
@@ -210,7 +218,7 @@ export class TelephonyService {
   async setDialer(user: AuthUser, surveyId: string, input: { enabled: boolean; recordCalls: boolean; recordingNotice?: string }) {
     const survey = await this.cati.surveyFor(user, surveyId);
     if (input.enabled && !this.current())
-      throw new ConflictException('The phone dialer is not set up for this installation (TELEPHONY is off).');
+      throw new ConflictException('The phone dialer is not set up for this installation (Twilio is off in Settings > Integrations).');
     const notice = input.recordingNotice?.trim().slice(0, 300) || null;
     const data = { enabled: input.enabled, recordCalls: input.recordCalls, recordingNotice: notice };
     await this.prisma.catiDialer.upsert({ where: { surveyId }, create: { surveyId, tenantId: survey.tenantId, ...data }, update: data });
@@ -249,7 +257,7 @@ export class TelephonyService {
     try {
       const placed = await provider.placeCall({
         to: this.secrets.open(me.phoneSealed),
-        from: cfg.TWILIO_CALLER_ID,
+        from: integration('twilio').values.callerId!,
         answerUrl: this.hook('answer', dial.id),
         statusUrl: this.hook('status', dial.id),
         ringSeconds: cfg.TELEPHONY_RING_SECONDS,
@@ -307,13 +315,13 @@ export class TelephonyService {
 
   // ---- Twilio webhooks -----------------------------------------------------------------------------
 
-  /** Check X-Twilio-Signature against the address Twilio was given (TELEPHONY_WEBHOOK_BASE). */
+  /** Check X-Twilio-Signature against the address Twilio was given (the webhook base in Settings > Integrations). */
   verifyTwilio(pathAndQuery: string, params: Record<string, unknown>, signature: string | undefined): boolean {
-    const cfg = config();
-    if (cfg.TELEPHONY !== 'twilio' || !signature) return false;
+    const s = integration('twilio');
+    if (!s.enabled || !signature) return false;
     // pathAndQuery is the request's address below /api, e.g. /telephony/twilio/answer?d=...
-    const url = `${cfg.TELEPHONY_WEBHOOK_BASE.replace(/\/$/, '')}${pathAndQuery}`;
-    const expected = Buffer.from(twilioSignature(cfg.TWILIO_AUTH_TOKEN, url, params));
+    const url = `${s.values.webhookBase!.replace(/\/$/, '')}${pathAndQuery}`;
+    const expected = Buffer.from(twilioSignature(s.values.authToken!, url, params));
     const got = Buffer.from(signature);
     return expected.length === got.length && timingSafeEqual(expected, got);
   }
@@ -345,7 +353,7 @@ export class TelephonyService {
     const cfg = config();
     const record = d.record && settings.recordCalls;
     const dialAttrs = [
-      `callerId="${xml(cfg.TWILIO_CALLER_ID)}"`,
+      `callerId="${xml(integration('twilio').values.callerId!)}"`,
       `timeout="${cfg.TELEPHONY_RING_SECONDS}"`,
       'answerOnBridge="true"',
       `action="${xml(this.hook('bridged', d.id))}"`,
