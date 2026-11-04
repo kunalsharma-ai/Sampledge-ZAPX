@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import type { Response, SurveyVersion } from '@zapx/db';
 import { allQuestions, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
+import { codes, variables } from '@zapx/analysis-core';
 import { computeVariables, prepareSurvey } from '@zapx/logic-engine';
 
 interface Column {
@@ -224,6 +225,27 @@ export class ExportService {
           label: variable.label ?? `${variable.id} = ${variable.expr}`,
           get: (r) => toCell(computeVariables(def, ans(r))[variable.id]),
         });
+      // Recodes: group codes worked out from their source variable (multi-answer recodes as codes joined by ";").
+      if ((def.recodes ?? []).length) {
+        const vars = variables(def);
+        for (const rc of def.recodes ?? []) {
+          const v = vars.find((x) => x.id === rc.id && x.derivation?.kind === 'recode');
+          if (!v) continue;
+          add({
+            key: rc.id,
+            label: v.label,
+            get: (r) => {
+              const a = ans(r);
+              const c = codes(v, {
+                answers: a,
+                system: { status: r.status.toLowerCase(), mode: r.mode.toLowerCase(), language: r.language, device: r.device, vendor: r.vendor?.code ?? null },
+                ...((def.variables ?? []).length ? { derived: computeVariables(def, a) } : {}),
+              });
+              return c.length ? (v.kind === 'multi' ? c.join(';') : (c[0] as number)) : null;
+            },
+          });
+        }
+      }
     }
     return cols;
   }

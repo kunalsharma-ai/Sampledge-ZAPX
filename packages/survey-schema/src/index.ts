@@ -517,6 +517,41 @@ export const variableSchema = z.object({
 });
 export type CalculatedVariable = z.infer<typeof variableSchema>;
 
+/**
+ * Recode (derived variable for analysis, blueprint phase 4): groups the values of one analysis
+ * variable into new categories, e.g. AGE 18-34 / 35-54 / 55+, or top-2 box of a scale. The source
+ * is an analysis variable id: a question, a grid row (GRID_row), a ranking or sum item, a calculated
+ * variable, a system variable (vendor, mode...) or an earlier recode. Answers are never changed;
+ * the recode is worked out when tables are run and in exports, and lists its lineage.
+ */
+export const recodeGroupSchema = z
+  .object({
+    code: z.number().int(),
+    label: z.string().min(1).max(200),
+    /** Source codes (or text values) that fall in this group. */
+    values: z.array(z.union([z.number(), z.string().max(100)])).max(200).optional(),
+    /** Numeric range, inclusive. */
+    min: z.number().optional(),
+    max: z.number().optional(),
+  })
+  .refine((g) => (g.values?.length ?? 0) > 0 || g.min !== undefined || g.max !== undefined, {
+    message: 'A group needs values or a range.',
+  })
+  .refine((g) => g.min === undefined || g.max === undefined || g.min <= g.max, { message: 'The range minimum is above its maximum.' });
+export const recodeSchema = z
+  .object({
+    id: variableName,
+    label: z.string().max(200).optional(),
+    source: z.string().min(1).max(100),
+    groups: z.array(recodeGroupSchema).min(1).max(50),
+    /** Group for answered values that match no group; left out (missing) when absent. */
+    otherwise: z.object({ code: z.number().int(), label: z.string().min(1).max(200) }).optional(),
+  })
+  .refine((r) => new Set([...r.groups.map((g) => g.code), ...(r.otherwise ? [r.otherwise.code] : [])]).size === r.groups.length + (r.otherwise ? 1 : 0), {
+    message: 'Group codes must be unique.',
+  });
+export type Recode = z.infer<typeof recodeSchema>;
+
 // ---- Data quality (Milestone 5) -----------------------------------------------------------------
 // Quality settings are part of the versioned definition: an in-survey quality reject changes where a
 // respondent is redirected, so it is published, diffed and reviewed like any other logic.
@@ -630,6 +665,7 @@ export const surveyDefinitionSchema = z.object({
   loops: z.array(loopSchema).max(50).default([]),
   blocks: z.array(blockSchema).max(50).default([]),
   variables: z.array(variableSchema).max(200).default([]),
+  recodes: z.array(recodeSchema).max(100).default([]),
   urlVariables: z.array(urlVariableSchema).max(100).default([]),
   settings: z
     .object({

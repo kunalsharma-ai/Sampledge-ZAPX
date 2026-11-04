@@ -401,6 +401,8 @@ export function analyzeSurvey(source: SurveyDefinition): AnalysisReport {
   });
 
   (def.variables ?? []).forEach((v) => checkExpr(v.expr, { kind: 'global' }, `variables.${v.id}.expr`));
+  // Recodes are analysis variables: their names must not clash with questions or calculated variables.
+  (def.recodes ?? []).forEach((r) => claim(r.id, `recodes.${r.id}`));
 
   // Dynamic answer lists need an earlier choice question that shares answer codes.
   def.pages.forEach((page, pi) =>

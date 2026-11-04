@@ -14,6 +14,7 @@ import {
   HotspotForm,
   LoopsEditor,
   QuotaTableBuilder,
+  RecodesEditor,
   UrlVariablesEditor,
   VariablesEditor,
 } from './FlowEditor';
@@ -607,6 +608,7 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
       <QuotaTableBuilder def={def} onChange={onChange} />
       <UrlVariablesEditor def={def} onChange={onChange} />
       <VariablesEditor def={def} onChange={onChange} />
+      <RecodesEditor def={def} onChange={onChange} />
       <LoopsEditor def={def} onChange={onChange} />
       <BlocksEditor def={def} onChange={onChange} />
     </>

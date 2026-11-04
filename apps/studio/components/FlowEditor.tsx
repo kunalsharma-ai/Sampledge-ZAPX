@@ -284,6 +284,149 @@ export function VariablesEditor({ def, onChange }: { def: Def; onChange: (d: Def
   );
 }
 
+// ---- Recodes (blueprint phase 4) ---------------------------------------------------------------------
+
+type RecodeDef = Def['recodes'][number];
+type RecodeGroup = RecodeDef['groups'][number];
+
+/** One group per line: "code | label | values" where values are "1,2,3" or a range "18..34", "55..", "..17". */
+export function groupsToText(groups: RecodeGroup[]) {
+  return groups
+    .map((g) => {
+      const what = g.values?.length ? g.values.join(',') : `${g.min ?? ''}..${g.max ?? ''}`;
+      return `${g.code} | ${g.label} | ${what}`;
+    })
+    .join('\n');
+}
+export function textToGroups(text: string): { groups: RecodeGroup[]; error?: string } {
+  const groups: RecodeGroup[] = [];
+  for (const [i, line] of text.split('\n').entries()) {
+    if (!line.trim()) continue;
+    const [c, label, what] = line.split('|').map((x) => x.trim());
+    const code = Number(c);
+    if (!Number.isInteger(code) || !label || !what) return { groups, error: `Line ${i + 1}: write code | label | values or range.` };
+    const range = /^(-?\d+(?:\.\d+)?)?\.\.(-?\d+(?:\.\d+)?)?$/.exec(what);
+    if (range && (range[1] !== undefined || range[2] !== undefined))
+      groups.push({ code, label, ...(range[1] !== undefined ? { min: Number(range[1]) } : {}), ...(range[2] !== undefined ? { max: Number(range[2]) } : {}) });
+    else
+      groups.push({
+        code,
+        label,
+        values: what
+          .split(',')
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .map((x) => (/^-?\d+(\.\d+)?$/.test(x) ? Number(x) : x)),
+      });
+  }
+  return groups.length ? { groups } : { groups, error: 'Add at least one group.' };
+}
+
+function RecodeGroups({ value, onChange }: { value: RecodeGroup[]; onChange: (g: RecodeGroup[]) => void }) {
+  const [text, setText] = useState(() => groupsToText(value));
+  const [error, setError] = useState<string>();
+  return (
+    <>
+      <textarea
+        className="mono"
+        rows={Math.max(3, value.length + 1)}
+        aria-label="Groups"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          const r = textToGroups(e.target.value);
+          setError(r.error);
+          if (!r.error) onChange(r.groups);
+        }}
+      />
+      {error && <p className="error small">{error}</p>}
+    </>
+  );
+}
+
+export function RecodesEditor({ def, onChange }: { def: Def; onChange: (d: Def) => void }) {
+  const recodes = def.recodes ?? [];
+  const set = (i: number, patch: Partial<RecodeDef>) => onChange({ ...def, recodes: recodes.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
+  const sources = [
+    ...def.pages.flatMap((p) =>
+      p.questions.flatMap((q) =>
+        q.type === 'grid'
+          ? q.rows.map((r) => `${q.id}_${r.id}`)
+          : q.type === 'ranking' || q.type === 'sum' || q.type === 'cardsort'
+            ? q.options.map((o) => `${q.id}_${o.code}`)
+            : q.type === 'single' || q.type === 'multi' || q.type === 'scale' || q.type === 'numeric' || q.type === 'hotspot'
+              ? [q.id]
+              : [],
+      ),
+    ),
+    ...(def.variables ?? []).map((v) => v.id),
+    'vendor',
+    'mode',
+    'language',
+    'device',
+    ...recodes.map((r) => r.id),
+  ];
+  return (
+    <section className="stack" aria-labelledby="recodes-h">
+      <h2 id="recodes-h" style={{ marginTop: 12 }}>
+        Recodes
+      </h2>
+      <p className="muted small">
+        New analysis variables that group another variable&apos;s answers, such as age bands or top-2 box. Answers are not changed; recodes appear in
+        Analysis (with where they come from) and in exports. One group per line: <code>code | label | values</code>, where values are codes like{' '}
+        <code>4,5</code> or a range like <code>18..34</code>, <code>55..</code>.
+      </p>
+      <datalist id="recode-sources">
+        {sources.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+      {recodes.map((r, i) => (
+        <fieldset key={i} className="stack" data-testid={`recode-${i}`}>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <label>
+              Recode
+              <input className="mono" aria-label="Recode id" value={r.id} onChange={(e) => set(i, { id: e.target.value })} />
+            </label>
+            <label>
+              From
+              <input className="mono" list="recode-sources" aria-label="Recode source" value={r.source} onChange={(e) => set(i, { source: e.target.value })} />
+            </label>
+            <label>
+              Label
+              <input aria-label="Recode label" value={r.label ?? ''} onChange={(e) => set(i, { label: e.target.value || undefined })} />
+            </label>
+            <button className="link danger" onClick={() => onChange({ ...def, recodes: recodes.filter((_, j) => j !== i) })}>
+              Remove
+            </button>
+          </div>
+          <RecodeGroups value={r.groups} onChange={(groups) => set(i, { groups })} />
+          <label className="row small" style={{ gap: 6 }}>
+            <input
+              type="checkbox"
+              checked={!!r.otherwise}
+              onChange={(e) => set(i, { otherwise: e.target.checked ? { code: 99, label: 'Other' } : undefined })}
+            />
+            Put other answers in group 99 &quot;Other&quot;
+          </label>
+        </fieldset>
+      ))}
+      <div>
+        <button
+          onClick={() =>
+            onChange({
+              ...def,
+              recodes: [...recodes, { id: `R${recodes.length + 1}`, source: sources[0] ?? '', groups: [{ code: 1, label: 'Group 1', values: [1] }] }],
+            })
+          }
+        >
+          + Recode
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // ---- URL variables ------------------------------------------------------------------------------
 
 export function UrlVariablesEditor({ def, onChange }: { def: Def; onChange: (d: Def) => void }) {

@@ -11,7 +11,7 @@
  *
  * Pure functions, no framework or database.
  */
-import { scaleCodes, type SurveyDefinition } from '@zapx/survey-schema';
+import { scaleCodes, type Recode, type SurveyDefinition } from '@zapx/survey-schema';
 
 /** scale: a rating scale; reported like single choice, plus mean (and NPS when it is one). */
 export type VariableKind = 'single' | 'multi' | 'numeric' | 'open' | 'scale';
@@ -27,7 +27,11 @@ export interface Variable {
   kind: VariableKind;
   categories: Category[];
   /** Where it comes from: a question, a grid row, or the interview record (status, vendor, mode). */
-  source: 'question' | 'grid_row' | 'item' | 'system';
+  source: 'question' | 'grid_row' | 'item' | 'system' | 'derived';
+  /** Derived variables: the variables it is worked out from, nearest first (recode source, formula inputs). */
+  lineage?: string[];
+  /** Derived variables: what it is (a calculated variable or a recode of another variable). */
+  derivation?: { kind: 'calculated'; expr: string } | { kind: 'recode'; from: string };
   /** Grid rows: the grid question and row the answer is stored under (answers[question][row]). */
   grid?: { question: string; row: string };
   /** Ranking and constant sum items: the question and item code (value = rank or amount). */
@@ -42,6 +46,8 @@ export interface AnalysisRecord {
   answers: Record<string, unknown>;
   /** System variables, already as plain values: status, vendor, mode, language, device... */
   system: Record<string, string | null>;
+  /** Calculated variables worked out from the answers (id to value). */
+  derived?: Record<string, unknown>;
   /** Analysis weight (1 when absent). */
   weight?: number;
 }
@@ -78,7 +84,7 @@ const strip = (s: string) =>
  * Variables available for analysis. System variables get their categories from the records,
  * since their values (vendor codes, languages) are not in the definition.
  */
-export function variables(def: SurveyDefinition, records: AnalysisRecord[] = []): Variable[] {
+export function variables(def: SurveyDefinition, records: AnalysisRecord[] = [], opts: VariableOptions = {}): Variable[] {
   const out: Variable[] = [];
   for (const page of def.pages) {
     for (const q of page.questions) {
@@ -164,12 +170,88 @@ export function variables(def: SurveyDefinition, records: AnalysisRecord[] = [])
     const values = [...new Set(records.map((r) => r.system[id]).filter((v): v is string => !!v))].sort();
     out.push({ id, label: SYSTEM_LABELS[id], kind: 'single', categories: values.map((v) => ({ code: v, label: v })), source: 'system' });
   }
+  // Calculated variables: numeric when every value is a number, yes/no when any is true/false,
+  // otherwise categories from the values seen.
+  for (const cv of def.variables ?? []) {
+    const seen = records.map((r) => r.derived?.[cv.id]).filter((x) => x !== undefined && x !== null && x !== '');
+    const base = { id: cv.id, label: cv.label || cv.id, source: 'derived' as const, derivation: { kind: 'calculated' as const, expr: cv.expr } };
+    const lineage = opts.lineage?.[cv.id];
+    const extra = lineage?.length ? { lineage } : {};
+    if (seen.some((x) => typeof x === 'boolean'))
+      out.push({ ...base, ...extra, kind: 'single', categories: [{ code: 1, label: 'Yes' }, { code: 0, label: 'No' }] });
+    else if (seen.length && seen.every((x) => typeof x === 'number')) out.push({ ...base, ...extra, kind: 'numeric', categories: [] });
+    else if (!seen.length) out.push({ ...base, ...extra, kind: 'numeric', categories: [] });
+    else {
+      const values = [...new Set(seen.map(String))].sort().slice(0, 200);
+      out.push({ ...base, ...extra, kind: 'single', categories: values.map((v) => ({ code: v, label: v })) });
+    }
+  }
+  // Recodes, in order: each may use any variable above, or an earlier recode.
+  const byId = new Map(out.map((v) => [v.id, v]));
+  for (const rc of def.recodes ?? []) {
+    const from = byId.get(rc.source);
+    if (!from || byId.has(rc.id)) continue;
+    const v: Variable = {
+      id: rc.id,
+      label: rc.label || `${rc.id} (recode of ${from.id})`,
+      kind: from.kind === 'multi' ? 'multi' : 'single',
+      categories: [...rc.groups.map((g) => ({ code: g.code, label: g.label })), ...(rc.otherwise ? [rc.otherwise] : [])],
+      source: 'derived',
+      derivation: { kind: 'recode', from: from.id },
+      lineage: [from.id, ...(from.lineage ?? [])],
+    };
+    recodeSpecs.set(v, { rc, from });
+    out.push(v);
+    byId.set(v.id, v);
+  }
   return out;
+}
+
+/** Recodes that cannot be built, with the reason (unknown source, id already used). */
+export function recodeProblems(def: SurveyDefinition): Array<{ id: string; message: string }> {
+  const vars = variables(def);
+  const built = new Set(vars.filter((v) => v.derivation?.kind === 'recode').map((v) => v.id));
+  const ids = new Set(vars.filter((v) => v.derivation?.kind !== 'recode').map((v) => v.id));
+  const out: Array<{ id: string; message: string }> = [];
+  const seen = new Set<string>();
+  for (const rc of def.recodes ?? []) {
+    if (ids.has(rc.id) || seen.has(rc.id)) out.push({ id: rc.id, message: `"${rc.id}" is already a variable name.` });
+    else if (!built.has(rc.id)) out.push({ id: rc.id, message: `Recode "${rc.id}" uses "${rc.source}", which is not an analysis variable defined before it.` });
+    seen.add(rc.id);
+  }
+  return out;
+}
+
+export interface VariableOptions {
+  /** Calculated variables: the variables each formula uses (from the logic engine). */
+  lineage?: Record<string, string[]>;
+}
+
+const recodeSpecs = new WeakMap<Variable, { rc: Recode; from: Variable }>();
+
+function groupOf(rc: Recode, x: number | string): number | undefined {
+  const n = typeof x === 'number' ? x : x.trim() !== '' ? Number(x) : NaN;
+  for (const g of rc.groups) {
+    if (g.values?.some((v) => String(v) === String(x))) return g.code;
+    if ((g.min !== undefined || g.max !== undefined) && Number.isFinite(n) && (g.min === undefined || n >= g.min) && (g.max === undefined || n <= g.max)) return g.code;
+  }
+  return rc.otherwise?.code;
 }
 
 /** The record's value(s) for a variable, as a list of category codes (empty when not answered). */
 function rawValue(v: Variable, r: AnalysisRecord): unknown {
   if (v.source === 'system') return r.system[v.id];
+  if (v.derivation?.kind === 'recode') {
+    const spec = recodeSpecs.get(v);
+    if (!spec) return undefined;
+    const got = codes(spec.from, r).map((c) => groupOf(spec.rc, c)).filter((c): c is number => c !== undefined);
+    if (v.kind === 'multi') return [...new Set(got)];
+    return got[0];
+  }
+  if (v.derivation?.kind === 'calculated') {
+    const x = r.derived?.[v.id];
+    return typeof x === 'boolean' ? (x ? 1 : 0) : x;
+  }
   if (v.item) {
     const a = r.answers[v.item.question];
     if (v.item.of === 'rank') {

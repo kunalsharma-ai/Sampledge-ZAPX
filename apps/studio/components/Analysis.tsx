@@ -330,6 +330,7 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
                   <input type="checkbox" checked={picked.includes(v.id)} onChange={() => setPicked((p) => toggle(p, v.id))} />
                   <span className="mono small">{v.id}</span>
                   <span className="ellipsis">{v.label}</span>
+                  {v.source === 'derived' ? <span className="badge small">derived</span> : null}
                 </label>
               ))}
             </div>
@@ -399,6 +400,17 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
   );
 }
 
+/** Where a derived variable comes from: recode source or formula, then what that uses. */
+function Lineage({ v }: { v: Variable }) {
+  if (v.source !== 'derived' || !v.derivation) return null;
+  return (
+    <p className="small muted" data-testid={`lineage-${v.id}`}>
+      {v.derivation.kind === 'recode' ? `Recode of ${v.derivation.from}` : <>Calculated: <code>{v.derivation.expr}</code></>}
+      {v.lineage?.length ? ` · from ${v.lineage.join(' ← ')}` : ''}
+    </p>
+  );
+}
+
 function FrequencyCard({ f }: { f: Frequency }) {
   const max = Math.max(1, ...f.rows.map((r) => r.pct));
   return (
@@ -411,6 +423,7 @@ function FrequencyCard({ f }: { f: Frequency }) {
         {f.base !== f.unweightedBase ? ` (weighted ${fmt(f.base)}, effective ${fmt(f.effectiveBase, 0)})` : ''}
         {f.variable.kind === 'multi' ? ' · more than one answer allowed, so shares can add up to more than 100%' : ''}
       </p>
+      <Lineage v={f.variable} />
       {f.nps ? (
         <p className="nps" data-testid={`nps-${f.variable.id}`}>
           <span className="nps-score">{fmt(f.nps.score)}</span> Net Promoter Score

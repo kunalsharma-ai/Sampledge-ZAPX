@@ -5,6 +5,7 @@ import {
   crosstab,
   frequency,
   rake,
+  recodeProblems,
   variables,
   type AnalysisRecord,
   type Crosstab,
@@ -13,7 +14,7 @@ import {
   type Variable,
 } from '@zapx/analysis-core';
 import { parseSurveyDefinition, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
-import { conjointAnalysis, conjointDesign, maxDiffDesign, maxDiffScores, prepareSurvey } from '@zapx/logic-engine';
+import { computeVariables, conjointAnalysis, conjointDesign, maxDiffDesign, maxDiffScores, prepareSurvey, variableLineage } from '@zapx/logic-engine';
 import { z } from 'zod';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -136,6 +137,7 @@ export class AnalysisService {
       );
     }
     const records: AnalysisRecord[] = [];
+    const calculated = (def.variables ?? []).length > 0;
     let cursor: string | undefined;
     for (;;) {
       const page = await db.response.findMany({
@@ -146,8 +148,10 @@ export class AnalysisService {
         select: { id: true, answers: true, status: true, mode: true, language: true, device: true, vendor: { select: { code: true } } },
       });
       for (const r of page) {
+        const answers = (r.answers ?? {}) as Record<string, unknown>;
         records.push({
-          answers: (r.answers ?? {}) as Record<string, unknown>,
+          answers,
+          ...(calculated ? { derived: computeVariables(def, answers as Answers) } : {}),
           system: {
             status: r.status.toLowerCase(),
             vendor: r.vendor?.code ?? null,
@@ -160,7 +164,7 @@ export class AnalysisService {
       if (page.length < PAGE) break;
       cursor = page[page.length - 1]!.id;
     }
-    return { survey, def, records, vars: variables(def, records) };
+    return { survey, def, records, vars: variables(def, records, { lineage: variableLineage(def) }) };
   }
 
   /** Rake the records to the targets and attach the weights. Returns the diagnostics. */
@@ -190,8 +194,8 @@ export class AnalysisService {
   }
 
   async variables(user: AuthUser, surveyId: string) {
-    const { vars, records } = await this.load(user, surveyId, filtersSchema.parse({}));
-    return { completes: records.length, variables: vars };
+    const { def, vars, records } = await this.load(user, surveyId, filtersSchema.parse({}));
+    return { completes: records.length, variables: vars, recodeProblems: recodeProblems(def) };
   }
 
   async frequencies(user: AuthUser, surveyId: string, filters: Filters, ids?: string[], weighting?: Weighting) {

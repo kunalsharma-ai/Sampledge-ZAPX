@@ -76,6 +76,34 @@ export function computeVariables(def: SurveyDefinition, answers: Answers): Recor
 }
 
 /**
+ * Lineage of each calculated variable: the questions and variables its formula uses, then what those
+ * use in turn (nearest first, no repeats). Shown next to derived variables in analysis.
+ */
+export function variableLineage(def: SurveyDefinition): Record<string, string[]> {
+  const direct = new Map<string, string[]>();
+  for (const v of def.variables ?? []) {
+    try {
+      direct.set(v.id, [...new Set(references(parseCached(v.expr)).map((r) => r.name))]);
+    } catch {
+      direct.set(v.id, []);
+    }
+  }
+  const out: Record<string, string[]> = {};
+  for (const id of direct.keys()) {
+    const seen: string[] = [];
+    const queue = [...direct.get(id)!];
+    while (queue.length) {
+      const n = queue.shift()!;
+      if (n === id || seen.includes(n)) continue;
+      seen.push(n);
+      queue.push(...(direct.get(n) ?? []));
+    }
+    out[id] = seen;
+  }
+  return out;
+}
+
+/**
  * Evaluate a condition against a plain answer map, without the full definition. Used by renderers
  * to show or hide same-page questions as the respondent answers. Unknown variables are null.
  */

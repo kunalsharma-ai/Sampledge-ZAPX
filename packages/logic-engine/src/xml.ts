@@ -251,6 +251,13 @@ export function toZapxXml(def: SurveyDefinition): string {
   for (const u of def.urlVariables ?? [])
     out += `  <urlvar${attr('id', u.id)}${attr('param', u.param)}${attr('label', u.label)}${attr('numeric', u.numeric)}/>\n`;
   for (const v of def.variables ?? []) out += `  <variable${attr('id', v.id)}${attr('label', v.label)}>${esc(v.expr)}</variable>\n`;
+  for (const r of def.recodes ?? []) {
+    out += `  <recode${attr('id', r.id)}${attr('label', r.label)}${attr('source', r.source)}>\n`;
+    for (const g of r.groups)
+      out += `    <group${attr('code', g.code)}${attr('label', g.label)}${attr('values', g.values?.map(String).join('|'))}${attr('min', g.min)}${attr('max', g.max)}/>\n`;
+    if (r.otherwise) out += `    <otherwise${attr('code', r.otherwise.code)}${attr('label', r.otherwise.label)}/>\n`;
+    out += `  </recode>\n`;
+  }
   for (const p of def.pages) {
     out += `  <page${attr('id', p.id)}${attr('title', p.title)}${attr('cond', p.condition)}>\n`;
     for (const q of p.questions) out += questionXml(q, '    ');
@@ -405,6 +412,7 @@ export function fromZapxXml(src: string): XmlReadResult {
   def.blocks = [];
   def.variables = [];
   def.urlVariables = [];
+  def.recodes = [];
   for (const el of elements(root)) {
     switch (el.name) {
       case 'welcome':
@@ -454,6 +462,21 @@ export function fromZapxXml(src: string): XmlReadResult {
       case 'urlvar':
         (def.urlVariables as unknown[]).push(attrsTo(el, shapeKeys(urlVariableSchema)));
         break;
+      case 'recode': {
+        const rc = attrsTo(el, new Set(['id', 'label', 'source']));
+        rc.groups = [];
+        for (const g of elements(el)) {
+          if (g.name === 'group') {
+            const values = g.attrs.values;
+            const grp = attrsTo({ ...g, attrs: Object.fromEntries(Object.entries(g.attrs).filter(([k]) => k !== 'values')) }, new Set(['code', 'label', 'min', 'max']));
+            if (values !== undefined) grp.values = values.split('|').map((x) => (/^-?\d+(\.\d+)?$/.test(x) ? Number(x) : x));
+            (rc.groups as unknown[]).push(grp);
+          } else if (g.name === 'otherwise') rc.otherwise = attrsTo(g, new Set(['code', 'label']));
+          else unexpected(g, '<recode>');
+        }
+        (def.recodes as unknown[]).push(rc);
+        break;
+      }
       case 'variable':
         (def.variables as unknown[]).push({ ...attrsTo(el, new Set(['id', 'label'])), expr: textOf(el) });
         break;
