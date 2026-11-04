@@ -305,6 +305,9 @@ describe('email distribution', () => {
       .send({ name: 'Wave 1', subject: 'Your view', body: 'Hello [name]', sendAt: new Date().toISOString() })
       .expect(400);
     const t0 = new Date(Date.now() + 3_600_000);
+    // The job pass is server-wide: first send any waves other runs left in this database (e2e
+    // waves wait while sending is off), so the counts below are this survey's alone.
+    await app.get(DistributionService).pass(new FakeMail(), new Date(t0.getTime() + 1000));
     waveId = (
       await http
         .post(`/api/surveys/${surveyId}/distributions`)

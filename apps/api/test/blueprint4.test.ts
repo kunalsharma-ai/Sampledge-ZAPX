@@ -251,7 +251,10 @@ describe('derived variables', () => {
 
   it('exports recodes as columns', async () => {
     const csv = (await http.get(`/api/surveys/${surveyId}/export?format=csv`).set(admin).expect(200)).text;
-    const [head, ...lines] = csv.replace(/^﻿/, '').trim().split(/\r\n/);
+    const [head, ...lines] = csv
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split(/\r\n/);
     const cols = head!.split(',');
     const i = cols.indexOf('AGEGRP');
     expect(i).toBeGreaterThan(-1);

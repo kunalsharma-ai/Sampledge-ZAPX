@@ -8,7 +8,6 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import type { Prisma, Response, Survey, Vendor } from '@zapx/db';
 import {
   firstMatchingTermination,
-  matchingQuotas,
   nextPageIndex,
   prevPageIndex,
   prepareSurvey,
