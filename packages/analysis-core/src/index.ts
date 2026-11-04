@@ -174,11 +174,24 @@ export function variables(def: SurveyDefinition, records: AnalysisRecord[] = [],
   // otherwise categories from the values seen.
   for (const cv of def.variables ?? []) {
     const seen = records.map((r) => r.derived?.[cv.id]).filter((x) => x !== undefined && x !== null && x !== '');
-    const base = { id: cv.id, label: cv.label || cv.id, source: 'derived' as const, derivation: { kind: 'calculated' as const, expr: cv.expr } };
+    const base = {
+      id: cv.id,
+      label: cv.label || cv.id,
+      source: 'derived' as const,
+      derivation: { kind: 'calculated' as const, expr: cv.expr },
+    };
     const lineage = opts.lineage?.[cv.id];
     const extra = lineage?.length ? { lineage } : {};
     if (seen.some((x) => typeof x === 'boolean'))
-      out.push({ ...base, ...extra, kind: 'single', categories: [{ code: 1, label: 'Yes' }, { code: 0, label: 'No' }] });
+      out.push({
+        ...base,
+        ...extra,
+        kind: 'single',
+        categories: [
+          { code: 1, label: 'Yes' },
+          { code: 0, label: 'No' },
+        ],
+      });
     else if (seen.length && seen.every((x) => typeof x === 'number')) out.push({ ...base, ...extra, kind: 'numeric', categories: [] });
     else if (!seen.length) out.push({ ...base, ...extra, kind: 'numeric', categories: [] });
     else {
@@ -216,7 +229,8 @@ export function recodeProblems(def: SurveyDefinition): Array<{ id: string; messa
   const seen = new Set<string>();
   for (const rc of def.recodes ?? []) {
     if (ids.has(rc.id) || seen.has(rc.id)) out.push({ id: rc.id, message: `"${rc.id}" is already a variable name.` });
-    else if (!built.has(rc.id)) out.push({ id: rc.id, message: `Recode "${rc.id}" uses "${rc.source}", which is not an analysis variable defined before it.` });
+    else if (!built.has(rc.id))
+      out.push({ id: rc.id, message: `Recode "${rc.id}" uses "${rc.source}", which is not an analysis variable defined before it.` });
     seen.add(rc.id);
   }
   return out;
@@ -233,7 +247,13 @@ function groupOf(rc: Recode, x: number | string): number | undefined {
   const n = typeof x === 'number' ? x : x.trim() !== '' ? Number(x) : NaN;
   for (const g of rc.groups) {
     if (g.values?.some((v) => String(v) === String(x))) return g.code;
-    if ((g.min !== undefined || g.max !== undefined) && Number.isFinite(n) && (g.min === undefined || n >= g.min) && (g.max === undefined || n <= g.max)) return g.code;
+    if (
+      (g.min !== undefined || g.max !== undefined) &&
+      Number.isFinite(n) &&
+      (g.min === undefined || n >= g.min) &&
+      (g.max === undefined || n <= g.max)
+    )
+      return g.code;
   }
   return rc.otherwise?.code;
 }
@@ -244,7 +264,9 @@ function rawValue(v: Variable, r: AnalysisRecord): unknown {
   if (v.derivation?.kind === 'recode') {
     const spec = recodeSpecs.get(v);
     if (!spec) return undefined;
-    const got = codes(spec.from, r).map((c) => groupOf(spec.rc, c)).filter((c): c is number => c !== undefined);
+    const got = codes(spec.from, r)
+      .map((c) => groupOf(spec.rc, c))
+      .filter((c): c is number => c !== undefined);
     if (v.kind === 'multi') return [...new Set(got)];
     return got[0];
   }

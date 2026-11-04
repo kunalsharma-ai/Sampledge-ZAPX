@@ -28,8 +28,23 @@ const parsed = parseSurveyDefinition({
       ],
     },
     { id: 'T2B', source: 'SAT', groups: [{ code: 1, label: 'Top 2', values: [4, 5] }], otherwise: { code: 0, label: 'Rest' } },
-    { id: 'LOCAL', source: 'BRANDS', groups: [{ code: 1, label: 'Local', values: [1, 2] }, { code: 2, label: 'Global', values: [3, 4] }] },
-    { id: 'GEN', label: 'Generation', source: 'AGEGRP', groups: [{ code: 1, label: 'Younger', values: [1, 2] }, { code: 2, label: 'Older', values: [3] }] },
+    {
+      id: 'LOCAL',
+      source: 'BRANDS',
+      groups: [
+        { code: 1, label: 'Local', values: [1, 2] },
+        { code: 2, label: 'Global', values: [3, 4] },
+      ],
+    },
+    {
+      id: 'GEN',
+      label: 'Generation',
+      source: 'AGEGRP',
+      groups: [
+        { code: 1, label: 'Younger', values: [1, 2] },
+        { code: 2, label: 'Older', values: [3] },
+      ],
+    },
   ],
 });
 if (!parsed.ok) throw new Error(JSON.stringify(parsed.issues));
@@ -66,7 +81,14 @@ describe('derived variables', () => {
   });
 
   it('reports recodes that cannot be built', () => {
-    const bad = { ...def, recodes: [...def.recodes, { id: 'X', source: 'NOPE', groups: [{ code: 1, label: 'a', values: [1] }] }, { ...def.recodes[0]!, id: 'AGE' }] };
+    const bad = {
+      ...def,
+      recodes: [
+        ...def.recodes,
+        { id: 'X', source: 'NOPE', groups: [{ code: 1, label: 'a', values: [1] }] },
+        { ...def.recodes[0]!, id: 'AGE' },
+      ],
+    };
     expect(recodeProblems(bad as SurveyDefinition).map((p) => p.id)).toEqual(['X', 'AGE']);
     expect(recodeProblems(def)).toEqual([]);
   });

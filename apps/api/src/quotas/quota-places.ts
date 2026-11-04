@@ -14,7 +14,12 @@ export type TakeResult = { ok: true; cells: string[] } | { ok: false; quotaId: s
  * Count the complete toward its quotas inside the caller's transaction, never overfilling. When a
  * slot has no room the caller must throw so the transaction rolls back the places already taken.
  */
-export async function takeQuotaPlaces(tx: Prisma.TransactionClient, surveyId: string, def: SurveyDefinition, answers: Answers): Promise<TakeResult> {
+export async function takeQuotaPlaces(
+  tx: Prisma.TransactionClient,
+  surveyId: string,
+  def: SurveyDefinition,
+  answers: Answers,
+): Promise<TakeResult> {
   const matching = matchingQuotas(def, answers);
   if (!matching.length) return { ok: true, cells: [] };
   const counts = new Map(
@@ -51,7 +56,9 @@ export async function firstFullSlot(
 ): Promise<string | null> {
   const matching = matchingQuotas(def, answers);
   if (!matching.length) return null;
-  const counts = new Map((await db.quotaCount.findMany({ where: { surveyId, quotaId: { in: matching.map((q) => q.id) } } })).map((c) => [c.quotaId, c]));
+  const counts = new Map(
+    (await db.quotaCount.findMany({ where: { surveyId, quotaId: { in: matching.map((q) => q.id) } } })).map((c) => [c.quotaId, c]),
+  );
   const full = (id: string, target: number) => {
     const c = counts.get(id);
     return (c?.count ?? 0) >= (c?.targetOverride ?? target);

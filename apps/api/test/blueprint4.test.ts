@@ -83,8 +83,22 @@ const def = {
           type: 'conjoint',
           text: 'Which would you buy?',
           attributes: [
-            { id: 'price', label: 'Price', levels: [{ code: 1, label: '$1' }, { code: 2, label: '$2' }] },
-            { id: 'size', label: 'Size', levels: [{ code: 1, label: 'Small' }, { code: 2, label: 'Large' }] },
+            {
+              id: 'price',
+              label: 'Price',
+              levels: [
+                { code: 1, label: '$1' },
+                { code: 2, label: '$2' },
+              ],
+            },
+            {
+              id: 'size',
+              label: 'Size',
+              levels: [
+                { code: 1, label: 'Small' },
+                { code: 2, label: 'Large' },
+              ],
+            },
           ],
           tasks: 4,
           conceptsPerTask: 2,
@@ -95,8 +109,22 @@ const def = {
   ],
   variables: [{ id: 'OLDER', label: 'Aged 35+', expr: 'AGE >= 35' }],
   recodes: [
-    { id: 'AGEGRP', label: 'Age group', source: 'AGE', groups: [{ code: 1, label: 'Under 35', max: 34 }, { code: 2, label: '35 plus', min: 35 }] },
-    { id: 'OLDGRP', label: 'Older (recode)', source: 'OLDER', groups: [{ code: 1, label: 'Older', values: [1] }], otherwise: { code: 0, label: 'Younger' } },
+    {
+      id: 'AGEGRP',
+      label: 'Age group',
+      source: 'AGE',
+      groups: [
+        { code: 1, label: 'Under 35', max: 34 },
+        { code: 2, label: '35 plus', min: 35 },
+      ],
+    },
+    {
+      id: 'OLDGRP',
+      label: 'Older (recode)',
+      source: 'OLDER',
+      groups: [{ code: 1, label: 'Older', values: [1] }],
+      otherwise: { code: 0, label: 'Younger' },
+    },
   ],
 };
 
@@ -198,13 +226,25 @@ describe('derived variables', () => {
   });
 
   it('tabulates recodes in frequencies and crosstabs', async () => {
-    const f = (await http.post(`/api/surveys/${surveyId}/analysis/frequencies`).set(admin).send({ variables: ['AGEGRP', 'OLDGRP'] }).expect(200)).body;
+    const f = (
+      await http
+        .post(`/api/surveys/${surveyId}/analysis/frequencies`)
+        .set(admin)
+        .send({ variables: ['AGEGRP', 'OLDGRP'] })
+        .expect(200)
+    ).body;
     expect(f.frequencies[0].rows.map((r: { count: number }) => r.count)).toEqual([20, 20]);
     expect(f.frequencies[1].rows.map((r: { label: string; count: number }) => [r.label, r.count])).toEqual([
       ['Older', 20],
       ['Younger', 20],
     ]);
-    const x = (await http.post(`/api/surveys/${surveyId}/analysis/crosstab`).set(admin).send({ banner: 'AGEGRP', stubs: ['AWARE'] }).expect(200)).body;
+    const x = (
+      await http
+        .post(`/api/surveys/${surveyId}/analysis/crosstab`)
+        .set(admin)
+        .send({ banner: 'AGEGRP', stubs: ['AWARE'] })
+        .expect(200)
+    ).body;
     const brand2 = x.tables[0].rows.find((r: { code: number }) => r.code === 2);
     expect(brand2.cells.map((c: { pct: number }) => c.pct)).toEqual([50, 0, 100]);
   });
@@ -223,7 +263,11 @@ describe('derived variables', () => {
 describe('research assistant', () => {
   it('shows the computed tables it will send', async () => {
     const r = (
-      await http.post(`/api/surveys/${surveyId}/analysis/assistant/tables`).set(admin).send({ banner: 'AGEGRP', variables: ['AWARE'] }).expect(200)
+      await http
+        .post(`/api/surveys/${surveyId}/analysis/assistant/tables`)
+        .set(admin)
+        .send({ banner: 'AGEGRP', variables: ['AWARE'] })
+        .expect(200)
     ).body;
     expect(r.tables).toHaveLength(1);
     expect(r.tables[0]).toMatchObject({ id: 'T1', variable: 'AWARE' });
@@ -239,13 +283,19 @@ describe('research assistant', () => {
         .expect(200)
     ).body;
     expect(r.findings).toEqual([{ statement: 'Everyone aged 35 plus is aware of brand 2.', tables: ['T1'] }]);
-    expect(r.caveats).toEqual(expect.arrayContaining(['Small sample.', '2 statements that did not cite a table were left out.', 'Unweighted data.']));
+    expect(r.caveats).toEqual(
+      expect.arrayContaining(['Small sample.', '2 statements that did not cite a table were left out.', 'Unweighted data.']),
+    );
     expect(r.model).toBe('fake-analyst');
     const sent = fake.requests.at(-1)!;
     expect(sent.question).not.toContain('kunal@example.com');
     expect(sent.tables[0]!.text).toContain('100%');
     // Open answers are never tabulated for the assistant.
-    await http.post(`/api/surveys/${surveyId}/analysis/assistant`).set(admin).send({ question: 'x?', variables: ['NOPE'] }).expect(400);
+    await http
+      .post(`/api/surveys/${surveyId}/analysis/assistant`)
+      .set(admin)
+      .send({ question: 'x?', variables: ['NOPE'] })
+      .expect(400);
     const usage = await prisma.aiUsage.findMany({ where: { surveyId, task: 'insights' } });
     expect(usage.length).toBeGreaterThan(0);
     expect(usage[0]!.redactions).toBe(1);
@@ -262,7 +312,10 @@ describe('consented CAPI video', () => {
 
   it('round-trips the video setting with the survey', async () => {
     const d = (await http.get(`/api/surveys/${surveyId}/draft`).set(admin).expect(200)).body.version;
-    const next = { ...d.definition, settings: { ...d.definition.settings, capi: { ...d.definition.settings.capi, audio: 'consent', video: true } } };
+    const next = {
+      ...d.definition,
+      settings: { ...d.definition.settings, capi: { ...d.definition.settings.capi, audio: 'consent', video: true } },
+    };
     await http.put(`/api/surveys/${surveyId}/draft`).set(admin).send({ definition: next }).expect(200);
     const back = (await http.get(`/api/surveys/${surveyId}/draft`).set(admin).expect(200)).body.version.definition;
     expect(back.settings.capi).toMatchObject({ audio: 'consent', video: true });
@@ -274,7 +327,10 @@ describe('least-fill quota groups', () => {
   let vendorId: string;
   const counts = async () =>
     Object.fromEntries(
-      ((await http.get(`/api/surveys/${sid}/quotas`).set(admin).expect(200)).body as Array<{ id: string; count: number }>).map((q) => [q.id, q.count]),
+      ((await http.get(`/api/surveys/${sid}/quotas`).set(admin).expect(200)).body as Array<{ id: string; count: number }>).map((q) => [
+        q.id,
+        q.count,
+      ]),
     );
 
   beforeAll(async () => {
@@ -283,7 +339,14 @@ describe('least-fill quota groups', () => {
     const brands = {
       schemaVersion: 1,
       title: 'Brands',
-      pages: [{ id: 'P1', questions: [{ id: 'AWARE', type: 'multi', text: 'Which brands?', options: [1, 2, 3].map((code) => ({ code, label: `Brand ${code}` })) }] }],
+      pages: [
+        {
+          id: 'P1',
+          questions: [
+            { id: 'AWARE', type: 'multi', text: 'Which brands?', options: [1, 2, 3].map((code) => ({ code, label: `Brand ${code}` })) },
+          ],
+        },
+      ],
       quotas: [
         ...[1, 2, 3].map((b) => ({ id: `QB${b}`, condition: `selected(AWARE, ${b})`, target: 2, group: 'BRAND' })),
         { id: 'QALL', condition: 'true', target: 100 },
@@ -296,8 +359,18 @@ describe('least-fill quota groups', () => {
 
   async function respond(uid: string, aware: number[]) {
     const { url } = (await http.post(`/api/surveys/${sid}/links`).set(admin).send({ vendorId, uid }).expect(201)).body;
-    const s = (await http.post(`/api/public/s/${sid}/start`).send({ query: Object.fromEntries(new URL(url).searchParams) }).expect(200)).body;
-    const st = (await http.post(`/api/public/r/${s.token}/answers`).send({ pageId: 'P1', answers: { AWARE: aware } }).expect(200)).body;
+    const s = (
+      await http
+        .post(`/api/public/s/${sid}/start`)
+        .send({ query: Object.fromEntries(new URL(url).searchParams) })
+        .expect(200)
+    ).body;
+    const st = (
+      await http
+        .post(`/api/public/r/${s.token}/answers`)
+        .send({ pageId: 'P1', answers: { AWARE: aware } })
+        .expect(200)
+    ).body;
     return st.status as string;
   }
 
@@ -315,7 +388,11 @@ describe('least-fill quota groups', () => {
     expect(await respond('a7', [2, 3])).toBe('quota_full');
     const r = await prisma.response.findFirstOrThrow({ where: { surveyId: sid, uid: 'a1' } });
     expect(r.quotaCells).toEqual(['QB1', 'QALL']);
-    await http.post(`/api/surveys/${sid}/quality/decisions`).set(admin).send({ responseIds: [r.id], decision: 'reject' }).expect(200);
+    await http
+      .post(`/api/surveys/${sid}/quality/decisions`)
+      .set(admin)
+      .send({ responseIds: [r.id], decision: 'reject' })
+      .expect(200);
     expect(await counts()).toMatchObject({ QB1: 1, QB2: 2, QB3: 2, QALL: 5 });
     expect(await respond('a8', [1, 2])).toBe('complete');
     expect((await prisma.response.findFirstOrThrow({ where: { surveyId: sid, uid: 'a8' } })).quotaCells).toEqual(['QB1', 'QALL']);
@@ -326,12 +403,20 @@ describe('question bank blocks', () => {
   it('saves a page of questions as a block and refuses invalid blocks', async () => {
     const page = def.pages[0];
     const item = (
-      await http.post('/api/library').set(admin).send({ kind: 'BLOCK', name: 'Screener block', category: 'Demographics', content: { pages: [page] } }).expect(201)
+      await http
+        .post('/api/library')
+        .set(admin)
+        .send({ kind: 'BLOCK', name: 'Screener block', category: 'Demographics', content: { pages: [page] } })
+        .expect(201)
     ).body;
     expect(item.kind).toBe('BLOCK');
     const list = (await http.get('/api/library?kind=BLOCK').set(admin).expect(200)).body;
     expect(list.map((i: { id: string }) => i.id)).toEqual([item.id]);
     expect(list[0].content.pages[0].questions.map((q: { id: string }) => q.id)).toEqual(['AGE', 'GENDER']);
-    await http.post('/api/library').set(admin).send({ kind: 'BLOCK', name: 'Bad', content: { pages: [] } }).expect(400);
+    await http
+      .post('/api/library')
+      .set(admin)
+      .send({ kind: 'BLOCK', name: 'Bad', content: { pages: [] } })
+      .expect(400);
   });
 });

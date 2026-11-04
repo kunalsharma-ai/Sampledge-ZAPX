@@ -253,7 +253,9 @@ export function InsertBlockFromBank({
       </div>
       <ErrorNote error={error} />
       {items === null ? <p className="muted small">Loading…</p> : null}
-      {items && !items.length ? <p className="muted small">No saved blocks yet. Select a page and save it to the bank as a block.</p> : null}
+      {items && !items.length ? (
+        <p className="muted small">No saved blocks yet. Select a page and save it to the bank as a block.</p>
+      ) : null}
       <div className="bank-picker">
         {(items ?? []).map((i) => {
           const questions = i.content.pages.reduce((n, p) => n + p.questions.length, 0);
@@ -269,7 +271,8 @@ export function InsertBlockFromBank({
             >
               <strong className="small">{i.name}</strong>
               <span className="muted small">
-                {i.category} · {i.content.pages.length} page{i.content.pages.length === 1 ? '' : 's'}, {questions} question{questions === 1 ? '' : 's'}
+                {i.category} · {i.content.pages.length} page{i.content.pages.length === 1 ? '' : 's'}, {questions} question
+                {questions === 1 ? '' : 's'}
               </span>
             </button>
           );

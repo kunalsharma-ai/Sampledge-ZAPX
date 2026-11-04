@@ -238,7 +238,13 @@ export class ExportService {
               const a = ans(r);
               const c = codes(v, {
                 answers: a,
-                system: { status: r.status.toLowerCase(), mode: r.mode.toLowerCase(), language: r.language, device: r.device, vendor: r.vendor?.code ?? null },
+                system: {
+                  status: r.status.toLowerCase(),
+                  mode: r.mode.toLowerCase(),
+                  language: r.language,
+                  device: r.device,
+                  vendor: r.vendor?.code ?? null,
+                },
                 ...((def.variables ?? []).length ? { derived: computeVariables(def, a) } : {}),
               });
               return c.length ? (v.kind === 'multi' ? c.join(';') : (c[0] as number)) : null;

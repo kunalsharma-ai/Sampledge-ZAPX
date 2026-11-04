@@ -469,7 +469,10 @@ export function fromZapxXml(src: string): XmlReadResult {
         for (const g of elements(el)) {
           if (g.name === 'group') {
             const values = g.attrs.values;
-            const grp = attrsTo({ ...g, attrs: Object.fromEntries(Object.entries(g.attrs).filter(([k]) => k !== 'values')) }, new Set(['code', 'label', 'min', 'max']));
+            const grp = attrsTo(
+              { ...g, attrs: Object.fromEntries(Object.entries(g.attrs).filter(([k]) => k !== 'values')) },
+              new Set(['code', 'label', 'min', 'max']),
+            );
             if (values !== undefined) grp.values = values.split('|').map((x) => (/^-?\d+(\.\d+)?$/.test(x) ? Number(x) : x));
             (rc.groups as unknown[]).push(grp);
           } else if (g.name === 'otherwise') rc.otherwise = attrsTo(g, new Set(['code', 'label']));

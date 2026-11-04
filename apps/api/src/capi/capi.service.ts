@@ -332,7 +332,9 @@ export class CapiService {
     }
 
     const create = (s: ResponseStatus, why: string | null, tx: Prisma.TransactionClient, quotaCells: string[] = []) =>
-      tx.response.create({ data: { ...base, ...quality, status: s, outcomeReason: why, answers: answers as Prisma.InputJsonValue, quotaCells } });
+      tx.response.create({
+        data: { ...base, ...quality, status: s, outcomeReason: why, answers: answers as Prisma.InputJsonValue, quotaCells },
+      });
 
     try {
       await this.prisma.$transaction(async (tx) => {

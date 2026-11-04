@@ -46,7 +46,11 @@ export function suggestTestCases(source: SurveyDefinition, opts: SuggestOptions 
     const ending = t ? `${t.status}:${t.id}` : 'complete';
     return {
       ending,
-      targets: [`${ENDING_PREFIX}${ending}`, ...iv.pages.map((p) => `page ${p}`), ...matchingQuotas(def, answers).map((q) => `quota ${q.id}`)],
+      targets: [
+        `${ENDING_PREFIX}${ending}`,
+        ...iv.pages.map((p) => `page ${p}`),
+        ...matchingQuotas(def, answers).map((q) => `quota ${q.id}`),
+      ],
     };
   };
   const scored = interviews.map((iv) => ({ iv, ...targetsOf(iv) }));
@@ -59,7 +63,10 @@ export function suggestTestCases(source: SurveyDefinition, opts: SuggestOptions 
       const fresh = s.targets.filter((t) => !covered.has(t));
       // A new ending counts most, so every ending gets its own case first.
       const weight = (xs: string[]) => xs.reduce((n, t) => n + (t.startsWith(ENDING_PREFIX) ? 100 : 1), 0);
-      if (fresh.length && (!best || weight(fresh) > weight(bestNew) || (weight(fresh) === weight(bestNew) && s.iv.pages.length < best.iv.pages.length))) {
+      if (
+        fresh.length &&
+        (!best || weight(fresh) > weight(bestNew) || (weight(fresh) === weight(bestNew) && s.iv.pages.length < best.iv.pages.length))
+      ) {
         best = s;
         bestNew = fresh;
       }
@@ -76,13 +83,26 @@ export function suggestTestCases(source: SurveyDefinition, opts: SuggestOptions 
       ),
     );
     const tc: QaTestCase = {
-      name: `Suggested ${out.length + 1}: ends ${best.ending}${bestNew.some((t) => t.startsWith('quota ')) ? `, ${bestNew.filter((t) => t.startsWith('quota ')).map((t) => t.slice(6)).join(', ')}` : ''}`.slice(0, 200),
+      name: `Suggested ${out.length + 1}: ends ${best.ending}${
+        bestNew.some((t) => t.startsWith('quota '))
+          ? `, ${bestNew
+              .filter((t) => t.startsWith('quota '))
+              .map((t) => t.slice(6))
+              .join(', ')}`
+          : ''
+      }`.slice(0, 200),
       answers,
       seed: seedFor,
       expect: {
         outcome: best.ending,
-        shows: steps.filter((x) => x.shown).map((x) => x.pageId).slice(0, 200),
-        skips: steps.filter((x) => !x.shown).map((x) => x.pageId).slice(0, 200),
+        shows: steps
+          .filter((x) => x.shown)
+          .map((x) => x.pageId)
+          .slice(0, 200),
+        skips: steps
+          .filter((x) => !x.shown)
+          .map((x) => x.pageId)
+          .slice(0, 200),
         variables,
         quotas: matchingQuotas(def, answers).map((q) => q.id),
       },

@@ -53,7 +53,7 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
     setBusy(true);
     setError(null);
     try {
-      setTables((await api<{ tables: Table[] }>(`/surveys/${surveyId}/analysis/assistant/tables`, { method: 'POST', body: JSON.stringify(body()) })).tables);
+      setTables((await api<{ tables: Table[] }>(`/surveys/${surveyId}/analysis/assistant/tables`, { body: body() })).tables);
     } catch (e) {
       setError(e);
     } finally {
@@ -64,7 +64,7 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
     setBusy(true);
     setError(null);
     try {
-      const r = await api<Answer>(`/surveys/${surveyId}/analysis/assistant`, { method: 'POST', body: JSON.stringify(body()) });
+      const r = await api<Answer>(`/surveys/${surveyId}/analysis/assistant`, { body: body() });
       setOut(r);
       setTables(r.tables);
     } catch (e) {
@@ -80,13 +80,23 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
     <section className="panel stack" aria-labelledby="assistant-h" data-testid="research-assistant">
       <h2 id="assistant-h">Research assistant</h2>
       <p className="muted small">
-        Ask a question about the completes. ZAPX computes the tables (the same frequencies and crosstabs as above) and the AI reads only those
-        tables; every finding cites the table it comes from. Open answers are never sent. Check findings against the tables before you report them.
+        Ask a question about the completes. ZAPX computes the tables (the same frequencies and crosstabs as above) and the AI reads only
+        those tables; every finding cites the table it comes from. Open answers are never sent. Check findings against the tables before you
+        report them.
       </p>
-      {!aiConfigured ? <p className="note">AI is not configured on this server, so you can see the tables but not ask. An administrator sets the AI key in settings.</p> : null}
+      {!aiConfigured ? (
+        <p className="note">
+          AI is not configured on this server, so you can see the tables but not ask. An administrator sets the AI key in settings.
+        </p>
+      ) : null}
       <label className="field">
         Question
-        <textarea rows={2} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Which groups are most satisfied, and why might that be?" />
+        <textarea
+          rows={2}
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Which groups are most satisfied, and why might that be?"
+        />
       </label>
       <div className="row" style={{ gap: 12, flexWrap: 'wrap' }}>
         <label className="field">
@@ -104,7 +114,12 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
         </label>
         <label className="field">
           Tables for ({picked.length ? `${picked.length} chosen` : 'first 20 questions'})
-          <select multiple size={4} value={picked} onChange={(e) => setPicked([...e.target.selectedOptions].map((o) => o.value).slice(0, 20))}>
+          <select
+            multiple
+            size={4}
+            value={picked}
+            onChange={(e) => setPicked([...e.target.selectedOptions].map((o) => o.value).slice(0, 20))}
+          >
             {choices.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.id}: {v.label}
@@ -131,7 +146,12 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
                 <li key={i}>
                   {f.statement}{' '}
                   {f.tables.map((t) => (
-                    <button key={t} className="link small mono" onClick={() => setOpen(open === t ? null : t)} aria-label={`Show table ${t}`}>
+                    <button
+                      key={t}
+                      className="link small mono"
+                      onClick={() => setOpen(open === t ? null : t)}
+                      aria-label={`Show table ${t}`}
+                    >
                       [{t}]
                     </button>
                   ))}
@@ -147,7 +167,8 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
             </ul>
           ) : null}
           <p className="small muted">
-            AI-written by {out.model} from {out.total.toLocaleString()} completes{out.redactions ? `; ${out.redactions} personal detail(s) removed from your question` : ''}.
+            AI-written by {out.model} from {out.total.toLocaleString()} completes
+            {out.redactions ? `; ${out.redactions} personal detail(s) removed from your question` : ''}.
           </p>
           {open && tableById(open) ? (
             <pre className="small" data-testid="assistant-cited-table">

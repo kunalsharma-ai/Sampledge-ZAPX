@@ -130,7 +130,6 @@ Rules:
 6. Return one translation for every key you were given, and no other keys.
 `.trim();
 
-
 export const INSIGHTS_SYSTEM = `
 You are a market research analyst helping a researcher read survey results. You are given tables
 that ZAPX computed from the interviews (frequencies and crosstabs with bases, percentages and

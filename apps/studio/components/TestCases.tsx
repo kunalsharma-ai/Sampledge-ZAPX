@@ -5,7 +5,14 @@
  * picked from suggestions: simulated respondents chosen so every ending, page and quota is covered.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { firstMatchingTermination, prepareSurvey, suggestTestCases, traceRoute, type SuggestedCase, type TestCaseResult } from '@zapx/logic-engine';
+import {
+  firstMatchingTermination,
+  prepareSurvey,
+  suggestTestCases,
+  traceRoute,
+  type SuggestedCase,
+  type TestCaseResult,
+} from '@zapx/logic-engine';
 import type { Answers, QaTestCaseInput, SurveyDefinition } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';

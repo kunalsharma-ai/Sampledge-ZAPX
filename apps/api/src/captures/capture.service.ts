@@ -152,7 +152,10 @@ export class CaptureService {
       throw new ConflictException('Too many files for one interview');
     let video = false;
     if (input.kind === 'audio') {
-      const survey = await this.prisma.survey.findFirst({ where: { id: input.surveyId, tenantId: user.tenantId }, select: { liveVersionId: true } });
+      const survey = await this.prisma.survey.findFirst({
+        where: { id: input.surveyId, tenantId: user.tenantId },
+        select: { liveVersionId: true },
+      });
       const live = survey?.liveVersionId
         ? await this.prisma.surveyVersion.findUnique({ where: { id: survey.liveVersionId }, select: { definition: true } })
         : null;

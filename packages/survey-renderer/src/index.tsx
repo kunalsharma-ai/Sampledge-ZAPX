@@ -1202,7 +1202,7 @@ function CardSort({
   const cardEl = (o: Option) => (
     <li
       key={o.code}
-      className="zx-card"
+      className="zx-sort-card"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', String(o.code));
@@ -1400,7 +1400,7 @@ export const defaultThemeCss = `
 .zx-sort-title{margin:0 0 8px;font-weight:600;}
 .zx-sort-count{color:var(--zx-muted);font-weight:400;}
 .zx-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
-.zx-card{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--zx-border);border-radius:calc(var(--zx-radius) - 4px);background:var(--zx-bg);cursor:grab;}
+.zx-sort-card{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--zx-border);border-radius:calc(var(--zx-radius) - 4px);background:var(--zx-bg);cursor:grab;}
 .zx-card-select{max-width:50%;font:inherit;padding:4px;border-radius:6px;border:1px solid var(--zx-border);background:var(--zx-card);color:var(--zx-text);}
 .zx-signature-pad{display:block;width:100%;max-width:560px;aspect-ratio:5/2;border:2px dashed var(--zx-border,#c8ccd4);border-radius:var(--zx-radius);background:var(--zx-card,#fff);touch-action:none;cursor:crosshair;color:var(--zx-text,#111);}
 .zx-signature-clear{margin-top:8px;}

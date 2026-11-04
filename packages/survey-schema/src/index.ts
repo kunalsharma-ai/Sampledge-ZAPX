@@ -543,7 +543,10 @@ export const recodeGroupSchema = z
     code: z.number().int(),
     label: z.string().min(1).max(200),
     /** Source codes (or text values) that fall in this group. */
-    values: z.array(z.union([z.number(), z.string().max(100)])).max(200).optional(),
+    values: z
+      .array(z.union([z.number(), z.string().max(100)]))
+      .max(200)
+      .optional(),
     /** Numeric range, inclusive. */
     min: z.number().optional(),
     max: z.number().optional(),
@@ -561,9 +564,14 @@ export const recodeSchema = z
     /** Group for answered values that match no group; left out (missing) when absent. */
     otherwise: z.object({ code: z.number().int(), label: z.string().min(1).max(200) }).optional(),
   })
-  .refine((r) => new Set([...r.groups.map((g) => g.code), ...(r.otherwise ? [r.otherwise.code] : [])]).size === r.groups.length + (r.otherwise ? 1 : 0), {
-    message: 'Group codes must be unique.',
-  });
+  .refine(
+    (r) =>
+      new Set([...r.groups.map((g) => g.code), ...(r.otherwise ? [r.otherwise.code] : [])]).size ===
+      r.groups.length + (r.otherwise ? 1 : 0),
+    {
+      message: 'Group codes must be unique.',
+    },
+  );
 export type Recode = z.infer<typeof recodeSchema>;
 
 // ---- Data quality (Milestone 5) -----------------------------------------------------------------

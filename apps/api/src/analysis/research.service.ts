@@ -40,7 +40,10 @@ export function frequencyText(f: Frequency, weighted: boolean): string {
     lines.push('Answer | Count | %');
     for (const r of f.rows) lines.push(`${r.label} | ${n1(r.count)} | ${n1(r.pct)}%`);
   }
-  if (f.stats) lines.push(`Mean ${n1(f.stats.mean)} (sd ${n1(f.stats.sd)}, median ${n1(f.stats.median)}, min ${f.stats.min}, max ${f.stats.max}, n ${f.stats.n})`);
+  if (f.stats)
+    lines.push(
+      `Mean ${n1(f.stats.mean)} (sd ${n1(f.stats.sd)}, median ${n1(f.stats.median)}, min ${f.stats.min}, max ${f.stats.max}, n ${f.stats.n})`,
+    );
   if (f.nps) lines.push(`NPS ${n1(f.nps.score)} (promoters ${n1(f.nps.promoters)}%, detractors ${n1(f.nps.detractors)}%)`);
   return lines.join('\n');
 }
@@ -54,7 +57,10 @@ export function crosstabText(x: Crosstab, weighted: boolean): string {
   ];
   for (const r of x.rows)
     lines.push(`${r.label} | ${r.cells.map((c) => `${n1(c.pct)}%${c.higherThan.length ? ` ${c.higherThan.join('')}` : ''}`).join(' | ')}`);
-  if (x.means) lines.push(`Mean | ${x.means.map((m) => (m.stats ? `${n1(m.stats.mean)}${m.higherThan.length ? ` ${m.higherThan.join('')}` : ''}` : '-')).join(' | ')}`);
+  if (x.means)
+    lines.push(
+      `Mean | ${x.means.map((m) => (m.stats ? `${n1(m.stats.mean)}${m.higherThan.length ? ` ${m.higherThan.join('')}` : ''}` : '-')).join(' | ')}`,
+    );
   return lines.join('\n');
 }
 
@@ -76,9 +82,12 @@ export class ResearchAssistantService {
       return v;
     };
     const banner = input.banner ? find(input.banner) : null;
-    if (banner && banner.kind !== 'single' && banner.kind !== 'multi') throw new BadRequestException('Choose a single or multiple choice banner.');
+    if (banner && banner.kind !== 'single' && banner.kind !== 'multi')
+      throw new BadRequestException('Choose a single or multiple choice banner.');
     const chosen = (
-      input.variables?.length ? input.variables.map(find) : vars.filter((v) => v.source !== 'system' && v.kind !== 'open' && v.id !== banner?.id)
+      input.variables?.length
+        ? input.variables.map(find)
+        : vars.filter((v) => v.source !== 'system' && v.kind !== 'open' && v.id !== banner?.id)
     )
       .filter((v) => v.kind !== 'open')
       .slice(0, MAX_ASSISTANT_TABLES);
@@ -86,7 +95,10 @@ export class ResearchAssistantService {
       id: `T${i + 1}`,
       variable: v.id,
       title: banner ? `${v.id}: ${v.label} by ${banner.id}: ${banner.label}` : `${v.id}: ${v.label}`,
-      text: banner && v.id !== banner.id ? crosstabText(crosstab(banner, v, records), !!weighting) : frequencyText(frequency(v, records), !!weighting),
+      text:
+        banner && v.id !== banner.id
+          ? crosstabText(crosstab(banner, v, records), !!weighting)
+          : frequencyText(frequency(v, records), !!weighting),
     }));
     return { survey, def, total: records.length, weighted: !!weighting, tables };
   }
@@ -104,11 +116,20 @@ export class ResearchAssistantService {
     // counts and survey labels, not personal data (open answers are never sent).
     const q = admitted.policy.redactPii ? redactPii(input.question) : { text: input.question, count: 0 };
     const r = await this.gateway
-      .run('insights', actor, (m) => this.ai.insights({ surveyTitle: def.title, question: q.text, tables: tables.map(({ id, title, text }) => ({ id, title, text })) }, m), {
-        surveyId,
-        redactions: q.count,
-        admitted,
-      })
+      .run(
+        'insights',
+        actor,
+        (m) =>
+          this.ai.insights(
+            { surveyTitle: def.title, question: q.text, tables: tables.map(({ id, title, text }) => ({ id, title, text })) },
+            m,
+          ),
+        {
+          surveyId,
+          redactions: q.count,
+          admitted,
+        },
+      )
       .catch((e: unknown) => {
         throw toHttp(e);
       });
@@ -118,7 +139,8 @@ export class ResearchAssistantService {
       .filter((f) => f.statement.trim() && f.tables.length);
     const dropped = r.findings.length - findings.length;
     const caveats = r.caveats.map((c) => c.slice(0, 1000)).slice(0, 20);
-    if (dropped) caveats.push(`${dropped} statement${dropped === 1 ? '' : 's'} that did not cite a table ${dropped === 1 ? 'was' : 'were'} left out.`);
+    if (dropped)
+      caveats.push(`${dropped} statement${dropped === 1 ? '' : 's'} that did not cite a table ${dropped === 1 ? 'was' : 'were'} left out.`);
     if (!weighted) caveats.push('Unweighted data.');
     return {
       answer: r.answer.slice(0, 4000),

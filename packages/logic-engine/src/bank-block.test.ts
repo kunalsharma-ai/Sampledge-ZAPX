@@ -21,7 +21,15 @@ const block = bankBlockSchema.parse({
       id: 'S1',
       questions: [
         { id: 'AGE', type: 'numeric', text: 'Your age?' },
-        { id: 'KIDS', type: 'single', text: 'Any kids?', options: [{ code: 1, label: 'Yes' }, { code: 2, label: 'No' }] },
+        {
+          id: 'KIDS',
+          type: 'single',
+          text: 'Any kids?',
+          options: [
+            { code: 1, label: 'Yes' },
+            { code: 2, label: 'No' },
+          ],
+        },
       ],
     },
     {
@@ -32,7 +40,10 @@ const block = bankBlockSchema.parse({
           id: 'KIDAGE',
           type: 'multi',
           text: 'Ages of the children, at {{AGE}}?',
-          options: [{ code: 1, label: 'Under 5' }, { code: 2, label: '5 plus' }],
+          options: [
+            { code: 1, label: 'Under 5' },
+            { code: 2, label: '5 plus' },
+          ],
           validations: [{ expr: 'count(KIDAGE) >= 1 or AGE < 18', message: 'Pick one' }],
         },
       ],
@@ -49,10 +60,16 @@ describe('question bank blocks', () => {
     expect(first!.questions.map((q) => q.id)).toEqual(['AGE_2', 'KIDS']);
     expect(second!.questions[0]!.text).toBe('Ages of the children, at {{AGE_2}}?');
     expect(second!.condition).toBe('KIDS == 1 and AGE_2 >= 18 and "AGE" != "x"');
-    expect((second!.questions[0] as { validations: Array<{ expr: string }> }).validations[0]!.expr).toBe('count(KIDAGE) >= 1 or AGE_2 < 18');
+    expect((second!.questions[0] as { validations: Array<{ expr: string }> }).validations[0]!.expr).toBe(
+      'count(KIDAGE) >= 1 or AGE_2 < 18',
+    );
     const parsed = parseSurveyDefinition(r.def);
     expect(parsed.ok).toBe(true);
-    expect(analyzeSurvey(r.def).issues.filter((i) => i.severity === 'error').map((i) => i.message)).toEqual([]);
+    expect(
+      analyzeSurvey(r.def)
+        .issues.filter((i) => i.severity === 'error')
+        .map((i) => i.message),
+    ).toEqual([]);
   });
 
   it('keeps names when nothing clashes, and appends at the end by default', () => {

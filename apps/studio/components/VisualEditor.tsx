@@ -352,9 +352,7 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
               }
             />
           ) : null}
-          {sel.kind === 'page' && selected && !readOnly ? (
-            <SavePageToBank page={selected as Page} />
-          ) : null}
+          {sel.kind === 'page' && selected && !readOnly ? <SavePageToBank page={selected as Page} /> : null}
           {sel.kind === 'question' && selected ? (
             <QuestionForm
               q={selected as Question}
@@ -549,8 +547,8 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
       <h2 style={{ marginTop: 12 }}>Quotas</h2>
       <p className="muted small">
         Respondents matching the condition count toward the target when they complete. Over-target respondents get the quota-full redirect.
-        Quotas with the same least-fill group are alternatives: someone who matches several (aware of three brands, say) counts toward only the
-        least filled one, and is over quota only when all of them are full.
+        Quotas with the same least-fill group are alternatives: someone who matches several (aware of three brands, say) counts toward only
+        the least filled one, and is over quota only when all of them are full.
       </p>
       <table className="data list-editor">
         <thead>

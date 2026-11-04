@@ -14,7 +14,15 @@ import {
   type Variable,
 } from '@zapx/analysis-core';
 import { parseSurveyDefinition, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
-import { computeVariables, conjointAnalysis, conjointDesign, maxDiffDesign, maxDiffScores, prepareSurvey, variableLineage } from '@zapx/logic-engine';
+import {
+  computeVariables,
+  conjointAnalysis,
+  conjointDesign,
+  maxDiffDesign,
+  maxDiffScores,
+  prepareSurvey,
+  variableLineage,
+} from '@zapx/logic-engine';
 import { z } from 'zod';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';

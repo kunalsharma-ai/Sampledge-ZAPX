@@ -6,7 +6,6 @@
  */
 import type { BankBlock, Page, SurveyDefinition } from '@zapx/survey-schema';
 
-
 function free(base: string, used: Set<string>) {
   if (!used.has(base.toLowerCase())) return base;
   let n = 2;
@@ -16,7 +15,9 @@ function free(base: string, used: Set<string>) {
 
 /** Replace whole identifiers in a logic expression, leaving text inside quotes alone. */
 function renameInExpr(expr: string, map: Map<string, string>) {
-  return expr.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[A-Za-z_][A-Za-z0-9_]*/g, (m) => (m[0] === '"' || m[0] === "'" ? m : (map.get(m) ?? m)));
+  return expr.replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[A-Za-z_][A-Za-z0-9_]*/g, (m) =>
+    m[0] === '"' || m[0] === "'" ? m : (map.get(m) ?? m),
+  );
 }
 /** Replace piping like {{Q1}} or {{Q1.label}} in text. */
 function renameInText(text: string, map: Map<string, string>) {
@@ -82,4 +83,3 @@ export function insertBankBlock(def: SurveyDefinition, block: BankBlock, afterIn
   const at = Math.max(-1, Math.min(afterIndex, def.pages.length - 1)) + 1;
   return { def: { ...def, pages: [...def.pages.slice(0, at), ...pages, ...def.pages.slice(at)] }, renamed, pages: pages.map((p) => p.id) };
 }
-

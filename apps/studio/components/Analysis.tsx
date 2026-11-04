@@ -405,7 +405,13 @@ function Lineage({ v }: { v: Variable }) {
   if (v.source !== 'derived' || !v.derivation) return null;
   return (
     <p className="small muted" data-testid={`lineage-${v.id}`}>
-      {v.derivation.kind === 'recode' ? `Recode of ${v.derivation.from}` : <>Calculated: <code>{v.derivation.expr}</code></>}
+      {v.derivation.kind === 'recode' ? (
+        `Recode of ${v.derivation.from}`
+      ) : (
+        <>
+          Calculated: <code>{v.derivation.expr}</code>
+        </>
+      )}
       {v.lineage?.length ? ` · from ${v.lineage.join(' ← ')}` : ''}
     </p>
   );

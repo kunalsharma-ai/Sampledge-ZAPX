@@ -6,13 +6,29 @@ const make = (extra: Record<string, unknown>) => {
   const p = parseSurveyDefinition({
     schemaVersion: 1,
     title: 'Recodes',
-    pages: [{ id: 'P1', questions: [{ id: 'AGE', type: 'numeric', text: 'Age?' }, { id: 'INC', type: 'numeric', text: 'Income?' }] }],
+    pages: [
+      {
+        id: 'P1',
+        questions: [
+          { id: 'AGE', type: 'numeric', text: 'Age?' },
+          { id: 'INC', type: 'numeric', text: 'Income?' },
+        ],
+      },
+    ],
     variables: [
       { id: 'RICH', expr: 'INC >= 5' },
       { id: 'SEG', expr: 'RICH and AGE >= 35' },
     ],
     recodes: [
-      { id: 'AGEGRP', label: 'Age group', source: 'AGE', groups: [{ code: 1, label: 'Under 35', max: 34 }, { code: 2, label: '35 plus', min: 35 }] },
+      {
+        id: 'AGEGRP',
+        label: 'Age group',
+        source: 'AGE',
+        groups: [
+          { code: 1, label: 'Under 35', max: 34 },
+          { code: 2, label: '35 plus', min: 35 },
+        ],
+      },
       { id: 'SEGR', source: 'SEG', groups: [{ code: 1, label: 'Target', values: [1, 'yes'] }], otherwise: { code: 0, label: 'Other' } },
     ],
     ...extra,
@@ -41,7 +57,19 @@ describe('recodes and lineage', () => {
     const base = { schemaVersion: 1, title: 't', pages: [{ id: 'P', questions: [{ id: 'A', type: 'numeric', text: 'a' }] }] };
     expect(parseSurveyDefinition({ ...base, recodes: [{ id: 'R', source: 'A', groups: [{ code: 1, label: 'x' }] }] }).ok).toBe(false);
     expect(
-      parseSurveyDefinition({ ...base, recodes: [{ id: 'R', source: 'A', groups: [{ code: 1, label: 'x', min: 1 }, { code: 1, label: 'y', max: 0 }] }] }).ok,
+      parseSurveyDefinition({
+        ...base,
+        recodes: [
+          {
+            id: 'R',
+            source: 'A',
+            groups: [
+              { code: 1, label: 'x', min: 1 },
+              { code: 1, label: 'y', max: 0 },
+            ],
+          },
+        ],
+      }).ok,
     ).toBe(false);
   });
 });

@@ -10,8 +10,21 @@ const def = (() => {
       {
         id: 'P1',
         questions: [
-          { id: 'REGION', type: 'single', text: 'Region?', options: ['North', 'South', 'East'].map((label, i) => ({ code: i + 1, label })) },
-          { id: 'AGE', type: 'single', text: 'Age?', options: [{ code: 1, label: '18-34' }, { code: 2, label: '35+' }] },
+          {
+            id: 'REGION',
+            type: 'single',
+            text: 'Region?',
+            options: ['North', 'South', 'East'].map((label, i) => ({ code: i + 1, label })),
+          },
+          {
+            id: 'AGE',
+            type: 'single',
+            text: 'Age?',
+            options: [
+              { code: 1, label: '18-34' },
+              { code: 2, label: '35+' },
+            ],
+          },
           { id: 'SAT', type: 'scale', text: 'Satisfaction', min: 1, max: 5 },
           { id: 'NOTE', type: 'open', text: 'Anything else?' },
         ],
