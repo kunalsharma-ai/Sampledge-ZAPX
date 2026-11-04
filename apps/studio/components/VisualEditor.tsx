@@ -538,6 +538,8 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
       <h2 style={{ marginTop: 12 }}>Quotas</h2>
       <p className="muted small">
         Respondents matching the condition count toward the target when they complete. Over-target respondents get the quota-full redirect.
+        Quotas with the same least-fill group are alternatives: someone who matches several (aware of three brands, say) counts toward only the
+        least filled one, and is over quota only when all of them are full.
       </p>
       <table className="data list-editor">
         <thead>
@@ -546,6 +548,7 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
             <th>Label</th>
             <th>Condition</th>
             <th>Target</th>
+            <th>Least-fill group</th>
             <th />
           </tr>
         </thead>
@@ -584,6 +587,18 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
                   style={{ width: 90 }}
                   onChange={(e) =>
                     onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, target: Number(e.target.value) } : x)) })
+                  }
+                />
+              </td>
+              <td>
+                <input
+                  className="mono"
+                  aria-label={`Least-fill group of ${q.id}`}
+                  value={q.group ?? ''}
+                  placeholder="none"
+                  style={{ width: 110 }}
+                  onChange={(e) =>
+                    onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, group: e.target.value || undefined } : x)) })
                   }
                 />
               </td>

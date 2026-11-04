@@ -113,7 +113,7 @@ const XML_ELEMENTS: ElementSpec[] = [
   { name: 'item', attributes: ['code'] },
   { name: 'block', attributes: ['id', 'label', 'pages', 'randomize', 'pick'] },
   { name: 'termination', attributes: ['id', { name: 'status', values: ['terminate', 'quality_fail'] }, 'label'] },
-  { name: 'quota', attributes: ['id', 'label', 'target'] },
+  { name: 'quota', attributes: ['id', 'label', 'target', 'group'] },
 ];
 
 /** Problems in an XML text, by line: reader errors, unknown parts, schema and logic issues. */

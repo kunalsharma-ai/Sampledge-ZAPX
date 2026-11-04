@@ -49,6 +49,7 @@ import {
   type Theme,
 } from '@zapx/survey-schema';
 import { config } from '../config';
+import { firstFullSlot, takeQuotaPlaces } from '../quotas/quota-places';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { isAllowedReturnUrl, verifySignedParams } from '@zapx/redirect-core';
@@ -741,15 +742,8 @@ export class InterviewService {
     return this.stateOf({ ...r, currentPage: prev }, ctx, vendor);
   }
 
-  private async firstFullQuota(surveyId: string, def: SurveyDefinition, answers: Answers): Promise<string | null> {
-    const matching = matchingQuotas(def, answers);
-    if (matching.length === 0) return null;
-    const counts = await this.prisma.quotaCount.findMany({ where: { surveyId, quotaId: { in: matching.map((q) => q.id) } } });
-    for (const q of matching) {
-      const c = counts.find((x) => x.quotaId === q.id);
-      if ((c?.count ?? 0) >= (c?.targetOverride ?? q.target)) return q.id;
-    }
-    return null;
+  private firstFullQuota(surveyId: string, def: SurveyDefinition, answers: Answers): Promise<string | null> {
+    return firstFullSlot(this.prisma, surveyId, def, answers);
   }
 
   /** Complete the interview, counting it toward every matching quota atomically (no overfill). */
@@ -766,17 +760,20 @@ export class InterviewService {
       const codes = [...new Set(assessment.flags.map((f) => f.code))].join(',');
       return this.finish(r, ctx, vendor, answers, 'quality_fail', `quality:${codes}`.slice(0, 200), scored);
     }
-    const quotas = r.isTest ? [] : matchingQuotas(def, answers);
     try {
       await this.prisma.$transaction(async (tx) => {
-        for (const q of quotas) {
-          const n = await tx.$executeRaw`UPDATE "QuotaCount" SET "count" = "count" + 1
-            WHERE "surveyId" = ${r.surveyId} AND "quotaId" = ${q.id} AND "count" < COALESCE("targetOverride", ${q.target})`;
-          if (n === 0) throw new QuotaFull(q.id);
-        }
+        const places = r.isTest ? { ok: true as const, cells: [] } : await takeQuotaPlaces(tx, r.surveyId, def, answers);
+        if (!places.ok) throw new QuotaFull(places.quotaId);
         const done = await tx.response.updateMany({
           where: { id: r.id, status: 'IN_PROGRESS' },
-          data: { status: 'COMPLETE', answers: answers as Prisma.InputJsonValue, currentPage: -1, completedAt: new Date(), ...scored },
+          data: {
+            status: 'COMPLETE',
+            answers: answers as Prisma.InputJsonValue,
+            currentPage: -1,
+            completedAt: new Date(),
+            quotaCells: places.cells,
+            ...scored,
+          },
         });
         if (done.count === 0) throw new ConflictException('This interview has already finished.');
       });

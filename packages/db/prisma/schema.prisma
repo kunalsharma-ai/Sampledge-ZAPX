@@ -441,6 +441,8 @@ model Response {
   captures     Capture[]
   /// Blueprint phase 3, CAPI: {pageTimes: [{pageId, shownAt, ms}], interruptions: {count, totalMs, log}, geofence}.
   evidence     Json?
+  /// Blueprint phase 4: the quotas this complete was counted toward (least-fill groups pick one), released on reject.
+  quotaCells   String[]     @default([])
 
   @@unique([surveyId, vendorId, uid])
   @@index([surveyId, reviewState])

@@ -268,3 +268,56 @@ describe('consented CAPI video', () => {
     expect(back.settings.capi).toMatchObject({ audio: 'consent', video: true });
   });
 });
+
+describe('least-fill quota groups', () => {
+  let sid: string;
+  let vendorId: string;
+  const counts = async () =>
+    Object.fromEntries(
+      ((await http.get(`/api/surveys/${sid}/quotas`).set(admin).expect(200)).body as Array<{ id: string; count: number }>).map((q) => [q.id, q.count]),
+    );
+
+  beforeAll(async () => {
+    const pid = (await http.post('/api/projects').set(admin).send({ name: 'Quota groups' }).expect(201)).body.id;
+    sid = (await http.post(`/api/projects/${pid}/surveys`).set(admin).send({ name: 'Brands' }).expect(201)).body.id;
+    const brands = {
+      schemaVersion: 1,
+      title: 'Brands',
+      pages: [{ id: 'P1', questions: [{ id: 'AWARE', type: 'multi', text: 'Which brands?', options: [1, 2, 3].map((code) => ({ code, label: `Brand ${code}` })) }] }],
+      quotas: [
+        ...[1, 2, 3].map((b) => ({ id: `QB${b}`, condition: `selected(AWARE, ${b})`, target: 2, group: 'BRAND' })),
+        { id: 'QALL', condition: 'true', target: 100 },
+      ],
+    };
+    await http.put(`/api/surveys/${sid}/draft`).set(admin).send({ definition: brands }).expect(200);
+    await http.post(`/api/surveys/${sid}/publish`).set(admin).expect(201);
+    vendorId = (await http.post(`/api/projects/${pid}/vendors`).set(admin).send({ name: 'Panel', code: 'PNL' }).expect(201)).body.id;
+  });
+
+  async function respond(uid: string, aware: number[]) {
+    const { url } = (await http.post(`/api/surveys/${sid}/links`).set(admin).send({ vendorId, uid }).expect(201)).body;
+    const s = (await http.post(`/api/public/s/${sid}/start`).send({ query: Object.fromEntries(new URL(url).searchParams) }).expect(200)).body;
+    const st = (await http.post(`/api/public/r/${s.token}/answers`).send({ pageId: 'P1', answers: { AWARE: aware } }).expect(200)).body;
+    return st.status as string;
+  }
+
+  it('counts someone who matches several cells once, in the least filled cell', async () => {
+    expect(await respond('a1', [1])).toBe('complete');
+    expect(await respond('a2', [1, 2, 3])).toBe('complete');
+    expect(await counts()).toMatchObject({ QB1: 1, QB2: 1, QB3: 0, QALL: 2 });
+    expect(await respond('a3', [1, 2, 3])).toBe('complete');
+    expect(await counts()).toMatchObject({ QB1: 1, QB2: 1, QB3: 1 });
+    for (const uid of ['a4', 'a5', 'a6']) expect(await respond(uid, [1, 2, 3])).toBe('complete');
+    expect(await counts()).toMatchObject({ QB1: 2, QB2: 2, QB3: 2, QALL: 6 });
+  });
+
+  it('is over quota only when every matching cell is full, and releases the cell it counted', async () => {
+    expect(await respond('a7', [2, 3])).toBe('quota_full');
+    const r = await prisma.response.findFirstOrThrow({ where: { surveyId: sid, uid: 'a1' } });
+    expect(r.quotaCells).toEqual(['QB1', 'QALL']);
+    await http.post(`/api/surveys/${sid}/quality/decisions`).set(admin).send({ responseIds: [r.id], decision: 'reject' }).expect(200);
+    expect(await counts()).toMatchObject({ QB1: 1, QB2: 2, QB3: 2, QALL: 5 });
+    expect(await respond('a8', [1, 2])).toBe('complete');
+    expect((await prisma.response.findFirstOrThrow({ where: { surveyId: sid, uid: 'a8' } })).quotaCells).toEqual(['QB1', 'QALL']);
+  });
+});

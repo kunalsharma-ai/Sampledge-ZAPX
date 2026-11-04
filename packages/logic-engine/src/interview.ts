@@ -204,6 +204,30 @@ export function matchingQuotas(def: SurveyDefinition, answers: Answers): Quota[]
   return def.quotas.filter((q) => conditionHolds(q.condition, def, answers));
 }
 
+/**
+ * The quota places a complete must take: one slot per matching ungrouped quota, and one slot per
+ * least-fill group the respondent matches. Each slot lists its candidates in the order to try them
+ * (a group's matching quotas, least filled first, ties in definition order); the complete counts
+ * toward the first candidate with room, and a slot whose candidates are all full means quota full.
+ * `filled` gives a quota's count as a share of its target (0 when unknown).
+ */
+export function quotaSlots(def: SurveyDefinition, answers: Answers, filled: (q: Quota) => number = () => 0): Quota[][] {
+  const slots: Quota[][] = [];
+  const groups = new Map<string, Quota[]>();
+  for (const q of matchingQuotas(def, answers)) {
+    if (!q.group) slots.push([q]);
+    else {
+      if (!groups.has(q.group)) slots.push((groups.set(q.group, []), groups.get(q.group)!));
+      groups.get(q.group)!.push(q);
+    }
+  }
+  for (const qs of groups.values()) {
+    const share = new Map(qs.map((q) => [q.id, filled(q)]));
+    qs.sort((a, b) => share.get(a.id)! - share.get(b.id)!);
+  }
+  return slots;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------------------------

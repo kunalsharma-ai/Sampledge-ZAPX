@@ -273,7 +273,7 @@ export function toZapxXml(def: SurveyDefinition): string {
   for (const t of def.terminations)
     out += `  <termination${attr('id', t.id)}${attr('status', t.status)}${attr('label', t.label)}>${esc(t.condition)}</termination>\n`;
   for (const q of def.quotas)
-    out += `  <quota${attr('id', q.id)}${attr('label', q.label)}${attr('target', q.target)}>${esc(q.condition)}</quota>\n`;
+    out += `  <quota${attr('id', q.id)}${attr('label', q.label)}${attr('target', q.target)}${attr('group', q.group)}>${esc(q.condition)}</quota>\n`;
   return `${out}</survey>\n`;
 }
 
@@ -505,7 +505,7 @@ export function fromZapxXml(src: string): XmlReadResult {
         (def.terminations as unknown[]).push({ ...attrsTo(el, new Set(['id', 'status', 'label'])), condition: textOf(el) });
         break;
       case 'quota':
-        (def.quotas as unknown[]).push({ ...attrsTo(el, new Set(['id', 'label', 'target'])), condition: textOf(el) });
+        (def.quotas as unknown[]).push({ ...attrsTo(el, new Set(['id', 'label', 'target', 'group'])), condition: textOf(el) });
         break;
       default:
         unexpected(el, '<survey>');

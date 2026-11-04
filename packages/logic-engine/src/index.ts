@@ -14,3 +14,4 @@ export * from './voice.js';
 export * from './geo.js';
 export * from './choice-design.js';
 export * from './choice-analysis.js';
+export * from './quota-table.js';

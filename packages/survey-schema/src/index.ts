@@ -425,6 +425,13 @@ export const quotaSchema = z.object({
   condition: expression,
   /** Number of completes allowed. */
   target: z.number().int().min(0),
+  /**
+   * Blueprint phase 4, least-fill quota balancing: quotas with the same group are alternatives. A
+   * respondent who matches several counts toward only one of them, the least filled (count as a
+   * share of target) that still has room, and is over quota only when every one they match is full.
+   * Typical use: brand quotas where a respondent aware of several brands is assigned one.
+   */
+  group: variableName.optional(),
 });
 export type Quota = z.infer<typeof quotaSchema>;
 
