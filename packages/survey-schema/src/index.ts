@@ -69,6 +69,17 @@ const validationRule = z.object({
 });
 export type ValidationRule = z.infer<typeof validationRule>;
 
+/**
+ * Dynamic answer list (carry forward): offer only the options the respondent chose (or did not
+ * choose) at an earlier single, multiple choice or ranking question. Codes are matched; options whose
+ * code is not in the source question (such as "None of these") are always offered.
+ */
+export const optionsFromSchema = z.object({
+  question: variableName,
+  include: z.enum(['selected', 'not_selected']).default('selected'),
+});
+export type OptionsFrom = z.infer<typeof optionsFromSchema>;
+
 const baseQuestion = {
   id: variableName,
   /** Question text. Supports piping with {{VAR}} (e.g. "You said {{Q1}}"). */
@@ -88,6 +99,7 @@ export const singleQuestionSchema = z.object({
   type: z.literal('single'),
   options: z.array(optionSchema).min(1),
   randomize: z.boolean().default(false),
+  optionsFrom: optionsFromSchema.optional(),
 });
 
 export const multiQuestionSchema = z.object({
@@ -95,6 +107,7 @@ export const multiQuestionSchema = z.object({
   type: z.literal('multi'),
   options: z.array(optionSchema).min(1),
   randomize: z.boolean().default(false),
+  optionsFrom: optionsFromSchema.optional(),
   minSelected: z.number().int().min(0).optional(),
   maxSelected: z.number().int().min(1).optional(),
 });
@@ -141,6 +154,7 @@ export const rankingQuestionSchema = z.object({
   type: z.literal('ranking'),
   options: z.array(optionSchema).min(2).max(30),
   randomize: z.boolean().default(false),
+  optionsFrom: optionsFromSchema.optional(),
   /** Rank only the top N (default: all options). */
   rankCount: z.number().int().min(1).max(30).optional(),
 });
@@ -173,6 +187,47 @@ export const gridQuestionSchema = z.object({
 });
 
 /**
+ * Card sort: the respondent sorts cards (options) into groups (an open card sort uses fixed groups
+ * here; open naming of groups is not supported). Stored as card code -> group code, like a grid.
+ */
+export const cardSortQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('cardsort'),
+  options: z.array(optionSchema).min(2).max(60),
+  groups: z.array(optionSchema).min(2).max(20),
+  randomize: z.boolean().default(true),
+  /** Allow cards to be left unsorted. Off: every card must be put in a group. */
+  allowUnsorted: z.boolean().default(false),
+});
+
+export const hotspotRegionSchema = z.object({
+  code: z.number().int(),
+  label: z.string().min(1),
+  /** Position and size in percent of the image (0-100), so regions scale with the picture. */
+  x: z.number().min(0).max(100),
+  y: z.number().min(0).max(100),
+  w: z.number().min(1).max(100),
+  h: z.number().min(1).max(100),
+});
+export type HotspotRegion = z.infer<typeof hotspotRegionSchema>;
+
+/**
+ * Image hot-spot: the respondent picks areas of a picture (a pack, an ad, a shelf, a web page).
+ * Each region has a code and a label, so the answer is stored like a multiple choice (region codes)
+ * and the label doubles as the accessible name of the region's button.
+ */
+export const hotspotQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('hotspot'),
+  /** The picture (uploaded in the studio). Publishing requires one. */
+  image: z.string().regex(MEDIA_ID, 'Upload the image in the studio').optional(),
+  imageAlt: z.string().max(300).default(''),
+  regions: z.array(hotspotRegionSchema).min(1).max(40),
+  minSelected: z.number().int().min(0).optional(),
+  maxSelected: z.number().int().min(1).optional(),
+});
+
+/**
  * Photo (Milestone 12): the respondent or interviewer takes or chooses a picture (a receipt, a shelf,
  * a product at home). The answer is a capture reference; the file itself is private to the
  * organization and never shown to other respondents.
@@ -202,6 +257,8 @@ export const questionSchema = z.discriminatedUnion('type', [
   scaleQuestionSchema,
   rankingQuestionSchema,
   sumQuestionSchema,
+  cardSortQuestionSchema,
+  hotspotQuestionSchema,
   photoQuestionSchema,
   infoElementSchema,
 ]);
@@ -218,6 +275,8 @@ export type ScaleQuestion = z.infer<typeof scaleQuestionSchema>;
 export type RankingQuestion = z.infer<typeof rankingQuestionSchema>;
 export type SumQuestion = z.infer<typeof sumQuestionSchema>;
 export type PhotoQuestion = z.infer<typeof photoQuestionSchema>;
+export type CardSortQuestion = z.infer<typeof cardSortQuestionSchema>;
+export type HotspotQuestion = z.infer<typeof hotspotQuestionSchema>;
 
 /** Codes a scale question can store: every point of the scale, plus "don't know" when offered. */
 export function scaleCodes(q: Pick<ScaleQuestion, 'min' | 'max' | 'dontKnow'>): number[] {
@@ -233,6 +292,7 @@ export function mediaIdsOf(def: { pages: Array<{ questions: Question[] }> }): st
   for (const p of def.pages)
     for (const q of p.questions) {
       if (q.media) ids.add(q.media.id);
+      if (q.type === 'hotspot' && q.image) ids.add(q.image);
       if ('options' in q) for (const o of q.options) if (o.image) ids.add(o.image);
     }
   return [...ids];
@@ -279,6 +339,58 @@ export const quotaSchema = z.object({
   target: z.number().int().min(0),
 });
 export type Quota = z.infer<typeof quotaSchema>;
+
+// ---- Survey flow: loops, blocks and calculated variables (blueprint phase 1) ---------------------
+
+const PAGE_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+export const loopItemSchema = z.object({
+  /** Becomes the suffix of every looped variable (Q5 -> Q5_3). */
+  code: z.number().int().min(0).max(99999),
+  label: z.string().min(1),
+});
+export type LoopItem = z.infer<typeof loopItemSchema>;
+
+/**
+ * Loop (Loop & Merge): a run of consecutive pages asked once per item. Each pass gets its own
+ * variables (`Q5_<code>`) so the data stays one row per respondent. `{{LOOPID}}` in text pipes the
+ * item's label, and the loop id in logic is the item's code. With `source`, the items are the options
+ * of that single or multiple choice question and a pass is only asked for the options chosen.
+ */
+export const loopSchema = z.object({
+  id: variableName,
+  label: z.string().max(200).optional(),
+  pages: z.array(z.string().regex(PAGE_ID)).min(1).max(50),
+  source: variableName.optional(),
+  items: z.array(loopItemSchema).max(100).default([]),
+});
+export type Loop = z.infer<typeof loopSchema>;
+
+/**
+ * Block: consecutive pages shown in a random order per respondent (seeded, so a respondent who
+ * resumes sees the same order). `pick` shows only that many of the pages (a random subset), which is
+ * how balanced incomplete designs are set up.
+ */
+export const blockSchema = z.object({
+  id: z.string().regex(PAGE_ID),
+  label: z.string().max(200).optional(),
+  pages: z.array(z.string().regex(PAGE_ID)).min(2).max(100),
+  randomize: z.boolean().default(true),
+  pick: z.number().int().min(1).optional(),
+});
+export type Block = z.infer<typeof blockSchema>;
+
+/**
+ * Calculated variable (derived / embedded variable): a value worked out from answers with the logic
+ * language, usable in conditions, quotas, piping and exported as its own column.
+ * Example: `{ id: 'SEG', expr: 'AGE >= 35 and INCOME >= 4' }`.
+ */
+export const variableSchema = z.object({
+  id: variableName,
+  label: z.string().max(200).optional(),
+  expr: expression,
+});
+export type CalculatedVariable = z.infer<typeof variableSchema>;
 
 // ---- Data quality (Milestone 5) -----------------------------------------------------------------
 // Quality settings are part of the versioned definition: an in-survey quality reject changes where a
@@ -372,6 +484,9 @@ export const surveyDefinitionSchema = z.object({
   pages: z.array(pageSchema).min(1),
   terminations: z.array(terminationSchema).default([]),
   quotas: z.array(quotaSchema).default([]),
+  loops: z.array(loopSchema).max(50).default([]),
+  blocks: z.array(blockSchema).max(50).default([]),
+  variables: z.array(variableSchema).max(200).default([]),
   settings: z
     .object({
       allowBack: z.boolean().default(false),
@@ -402,9 +517,9 @@ export function parseSurveyDefinition(input: unknown): { ok: true; definition: S
 /** Answer value shapes stored per question type. */
 export type AnswerValue =
   | number // single, numeric
-  | number[] // multi; ranking (codes in rank order)
+  | number[] // multi; ranking (codes in rank order); hotspot (region codes)
   | string // open; photo (capture reference)
-  | Record<string, number> // grid: rowId -> column code; sum: option code -> amount
+  | Record<string, number> // grid: rowId -> column code; sum: option code -> amount; cardsort: card -> group
   | null;
 
 export type Answers = Record<string, AnswerValue>;
@@ -529,3 +644,4 @@ export function parsePresentation(input: unknown): { ok: true; presentation: Pre
 export function defaultPresentation(): Presentation {
   return presentationSchema.parse({});
 }
+export * from './templates.js';

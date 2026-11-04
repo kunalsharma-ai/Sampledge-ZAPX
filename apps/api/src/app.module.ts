@@ -30,6 +30,7 @@ import { SurveysController } from './surveys/surveys.controller';
 import { SurveysService } from './surveys/surveys.service';
 import { ExportService } from './exports/export.service';
 import { VendorsController } from './vendors/vendors.controller';
+import { LibraryController } from './library/library.controller';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
@@ -92,6 +93,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     ProjectsController,
     SurveysController,
     VendorsController,
+    LibraryController,
     InterviewController,
     QaController,
     ChangeSetsController,

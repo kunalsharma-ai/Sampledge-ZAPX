@@ -5,7 +5,7 @@
  */
 import { scaleCodes, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 
-export type DiffEntity = 'survey' | 'settings' | 'page' | 'question' | 'termination' | 'quota';
+export type DiffEntity = 'survey' | 'settings' | 'page' | 'question' | 'termination' | 'quota' | 'loop' | 'block' | 'variable';
 
 export interface DiffItem {
   change: 'added' | 'removed' | 'changed' | 'moved';
@@ -46,7 +46,9 @@ function shortText(t: string, n = 60): string {
 }
 
 function codesOf(q: Question): number[] {
-  if (q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum') return q.options.map((o) => o.code);
+  if (q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum' || q.type === 'cardsort')
+    return q.options.map((o) => o.code);
+  if (q.type === 'hotspot') return q.regions.map((r) => r.code);
   if (q.type === 'grid') return q.columns.map((o) => o.code);
   if (q.type === 'scale') return scaleCodes(q);
   return [];
@@ -172,30 +174,33 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
     }
   }
 
-  // Terminations and quotas
+  // Terminations, quotas, loops, blocks and calculated variables
+  const NAMES: Record<string, string> = { termination: 'Termination', quota: 'Quota', loop: 'Loop', block: 'Block', variable: 'Variable' };
   for (const [entity, b, a] of [
     ['termination', before.terminations, after.terminations],
     ['quota', before.quotas, after.quotas],
+    ['loop', before.loops ?? [], after.loops ?? []],
+    ['block', before.blocks ?? [], after.blocks ?? []],
+    ['variable', before.variables ?? [], after.variables ?? []],
   ] as const) {
-    const mb = keyed<{ id: string }>(b);
-    const ma = keyed<{ id: string }>(a);
+    const name = NAMES[entity]!;
+    const mb = keyed<{ id: string }>(b as Array<{ id: string }>);
+    const ma = keyed<{ id: string }>(a as Array<{ id: string }>);
     for (const [id, { item }] of ma) {
       const old = mb.get(id);
       const desc = (x: unknown) => {
-        const r = x as { condition: string; target?: number };
-        return r.target === undefined ? r.condition : `${r.condition} (target ${r.target})`;
+        const r = x as { condition?: string; target?: number; expr?: string; pages?: string[] };
+        if (r.condition !== undefined) return r.target === undefined ? r.condition : `${r.condition} (target ${r.target})`;
+        if (r.expr !== undefined) return r.expr;
+        return `pages ${(r.pages ?? []).join(', ')}`;
       };
-      if (!old)
-        items.push({
-          change: 'added',
-          entity,
-          id,
-          after: item,
-          summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id} added: ${desc(item)}`,
-        });
-      else {
+      if (!old) {
+        if (entity === 'loop') affectsData = true;
+        items.push({ change: 'added', entity, id, after: item, summary: `${name} ${id} added: ${desc(item)}` });
+      } else {
         const f = changedFields(old.item, item);
-        if (f.length)
+        if (f.length) {
+          if (entity === 'loop' && f.includes('items')) affectsData = true;
           items.push({
             change: 'changed',
             entity,
@@ -203,19 +208,16 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
             fields: f,
             before: old.item,
             after: item,
-            summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id}: ${f.join(', ')} changed`,
+            summary: `${name} ${id}: ${f.join(', ')} changed`,
           });
+        }
       }
     }
     for (const [id, { item }] of mb) {
-      if (!ma.has(id))
-        items.push({
-          change: 'removed',
-          entity,
-          id,
-          before: item,
-          summary: `${entity === 'quota' ? 'Quota' : 'Termination'} ${id} removed`,
-        });
+      if (!ma.has(id)) {
+        if (entity === 'loop') affectsData = true;
+        items.push({ change: 'removed', entity, id, before: item, summary: `${name} ${id} removed` });
+      }
     }
   }
 

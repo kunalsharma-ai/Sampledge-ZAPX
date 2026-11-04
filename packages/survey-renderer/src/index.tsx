@@ -41,8 +41,11 @@ export interface RendererMessages {
   photoUploading: string;
   photoFailed: string;
   photoSaved: string;
+  /** Card sort: the tray of cards not yet put in a group. */
+  unsorted: string;
 }
 export const DEFAULT_RENDERER_MESSAGES: RendererMessages = {
+  unsorted: 'Not sorted',
   takePhoto: 'Take or choose a photo',
   retakePhoto: 'Use a different photo',
   photoUploading: 'Uploading the photo…',
@@ -390,6 +393,8 @@ export function QuestionView({
         </div>
       ) : null}
       {q.type === 'grid' ? <Grid question={q} name={id} value={value} onChange={onChange} /> : null}
+      {q.type === 'cardsort' ? <CardSort question={q} value={value} onChange={onChange} messages={messages} /> : null}
+      {q.type === 'hotspot' ? <Hotspot question={q} value={value} onChange={onChange} mediaUrl={mediaUrl} /> : null}
       {error ? (
         <p className="zx-error" id={errId} role="alert">
           {error}
@@ -792,6 +797,140 @@ function Grid({
   );
 }
 
+/**
+ * Card sort: drag a card onto a group, or pick its group from the card's own menu (keyboard,
+ * screen reader and touch users). Both write the same answer: card code -> group code.
+ */
+function CardSort({
+  question: q,
+  value,
+  onChange,
+  messages,
+}: {
+  question: Extract<Question, { type: 'cardsort' }>;
+  value: AnswerValue;
+  onChange: (v: AnswerValue) => void;
+  messages: RendererMessages;
+}) {
+  const current = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, number>) : {};
+  const [over, setOver] = useState<string | null>(null);
+  const place = (card: number, group: number | null) => {
+    const next = { ...current };
+    if (group === null) delete next[String(card)];
+    else next[String(card)] = group;
+    onChange(Object.keys(next).length ? next : null);
+  };
+  const cardEl = (o: Option) => (
+    <li
+      key={o.code}
+      className="zx-card"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', String(o.code));
+        e.dataTransfer.effectAllowed = 'move';
+      }}
+      data-card={o.code}
+    >
+      <span className="zx-card-label">{o.label}</span>
+      <select
+        className="zx-card-select"
+        aria-label={o.label}
+        value={current[String(o.code)] ?? ''}
+        onChange={(e) => place(o.code, e.target.value === '' ? null : Number(e.target.value))}
+      >
+        <option value="">{messages.unsorted}</option>
+        {q.groups.map((g) => (
+          <option key={g.code} value={g.code}>
+            {g.label}
+          </option>
+        ))}
+      </select>
+    </li>
+  );
+  const zone = (key: string, label: string, group: number | null, cards: Option[]) => (
+    <div
+      key={key}
+      className={`zx-sort-group${over === key ? ' zx-drop' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(key);
+      }}
+      onDragLeave={() => setOver((k) => (k === key ? null : k))}
+      onDrop={(e) => {
+        e.preventDefault();
+        setOver(null);
+        const code = Number(e.dataTransfer.getData('text/plain'));
+        if (q.options.some((o) => o.code === code)) place(code, group);
+      }}
+    >
+      <p className="zx-sort-title">
+        {label} <span className="zx-sort-count">({cards.length})</span>
+      </p>
+      <ul className="zx-cards">{cards.map(cardEl)}</ul>
+    </div>
+  );
+  const unsorted = q.options.filter((o) => current[String(o.code)] === undefined);
+  return (
+    <div className="zx-cardsort">
+      {zone('unsorted', messages.unsorted, null, unsorted)}
+      <div className="zx-sort-groups">
+        {q.groups.map((g) =>
+          zone(
+            `g${g.code}`,
+            g.label,
+            g.code,
+            q.options.filter((o) => current[String(o.code)] === g.code),
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Image hot-spot: each area of the picture is a toggle button named by its label. */
+function Hotspot({
+  question: q,
+  value,
+  onChange,
+  mediaUrl = defaultMediaUrl,
+}: {
+  question: Extract<Question, { type: 'hotspot' }>;
+  value: AnswerValue;
+  onChange: (v: AnswerValue) => void;
+  mediaUrl?: (id: string) => string;
+}) {
+  const selected = new Set<number>(Array.isArray(value) ? value : []);
+  if (!q.image) return null;
+  const image = q.image;
+  const toggle = (code: number) => {
+    const next = new Set(selected);
+    if (next.has(code)) next.delete(code);
+    else {
+      if (q.maxSelected === 1) next.clear();
+      else if (q.maxSelected !== undefined && next.size >= q.maxSelected) return;
+      next.add(code);
+    }
+    onChange(next.size ? [...next].sort((a, b) => a - b) : null);
+  };
+  return (
+    <div className="zx-hotspot">
+      <img className="zx-hotspot-img" src={mediaUrl(image)} alt={q.imageAlt} />
+      {q.regions.map((r) => (
+        <button
+          key={r.code}
+          type="button"
+          className={`zx-hotspot-area${selected.has(r.code) ? ' zx-selected' : ''}`}
+          style={{ left: `${r.x}%`, top: `${r.y}%`, width: `${r.w}%`, height: `${r.h}%` }}
+          aria-pressed={selected.has(r.code)}
+          aria-label={r.label}
+          title={r.label}
+          onClick={() => toggle(r.code)}
+        />
+      ))}
+    </div>
+  );
+}
+
 /** Default respondent theme. Themes in later milestones replace these tokens, never the logic. */
 export const defaultThemeCss = `
 .zx-root{--zx-bg:#f6f7fb;--zx-card:#ffffff;--zx-text:#1b1f2a;--zx-muted:#5b6475;--zx-accent:#2f5bea;--zx-accent-soft:#e8eefe;--zx-border:#d9deea;--zx-error:#c62828;--zx-radius:12px;
@@ -875,6 +1014,20 @@ export const defaultThemeCss = `
 .zx-sum-total{font-weight:600;margin:4px 0 0;text-align:right;color:var(--zx-muted);}
 .zx-sum-total.zx-done{color:var(--zx-accent);}
 .zx-sum-total.zx-over{color:var(--zx-error);}
+.zx-cardsort{display:flex;flex-direction:column;gap:12px;}
+.zx-sort-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;}
+.zx-sort-group{border:1px dashed var(--zx-border);border-radius:var(--zx-radius);padding:10px;min-height:72px;background:var(--zx-card);transition:border-color .15s,background .15s;}
+.zx-sort-group.zx-drop{border-color:var(--zx-accent);background:var(--zx-accent-soft);}
+.zx-sort-title{margin:0 0 8px;font-weight:600;}
+.zx-sort-count{color:var(--zx-muted);font-weight:400;}
+.zx-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
+.zx-card{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--zx-border);border-radius:calc(var(--zx-radius) - 4px);background:var(--zx-bg);cursor:grab;}
+.zx-card-select{max-width:50%;font:inherit;padding:4px;border-radius:6px;border:1px solid var(--zx-border);background:var(--zx-card);color:var(--zx-text);}
+.zx-hotspot{position:relative;display:inline-block;max-width:100%;line-height:0;}
+.zx-hotspot-img{max-width:100%;height:auto;border-radius:var(--zx-radius);}
+.zx-hotspot-area{position:absolute;border:2px dashed transparent;border-radius:6px;background:transparent;cursor:pointer;padding:0;}
+.zx-hotspot-area:hover,.zx-hotspot-area:focus-visible{border-color:var(--zx-accent);outline:none;}
+.zx-hotspot-area.zx-selected{border:3px solid var(--zx-accent);background:color-mix(in srgb,var(--zx-accent) 22%,transparent);}
 .zx-media-wait{color:var(--zx-muted);font-size:.9rem;margin:12px 0 0;}
 .zx-photo{display:flex;flex-direction:column;align-items:flex-start;gap:10px;}
 .zx-photo-preview{max-width:100%;max-height:320px;border-radius:var(--zx-radius,12px);border:1px solid var(--zx-border);object-fit:contain;background:var(--zx-card);}

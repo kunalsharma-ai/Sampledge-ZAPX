@@ -9,7 +9,9 @@ import {
   localizeDefinition,
   localizeMessages,
   nextPageIndex,
-  pageIsVisible,
+  prevPageIndex,
+  prepareSurvey,
+  hasNoOptions,
   progressPercent,
   renderQuestion,
   validatePage,
@@ -50,7 +52,9 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   }, [survey]);
   const [current, setCurrent] = useState<LocalInterview>(record);
   const lang = presentation.languages.find((l) => l.enabled && l.tag === current.language);
-  const def = useMemo(() => (source ? localizeDefinition(source, lang) : null), [source, lang]);
+  // Loops compiled; page indexes refer to these pages (the same in every language).
+  const structure = useMemo(() => (source ? prepareSurvey(source) : null), [source]);
+  const def = useMemo(() => (source ? prepareSurvey(localizeDefinition(source, lang)) : null), [source, lang]);
   const msg = useMemo(() => localizeMessages(presentation, lang), [presentation, lang]);
   const [pageAnswers, setPageAnswers] = useState<Answers>(() => pageAnswersOf(record));
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -93,12 +97,14 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   if (!def) return <p className="capi-card">This survey package could not be read. Update your surveys and try again.</p>;
 
   const page = current.pageIndex >= 0 ? def.pages[current.pageIndex] : undefined;
-  const questions = page ? page.questions.map((q) => renderQuestion(q, def, current.answers, current.clientId)) : [];
+  const questions = page
+    ? page.questions.map((q) => renderQuestion(q, def, current.answers, current.clientId)).filter((q) => !hasNoOptions(q))
+    : [];
   const playedHere = new Set([...played].filter((k) => k.startsWith(`${current.pageIndex}:`)).map((k) => k.slice(k.indexOf(':') + 1)));
   const waiting = pendingMedia(questions, pageAnswers, current.answers, playedHere).length > 0;
 
   function pageAnswersOf(r: LocalInterview): Answers {
-    const p = source?.pages[r.pageIndex];
+    const p = structure?.pages[r.pageIndex];
     const out: Answers = {};
     for (const q of p?.questions ?? []) if (r.answers[q.id] !== undefined) out[q.id] = r.answers[q.id]!;
     return out;
@@ -163,7 +169,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
     setErrors({});
     const t = firstMatchingTermination(def, answers);
     if (t) return finish(moved, t.status);
-    const n = nextPageIndex(def, answers, current.pageIndex);
+    const n = nextPageIndex(def, answers, current.pageIndex, current.clientId);
     if (n === -1) return finish(moved, 'complete');
     await save({ ...moved, pageIndex: n });
     setPageAnswers({});
@@ -171,15 +177,12 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   };
 
   const back = async () => {
-    for (let i = current.pageIndex - 1; i >= 0; i--) {
-      if (pageIsVisible(def.pages[i]!, def, current.answers)) {
-        const moved = { ...current, pageIndex: i, durationMs: current.durationMs + elapsed() };
-        await save(moved);
-        setPageAnswers(pageAnswersOf(moved));
-        setErrors({});
-        return;
-      }
-    }
+    const i = prevPageIndex(def, current.answers, current.pageIndex, current.clientId);
+    if (i === -1) return;
+    const moved = { ...current, pageIndex: i, durationMs: current.durationMs + elapsed() };
+    await save(moved);
+    setPageAnswers(pageAnswersOf(moved));
+    setErrors({});
   };
 
   const breakOff = async () => {
@@ -265,7 +268,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
           >
             <SurveyHeader
               theme={presentation.theme}
-              progress={def.settings.showProgress ? progressPercent(def, current.pageIndex) : undefined}
+              progress={def.settings.showProgress ? progressPercent(def, current.pageIndex, current.clientId) : undefined}
               progressLabel="Progress"
             />
             {page.title ? <h1 className="zx-title">{page.title}</h1> : null}
@@ -286,7 +289,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
             />
             {waiting ? <p className="zx-media-wait">{msg.playToEnd}</p> : null}
             <div className="zx-actions">
-              {def.settings.allowBack && current.pageIndex > nextPageIndex(def, current.answers, -1) ? (
+              {def.settings.allowBack && current.pageIndex !== nextPageIndex(def, current.answers, -1, current.clientId) ? (
                 <button type="button" className="zx-button zx-secondary" onClick={() => void back()}>
                   {msg.back}
                 </button>

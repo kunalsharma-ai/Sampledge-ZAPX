@@ -42,6 +42,7 @@ interface Look {
     photoUploading?: string;
     photoFailed?: string;
     photoSaved?: string;
+    unsorted?: string;
   };
   readAloud?: boolean;
 }

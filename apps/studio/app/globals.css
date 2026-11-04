@@ -512,6 +512,55 @@ table.data tbody tr:hover {
 .outline .q {
   padding-left: 18px;
 }
+.outline .item.drop-target {
+  border-color: var(--q-accent-text);
+  border-style: dashed;
+  background: var(--q-accent-soft);
+}
+.outline .item[draggable='true'] {
+  cursor: grab;
+}
+.outline-hint {
+  margin: 4px 8px 0;
+}
+.flow-card {
+  border: 1px solid var(--q-border);
+  border-radius: var(--radius);
+  padding: 12px;
+  background: var(--q-surface-2);
+}
+.hotspot-canvas {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  cursor: crosshair;
+  user-select: none;
+  touch-action: none;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--q-border);
+}
+.hotspot-canvas img {
+  max-width: min(100%, 640px);
+  height: auto;
+  pointer-events: none;
+}
+.hotspot-region {
+  position: absolute;
+  border: 2px solid var(--q-accent-text);
+  background: color-mix(in srgb, var(--q-accent-text) 18%, transparent);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 2px 4px;
+  color: var(--q-text);
+  overflow: hidden;
+  pointer-events: none;
+}
+.hotspot-region.drawing {
+  border-style: dashed;
+}
 .outline .type {
   font-size: 10.5px;
   color: var(--q-text-muted);
@@ -930,4 +979,112 @@ table.xtab tr.mean-row td {
 }
 .option-image select {
   max-width: 150px;
+}
+
+/* ---- Programmer workspace (blueprint phase 1) ---- */
+.programmer .segmented {
+  flex-wrap: wrap;
+}
+.programmer .segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.programmer .segmented button[aria-selected='true'] {
+  background: var(--q-accent-soft);
+  border-color: var(--q-accent-text);
+  color: var(--q-accent-text);
+}
+.code-editor {
+  min-width: 0;
+}
+.lint-list,
+.diff-list,
+.route {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.route {
+  padding-left: 20px;
+  list-style: decimal;
+}
+.diff-list li {
+  padding: 4px 8px;
+  border-left: 3px solid var(--q-border);
+  background: var(--q-surface-2);
+  border-radius: 4px;
+}
+.diff-list .diff-added {
+  border-left-color: var(--q-good);
+}
+.diff-list .diff-removed {
+  border-left-color: var(--q-bad);
+}
+.diff-list .diff-changed {
+  border-left-color: var(--q-warn);
+}
+.debug-pane {
+  align-items: start;
+}
+
+/* ---- Question bank (blueprint phase 1) ---- */
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.library-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.library-card h3 {
+  margin: 0;
+}
+.library-card p {
+  margin: 0;
+  flex: 1;
+}
+.library-card > button,
+.library-card > .row {
+  margin-top: 8px;
+  align-self: flex-start;
+}
+.nx-search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: min(320px, 100%);
+}
+.nx-search-field input {
+  flex: 1;
+}
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  margin-top: 12px;
+  color: var(--q-text-muted);
+}
+.bank-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.bank-picker button {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  height: auto;
+  padding: 8px 10px;
 }

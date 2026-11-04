@@ -11,7 +11,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { Prisma, type ResponseStatus, type SurveyVersion } from '@zapx/db';
-import { classifyDevice, matchingQuotas, replayInterview } from '@zapx/logic-engine';
+import { classifyDevice, matchingQuotas, prepareSurvey, replayInterview } from '@zapx/logic-engine';
 import { capiSettingsOf, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
@@ -227,7 +227,7 @@ export class CapiService {
       );
     const version = versions.get(item.versionId);
     if (!version) return { clientId: item.clientId, result: 'rejected', reason: 'Unknown survey version.' };
-    const def = version.definition as unknown as SurveyDefinition;
+    const def = prepareSurvey(version.definition as unknown as SurveyDefinition);
 
     const now = Date.now();
     const finished = clampDate(item.finishedAt, now, now);
@@ -235,7 +235,7 @@ export class CapiService {
     const elapsed = finished.getTime() - started.getTime();
     const durationMs = Math.max(0, Math.min(Math.round(item.durationMs), elapsed || Math.round(item.durationMs)));
 
-    const replay = replayInterview(def, item.answers);
+    const replay = replayInterview(def, item.answers, item.clientId);
     let status: ResponseStatus;
     let reason: string | null = null;
     let answers: Answers = replay.answers;
@@ -334,7 +334,7 @@ export class CapiService {
           // arrives after its quota filled is kept, marked quota_full with the quota that was full.
           for (const q of matchingQuotas(def, answers)) {
             const n = await tx.$executeRaw`UPDATE "QuotaCount" SET "count" = "count" + 1
-              WHERE "surveyId" = ${item.surveyId} AND "quotaId" = ${q.id} AND "count" < ${q.target}`;
+              WHERE "surveyId" = ${item.surveyId} AND "quotaId" = ${q.id} AND "count" < COALESCE("targetOverride", ${q.target})`;
             if (n === 0) throw new QuotaFullAtSync(q.id);
           }
         }

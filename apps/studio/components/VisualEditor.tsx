@@ -6,6 +6,8 @@
 import { useState } from 'react';
 import type { Option, Page, Question, QuestionType, SurveyDefinition } from '@zapx/survey-schema';
 import { MediaLibraryProvider, OptionImagePicker, QuestionMediaEditor, useHasMediaLibrary } from './MediaLibrary';
+import { BlocksEditor, CardSortForm, DynamicListEditor, HotspotForm, LoopsEditor, QuotaTableBuilder, VariablesEditor } from './FlowEditor';
+import { InsertFromBank, SaveQuestionToBank } from './QuestionBank';
 
 type Selection = { kind: 'survey' } | { kind: 'page'; page: number } | { kind: 'question'; page: number; q: number };
 
@@ -18,6 +20,8 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   scale: 'Rating scale / NPS',
   ranking: 'Ranking',
   sum: 'Constant sum',
+  cardsort: 'Card sort',
+  hotspot: 'Image hot-spot',
   photo: 'Photo',
   info: 'Information',
 };
@@ -59,6 +63,27 @@ function newQuestion(def: SurveyDefinition, type: QuestionType): Question {
       };
     case 'photo':
       return { ...base, type, text: 'Please take a photo' };
+    case 'cardsort':
+      return {
+        ...base,
+        type,
+        text: 'Sort these cards into groups',
+        options: [...opts.map((o, i) => ({ ...o, label: `Card ${i + 1}` })), { code: 3, label: 'Card 3' }],
+        groups: [
+          { code: 1, label: 'Group A' },
+          { code: 2, label: 'Group B' },
+        ],
+        randomize: true,
+        allowUnsorted: false,
+      };
+    case 'hotspot':
+      return {
+        ...base,
+        type,
+        text: 'Click the parts of the picture that catch your eye',
+        imageAlt: '',
+        regions: [{ code: 1, label: 'Area 1', x: 10, y: 10, w: 30, h: 20 }],
+      };
     case 'grid':
       return { ...base, type, rows: [{ id: 'r1', label: 'Item 1' }], columns: opts, randomizeRows: false };
     case 'info':
@@ -120,17 +145,71 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
 
   const selected = sel.kind === 'question' ? def.pages[sel.page]?.questions[sel.q] : sel.kind === 'page' ? def.pages[sel.page] : undefined;
 
+  // Drag and drop in the outline: pages reorder; questions move within or across pages.
+  const [drag, setDrag] = useState<{ page: number; q?: number } | null>(null);
+  const [dropAt, setDropAt] = useState<string | null>(null);
+  const dropQuestion = (toPage: number, toIndex: number) => {
+    if (!drag || drag.q === undefined) return;
+    const q = def.pages[drag.page]!.questions[drag.q]!;
+    if (drag.page === toPage && def.pages[drag.page]!.questions.length === 1) return;
+    let pages = def.pages.map((p, i) => (i === drag.page ? { ...p, questions: p.questions.filter((_, j) => j !== drag.q) } : p));
+    const target = drag.page === toPage && drag.q < toIndex ? toIndex - 1 : toIndex;
+    pages = pages.map((p, i) =>
+      i === toPage ? { ...p, questions: [...p.questions.slice(0, target), q, ...p.questions.slice(target)] } : p,
+    );
+    // A page left empty by the move is removed.
+    const emptied = pages.findIndex((p) => p.questions.length === 0);
+    if (emptied >= 0) pages = pages.filter((_, i) => i !== emptied);
+    setPages(pages);
+    const newPage = emptied >= 0 && emptied < toPage ? toPage - 1 : toPage;
+    setSel({ kind: 'question', page: newPage, q: target });
+  };
+  const dndProps = (key: string, start: { page: number; q?: number }, onDrop: () => void) =>
+    readOnly
+      ? {}
+      : {
+          draggable: true,
+          onDragStart: (e: React.DragEvent) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', key);
+            setDrag(start);
+          },
+          onDragEnd: () => {
+            setDrag(null);
+            setDropAt(null);
+          },
+          onDragOver: (e: React.DragEvent) => {
+            if (!drag) return;
+            e.preventDefault();
+            setDropAt(key);
+          },
+          onDrop: (e: React.DragEvent) => {
+            e.preventDefault();
+            onDrop();
+            setDrag(null);
+            setDropAt(null);
+          },
+        };
+
   return (
     <div className="editor" style={{ gridTemplateColumns: '260px minmax(0,1fr)' }}>
       <nav className="panel outline" aria-label="Survey outline">
         <button className={`item ${sel.kind === 'survey' ? 'selected' : ''}`} onClick={() => setSel({ kind: 'survey' })}>
-          Survey settings, terminations, quotas
+          Survey settings, quotas, loops, variables
         </button>
+        {!readOnly ? <p className="muted small outline-hint">Drag pages and questions to reorder them.</p> : null}
         {def.pages.map((p, pi) => (
           <div key={pi}>
             <button
-              className={`item page ${sel.kind === 'page' && sel.page === pi ? 'selected' : ''}`}
+              className={`item page ${sel.kind === 'page' && sel.page === pi ? 'selected' : ''}${dropAt === `p${pi}` ? ' drop-target' : ''}`}
               onClick={() => setSel({ kind: 'page', page: pi })}
+              {...dndProps(`p${pi}`, { page: pi }, () => {
+                if (!drag) return;
+                if (drag.q === undefined) {
+                  setPages(move(def.pages, drag.page, pi));
+                  setSel({ kind: 'page', page: pi });
+                } else dropQuestion(pi, def.pages[pi]!.questions.length);
+              })}
             >
               {p.id}
               {p.title ? ` · ${p.title}` : ''}
@@ -139,17 +218,29 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
             {p.questions.map((q, qi) => (
               <button
                 key={qi}
-                className={`item q ${sel.kind === 'question' && sel.page === pi && sel.q === qi ? 'selected' : ''}`}
+                className={`item q ${sel.kind === 'question' && sel.page === pi && sel.q === qi ? 'selected' : ''}${dropAt === `q${pi}.${qi}` ? ' drop-target' : ''}`}
                 onClick={() => setSel({ kind: 'question', page: pi, q: qi })}
+                {...dndProps(`q${pi}.${qi}`, { page: pi, q: qi }, () => {
+                  if (drag?.q !== undefined) dropQuestion(pi, qi);
+                })}
               >
                 <span className="mono">{q.id}</span>
                 <span className="type">{q.type}</span>
               </button>
             ))}
             {!readOnly ? (
-              <button className="link small" style={{ marginLeft: 18 }} onClick={() => addQuestion(pi)}>
-                + question
-              </button>
+              <div className="row" style={{ marginLeft: 18, gap: 10, flexWrap: 'wrap' }}>
+                <button className="link small" onClick={() => addQuestion(pi)}>
+                  + question
+                </button>
+                <InsertFromBank
+                  def={def}
+                  onInsert={(q) => {
+                    setPage(pi, { ...p, questions: [...p.questions, q] });
+                    setSel({ kind: 'question', page: pi, q: p.questions.length });
+                  }}
+                />
+              </div>
             ) : null}
           </div>
         ))}
@@ -194,6 +285,8 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
           {sel.kind === 'question' && selected ? (
             <QuestionForm
               q={selected as Question}
+              def={def}
+              canSave={!readOnly}
               onChange={(q) => setQuestion(sel.page, sel.q, q)}
               onMove={(d) => {
                 const page = def.pages[sel.page]!;
@@ -450,6 +543,10 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
           + Quota
         </button>
       </div>
+      <QuotaTableBuilder def={def} onChange={onChange} />
+      <VariablesEditor def={def} onChange={onChange} />
+      <LoopsEditor def={def} onChange={onChange} />
+      <BlocksEditor def={def} onChange={onChange} />
     </>
   );
 }
@@ -595,11 +692,16 @@ function OptionsEditor({
 
 function QuestionForm({
   q,
+  def,
   onChange,
   onMove,
   onDelete,
+  canSave,
 }: {
   q: Question;
+  def: SurveyDefinition;
+  /** Offer "Save to question bank". */
+  canSave?: boolean;
   onChange: (q: Question) => void;
   onMove: (d: number) => void;
   onDelete?: () => void;
@@ -623,6 +725,7 @@ function QuestionForm({
           </button>
         ) : null}
       </div>
+      {canSave ? <SaveQuestionToBank q={q} /> : null}
       <Text label="Variable name" mono value={q.id} onChange={(v) => onChange({ ...q, id: v ?? '' })} />
       <Text
         label="Question text (use {{VAR}} to pipe an earlier answer)"
@@ -653,8 +756,11 @@ function QuestionForm({
             value={q.randomize}
             onChange={(v) => onChange({ ...q, randomize: v })}
           />
+          <DynamicListEditor q={q} def={def} onChange={onChange} />
         </>
       ) : null}
+      {q.type === 'cardsort' ? <CardSortForm q={q} onChange={onChange} OptionsEditor={OptionsEditor} /> : null}
+      {q.type === 'hotspot' ? <HotspotForm q={q} onChange={onChange} /> : null}
       {q.type === 'multi' ? (
         <div className="row">
           <Num label="Minimum selections" value={q.minSelected} onChange={(v) => onChange({ ...q, minSelected: v })} />
@@ -742,6 +848,7 @@ function QuestionForm({
               onChange={(v) => onChange({ ...q, rankCount: v && v > 0 ? v : undefined })}
             />
           </div>
+          <DynamicListEditor q={q} def={def} onChange={onChange} />
         </>
       ) : null}
       {q.type === 'sum' ? (

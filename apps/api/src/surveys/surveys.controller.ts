@@ -28,9 +28,15 @@ import { ExportRunner } from '../exports/export-runner.service';
 import { signParams } from '@zapx/redirect-core';
 import { testSignature } from '../interview/interview.service';
 
-const createSchema = z.object({ name: z.string().min(1).max(200) });
+const createSchema = z.object({
+  name: z.string().min(1).max(200),
+  /** Start from a built-in template (its key) or a survey saved in the question bank (its id). */
+  template: z.string().max(60).optional(),
+  libraryItemId: z.string().max(60).optional(),
+});
 const draftSchema = z.object({ definition: z.unknown(), presentation: z.unknown().optional(), expectedUpdatedAt: z.string().optional() });
 const presentationBody = z.object({ presentation: z.unknown(), expectedUpdatedAt: z.string().optional() });
+const quotaTargetSchema = z.object({ target: z.number().int().min(0).max(10_000_000).nullable() });
 const statusSchema = z.object({ status: z.enum(['LIVE', 'PAUSED', 'CLOSED']) });
 const linkSchema = z.object({
   vendorId: z.string().optional(),
@@ -66,7 +72,8 @@ export class SurveysController {
   @Post('projects/:projectId/surveys')
   @Roles(...CAN_EDIT)
   create(@CurrentUser() user: AuthUser, @Param('projectId') projectId: string, @Body() body: unknown) {
-    return this.surveys.create(user, projectId, parseBody(createSchema, body).name);
+    const b = parseBody(createSchema, body);
+    return this.surveys.create(user, projectId, b.name, { template: b.template, libraryItemId: b.libraryItemId });
   }
 
   @Get('surveys/:id')
@@ -130,6 +137,11 @@ export class SurveysController {
     await this.audit.record(user, 'survey.delete', 'survey', id);
   }
 
+  @Get('surveys/:id/versions')
+  versions(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.surveys.versions(user, id);
+  }
+
   @Get('surveys/:id/versions/:version')
   version(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('version', ParseIntPipe) version: number) {
     return this.surveys.version(user, id, version);
@@ -138,6 +150,14 @@ export class SurveysController {
   @Get('surveys/:id/quotas')
   quotas(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.surveys.quotas(user, id);
+  }
+
+  /** Live quota adjustment: change a target without republishing (null restores the published one). */
+  @Put('surveys/:id/quotas/:quotaId')
+  @Roles(...CAN_EDIT)
+  setQuotaTarget(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('quotaId') quotaId: string, @Body() body: unknown) {
+    const { target } = parseBody(quotaTargetSchema, body);
+    return this.surveys.setQuotaTarget(user, id, quotaId, target);
   }
 
   @Get('surveys/:id/responses')

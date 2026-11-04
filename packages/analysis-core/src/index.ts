@@ -90,6 +90,26 @@ export function variables(def: SurveyDefinition, records: AnalysisRecord[] = [])
           categories: q.options.map((o) => ({ code: o.code, label: o.label })),
           source: 'question',
         });
+      } else if (q.type === 'hotspot') {
+        // Areas of the picture are reported like multiple choice.
+        out.push({
+          id: q.id,
+          label: strip(q.text),
+          kind: 'multi',
+          categories: q.regions.map((r) => ({ code: r.code, label: r.label })),
+          source: 'question',
+        });
+      } else if (q.type === 'cardsort') {
+        // One variable per card: which group it went into (stored like a grid row).
+        for (const card of q.options)
+          out.push({
+            id: `${q.id}_${card.code}`,
+            label: `${strip(q.text)}: ${card.label}`,
+            kind: 'single',
+            categories: q.groups.map((g) => ({ code: g.code, label: g.label })),
+            source: 'grid_row',
+            grid: { question: q.id, row: String(card.code) },
+          });
       } else if (q.type === 'scale') {
         const categories = scaleCodes(q).map((code) => ({
           code,

@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import type { Response, SurveyVersion } from '@zapx/db';
 import { allQuestions, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
+import { computeVariables, prepareSurvey } from '@zapx/logic-engine';
 
 interface Column {
   key: string;
@@ -93,9 +94,35 @@ export class ExportService {
     };
     const ans = (r: ExportRow) => (r.answers ?? {}) as Answers;
     for (const v of versions) {
-      for (const q of allQuestions(v.definition as unknown as SurveyDefinition)) {
+      const def = prepareSurvey(v.definition as unknown as SurveyDefinition);
+      for (const q of allQuestions(def)) {
         switch (q.type) {
           case 'info':
+            break;
+          case 'hotspot':
+            // Like multiple choice: one 0/1 column per area of the picture.
+            for (const reg of q.regions)
+              add({
+                key: `${q.id}_${reg.code}`,
+                label: `${q.id}: ${reg.label}`,
+                get: (r) => {
+                  const a = ans(r)[q.id];
+                  if (a === undefined || a === null) return null;
+                  return Array.isArray(a) && a.includes(reg.code) ? 1 : 0;
+                },
+              });
+            break;
+          case 'cardsort':
+            // One column per card: the code of the group it was sorted into.
+            for (const o of q.options)
+              add({
+                key: `${q.id}_${o.code}`,
+                label: `${q.id}: group of ${o.label}`,
+                get: (r) => {
+                  const a = ans(r)[q.id];
+                  return a && typeof a === 'object' && !Array.isArray(a) ? ((a as Record<string, number>)[String(o.code)] ?? null) : null;
+                },
+              });
             break;
           case 'multi':
             for (const o of q.options)
@@ -156,6 +183,13 @@ export class ExportService {
             });
         }
       }
+      // Calculated variables: worked out from each respondent's answers (formula of the first version that has it).
+      for (const variable of def.variables ?? [])
+        add({
+          key: variable.id,
+          label: variable.label ?? `${variable.id} = ${variable.expr}`,
+          get: (r) => toCell(computeVariables(def, ans(r))[variable.id]),
+        });
     }
     return cols;
   }
@@ -193,8 +227,9 @@ export class ExportService {
     ];
     for (const c of columns) book.addRow({ variable: c.key, description: c.label });
     const latest = versions.reduce((a, b) => (b.version > a.version ? b : a));
-    for (const q of allQuestions(latest.definition as unknown as SurveyDefinition)) {
+    for (const q of allQuestions(prepareSurvey(latest.definition as unknown as SurveyDefinition))) {
       if (q.type === 'single') for (const o of q.options) book.addRow({ variable: q.id, code: o.code, label: o.label });
+      if (q.type === 'cardsort') for (const o of q.groups) book.addRow({ variable: `${q.id}_*`, code: o.code, label: o.label });
       if (q.type === 'scale') {
         book.addRow({ variable: q.id, code: q.min, label: q.minLabel ?? `${q.min} (lowest)` });
         book.addRow({ variable: q.id, code: q.max, label: q.maxLabel ?? `${q.max} (highest)` });
@@ -205,4 +240,12 @@ export class ExportService {
     book.getRow(1).font = { bold: true };
     return Buffer.from(await wb.xlsx.writeBuffer());
   }
+}
+
+/** A calculated variable's value as a spreadsheet cell (true/false become 1/0). */
+function toCell(v: unknown): string | number | null {
+  if (v === true) return 1;
+  if (v === false) return 0;
+  if (typeof v === 'number' || typeof v === 'string') return v;
+  return null;
 }
