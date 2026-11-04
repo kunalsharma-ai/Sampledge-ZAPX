@@ -55,15 +55,42 @@ export class InterviewRecorder {
     private readonly surveyId: string,
   ) {}
 
-  /** Start recording. False when there is no microphone or the permission is refused. */
-  async start(): Promise<boolean> {
-    try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      return false;
+  /** True when the camera is being recorded too (video asked for and a camera was available). */
+  video = false;
+
+  /**
+   * Start recording. With video, the camera is recorded too at a small size (640x480, 15 frames a
+   * second, about 300 kbit/s, so an hour is roughly 135 MB); when no camera is available it falls
+   * back to sound only. False when there is no microphone or the permission is refused.
+   */
+  async start(opts: { video?: boolean } = {}): Promise<boolean> {
+    this.video = false;
+    if (opts.video) {
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15 }, facingMode: 'user' },
+        });
+        this.video = true;
+      } catch {
+        this.stream = null;
+      }
     }
-    const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
-    const recorder = new MediaRecorder(this.stream, type ? { mimeType: type, audioBitsPerSecond: 32_000 } : undefined);
+    if (!this.stream) {
+      try {
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        return false;
+      }
+    }
+    const types = this.video
+      ? ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+      : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+    const type = types.find((t) => MediaRecorder.isTypeSupported(t)) ?? '';
+    const recorder = new MediaRecorder(
+      this.stream,
+      type ? { mimeType: type, audioBitsPerSecond: 32_000, ...(this.video ? { videoBitsPerSecond: 270_000 } : {}) } : undefined,
+    );
     const k = key(this.clientId, AUDIO_REF);
     const empty: LocalCapture = {
       key: k,

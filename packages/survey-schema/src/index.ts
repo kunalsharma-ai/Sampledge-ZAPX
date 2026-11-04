@@ -631,6 +631,8 @@ export const capiSettingsSchema = z.object({
   gps: z.enum(['off', 'optional', 'required']).default('off'),
   /** consent: the interviewer asks the respondent before recording the interview's audio. Never recorded silently. */
   audio: z.enum(['off', 'consent']).default('off'),
+  /** Blueprint phase 4: with audio consent, record the device camera too (asked in the same consent). */
+  video: z.boolean().default(false),
   /** What the interviewer reads out to ask for consent to record. */
   consentText: z.string().max(1000).optional(),
   /**
@@ -646,6 +648,8 @@ export type CapiSettings = z.infer<typeof capiSettingsSchema>;
 
 export const DEFAULT_RECORDING_CONSENT =
   'May I record the sound of this interview? It is only used to check the quality of my work, is kept securely and is not shared.';
+export const DEFAULT_VIDEO_CONSENT =
+  'May I record this interview with sound and video from this device? It is only used to check the quality of my work, is kept securely and is not shared.';
 
 export function capiSettingsOf(def: { settings?: { capi?: unknown } }): CapiSettings {
   const parsed = capiSettingsSchema.safeParse(def.settings?.capi ?? {});

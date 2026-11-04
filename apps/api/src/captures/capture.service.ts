@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Prisma } from '@zapx/db';
-import { allQuestions, CAPTURE_REF, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
+import { allQuestions, capiSettingsOf, CAPTURE_REF, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { SurveysService } from '../surveys/surveys.service';
@@ -38,7 +38,7 @@ const PHOTO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
 const AUDIO_TYPES = new Set(['video/webm', 'audio/ogg', 'audio/mp4', 'video/mp4', 'audio/mpeg', 'audio/wav']);
 
 /** Check the bytes and size of a capture; returns the content type to serve it with. */
-export function checkCapture(kind: CaptureKind, data: Buffer): string {
+export function checkCapture(kind: CaptureKind, data: Buffer, opts: { video?: boolean } = {}): string {
   const t = sniffMedia(data);
   if (kind === 'photo') {
     if (!t || !PHOTO_TYPES.has(t.contentType)) throw new BadRequestException('Upload a JPEG, PNG or WebP photo');
@@ -48,7 +48,8 @@ export function checkCapture(kind: CaptureKind, data: Buffer): string {
   if (!t || !AUDIO_TYPES.has(t.contentType)) throw new BadRequestException('Upload the recording as WebM, Ogg, MP4, MP3 or WAV');
   if (data.length > config().CAPTURE_MAX_MB * 1024 * 1024)
     throw new PayloadTooLargeException(`Recordings can be up to ${config().CAPTURE_MAX_MB} MB`);
-  // WebM and MP4 recordings from MediaRecorder hold audio only; serve them as audio.
+  // WebM and MP4 recordings hold audio only unless the survey records video (blueprint phase 4).
+  if (opts.video && (t.contentType === 'video/webm' || t.contentType === 'video/mp4')) return t.contentType;
   return t.contentType === 'video/webm' ? 'audio/webm' : t.contentType === 'video/mp4' ? 'audio/mp4' : t.contentType;
 }
 
@@ -149,7 +150,15 @@ export class CaptureService {
       throw new ForbiddenException('This interview belongs to another interviewer.');
     if ((await this.prisma.capture.count({ where: { clientId: input.clientId } })) >= MAX_PER_INTERVIEW)
       throw new ConflictException('Too many files for one interview');
-    const contentType = checkCapture(input.kind, data);
+    let video = false;
+    if (input.kind === 'audio') {
+      const survey = await this.prisma.survey.findFirst({ where: { id: input.surveyId, tenantId: user.tenantId }, select: { liveVersionId: true } });
+      const live = survey?.liveVersionId
+        ? await this.prisma.surveyVersion.findUnique({ where: { id: survey.liveVersionId }, select: { definition: true } })
+        : null;
+      video = capiSettingsOf((live?.definition ?? {}) as { settings?: { capi?: unknown } }).video;
+    }
+    const contentType = checkCapture(input.kind, data, { video });
     try {
       const c = await this.save(data, input.kind, contentType, {
         tenantId: user.tenantId,

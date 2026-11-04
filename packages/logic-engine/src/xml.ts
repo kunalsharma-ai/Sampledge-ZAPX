@@ -243,7 +243,7 @@ export function toZapxXml(def: SurveyDefinition): string {
   for (const c of st.quality.checks)
     out += `      <check${attr('id', c.id)}${attr('label', c.label)}${attr('weight', c.weight)}>${esc(c.condition)}</check>\n`;
   out += `    </quality>\n`;
-  out += `    <capi${attr('gps', st.capi.gps)}${attr('audio', st.capi.audio)}${attr('interruptions', st.capi.interruptions)}>${st.capi.consentText ? esc(st.capi.consentText) : ''}`;
+  out += `    <capi${attr('gps', st.capi.gps)}${attr('audio', st.capi.audio)}${attr('interruptions', st.capi.interruptions)}${attr('video', st.capi.video)}>${st.capi.consentText ? esc(st.capi.consentText) : ''}`;
   for (const g of st.capi.geofences)
     out += `<area${attr('label', g.label)}${attr('lat', g.lat)}${attr('lon', g.lon)}${attr('radiusM', g.radiusM)}/>`;
   out += `</capi>\n`;
@@ -340,6 +340,7 @@ const BOOLEAN_KEYS = new Set([
   'sameNetwork',
   'fraud',
   'interruptions',
+  'video',
   'noneOption',
 ]);
 const LIST_KEYS = new Set(['pages', 'countries']);
@@ -444,7 +445,7 @@ export function fromZapxXml(src: string): XmlReadResult {
             });
             settings.quality = quality;
           } else if (s.name === 'capi') {
-            const capi = attrsTo(s, new Set(['gps', 'audio', 'interruptions']));
+            const capi = attrsTo(s, new Set(['gps', 'audio', 'interruptions', 'video']));
             const t = s.children
               .map((c) => ('text' in c ? c.text : ''))
               .join('')

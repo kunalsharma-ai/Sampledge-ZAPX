@@ -25,6 +25,7 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 import { PrismaService } from '../src/common/prisma.service';
 import { AiProvider, type InsightsRequest, type InsightsResult } from '../src/ai/ai-provider';
+import { checkCapture } from '../src/captures/capture.service';
 
 const demo = JSON.parse(readFileSync(join(__dirname, '../../../docs/examples/demo-screener.json'), 'utf8'));
 const run = `bp4${Date.now().toString(36)}`;
@@ -248,5 +249,22 @@ describe('research assistant', () => {
     const usage = await prisma.aiUsage.findMany({ where: { surveyId, task: 'insights' } });
     expect(usage.length).toBeGreaterThan(0);
     expect(usage[0]!.redactions).toBe(1);
+  });
+});
+
+describe('consented CAPI video', () => {
+  const WEBM = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), Buffer.alloc(2000, 5)]);
+  it('keeps a recording as video only when the survey records video', () => {
+    expect(checkCapture('audio', WEBM)).toBe('audio/webm');
+    expect(checkCapture('audio', WEBM, { video: true })).toBe('video/webm');
+    expect(() => checkCapture('photo', WEBM, { video: true })).toThrow();
+  });
+
+  it('round-trips the video setting with the survey', async () => {
+    const d = (await http.get(`/api/surveys/${surveyId}/draft`).set(admin).expect(200)).body.version;
+    const next = { ...d.definition, settings: { ...d.definition.settings, capi: { ...d.definition.settings.capi, audio: 'consent', video: true } } };
+    await http.put(`/api/surveys/${surveyId}/draft`).set(admin).send({ definition: next }).expect(200);
+    const back = (await http.get(`/api/surveys/${surveyId}/draft`).set(admin).expect(200)).body.version.definition;
+    expect(back.settings.capi).toMatchObject({ audio: 'consent', video: true });
   });
 });
