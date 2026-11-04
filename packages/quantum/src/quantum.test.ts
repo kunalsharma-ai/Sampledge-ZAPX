@@ -89,7 +89,7 @@ describe('theme engine', () => {
   });
 
   it('caches both schemes for the boot script', () => {
-    const cache = buildThemeCache(DEFAULT_APPEARANCE, false);
+    const cache = buildThemeCache({ ...DEFAULT_APPEARANCE, mode: 'system' }, false);
     expect(cache.light.attrs['data-q-scheme']).toBe('light');
     expect(cache.dark.attrs['data-q-scheme']).toBe('dark');
     expect(THEME_BOOT_SCRIPT).toContain('zapx.quantum.theme.v1');
@@ -98,6 +98,11 @@ describe('theme engine', () => {
 });
 
 describe('appearance settings', () => {
+  it('defaults to the Neon AI theme in dark mode', () => {
+    expect(DEFAULT_APPEARANCE).toMatchObject({ preset: 'neon-ai', mode: 'dark' });
+    expect(buildThemeCache(DEFAULT_APPEARANCE, false).light.attrs['data-q-scheme']).toBe('dark');
+  });
+
   it('sanitizes stored settings', () => {
     const a = sanitizeAppearance({ preset: 'cyber-pulse', glass: 250, accent: '#ABC', density: 'huge', extra: 1 });
     expect(a.preset).toBe('cyber-pulse');

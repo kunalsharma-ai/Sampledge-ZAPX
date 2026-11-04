@@ -1,10 +1,11 @@
 /**
- * The ten Quantum theme presets. Each preset is a colour family with a dark and a light scheme, so
+ * The Quantum theme presets (Neon AI, the default, plus the original ten). Each preset is a colour family with a dark and a light scheme, so
  * the person's light/dark/system choice works with every preset. Only key colours are listed here:
  * the theme engine derives the remaining tokens and corrects anything that would miss WCAG contrast.
  */
 
 export const PRESET_IDS = [
+  'neon-ai',
   'quantum-midnight',
   'aurora-intelligence',
   'obsidian-elite',
@@ -42,6 +43,15 @@ export interface ThemePreset {
 }
 
 export const PRESETS: Record<PresetId, ThemePreset> = {
+  'neon-ai': {
+    id: 'neon-ai',
+    name: 'Neon AI',
+    description: 'Deep indigo glass with violet, magenta and cyan neon light.',
+    native: 'dark',
+    accents: ['#7c5cff', '#e046f0', '#22d3ee'],
+    dark: { bg: '#090620', surface: '#140f3a', text: '#efeaff' },
+    light: { bg: '#f5f2ff', surface: '#ffffff', text: '#1a1240', accent: '#6d28d9' },
+  },
   'quantum-midnight': {
     id: 'quantum-midnight',
     name: 'Quantum Midnight',

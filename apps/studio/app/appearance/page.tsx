@@ -120,7 +120,7 @@ export default function AppearancePage() {
   };
 
   return (
-    <Shell crumbs={<Link href="/">Projects</Link>} forInterviewers>
+    <Shell crumbs={<Link href="/">Dashboard</Link>} forInterviewers>
       <div className="q-page-head">
         <div>
           <div className="q-eyebrow">Quantum Design System</div>

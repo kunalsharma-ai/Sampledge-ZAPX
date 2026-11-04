@@ -86,7 +86,7 @@ export default function SettingsPage() {
 
   if (me && me.role === 'PROGRAMMER') {
     return (
-      <Shell crumbs={<Link href="/">Projects</Link>}>
+      <Shell crumbs={<Link href="/">Dashboard</Link>}>
         <h1>API keys</h1>
         <ApiKeys isAdmin={false} />
       </Shell>
@@ -94,7 +94,7 @@ export default function SettingsPage() {
   }
   if (me && me.role !== 'ADMIN') {
     return (
-      <Shell crumbs={<Link href="/">Projects</Link>}>
+      <Shell crumbs={<Link href="/">Dashboard</Link>}>
         <p className="muted">Only administrators can change organization settings.</p>
       </Shell>
     );
@@ -116,7 +116,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <Shell crumbs={<Link href="/">Projects</Link>}>
+    <Shell crumbs={<Link href="/">Dashboard</Link>}>
       <div className="row">
         <h1 style={{ margin: 0 }}>Organization settings</h1>
         <div style={{ flex: 1 }} />

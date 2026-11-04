@@ -50,7 +50,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   };
 
   return (
-    <Shell crumbs={<Link href="/">Projects</Link>}>
+    <Shell crumbs={<Link href="/">Dashboard</Link>}>
       {!project ? (
         <ErrorNote error={error} />
       ) : (

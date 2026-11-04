@@ -74,15 +74,25 @@ export function Assist({
   readOnly,
   dirty,
   onApplied,
+  initialInstruction = '',
+  focusImport = false,
 }: {
   surveyId: string;
   language: string;
   readOnly: boolean;
   dirty: boolean;
   onApplied: () => Promise<void>;
+  /** Pre-filled instruction (from the dashboard's "Describe it to AI"). */
+  initialInstruction?: string;
+  /** Scroll to the questionnaire import (from the dashboard's "Import a questionnaire"). */
+  focusImport?: boolean;
 }) {
   const [ai, setAi] = useState<{ configured: boolean; model: string } | null>(null);
-  const [instruction, setInstruction] = useState('');
+  const [instruction, setInstruction] = useState(initialInstruction);
+  const importPanel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (focusImport) importPanel.current?.scrollIntoView({ block: 'center' });
+  }, [focusImport]);
   const [file, setFile] = useState<File | null>(null);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [list, setList] = useState<ChangeSetSummary[]>([]);
@@ -267,7 +277,7 @@ export function Assist({
                 </button>
               </div>
             </div>
-            <div className="panel stack" data-testid="import-panel">
+            <div className="panel stack" data-testid="import-panel" ref={importPanel}>
               <h2>Import a questionnaire</h2>
               <p className="muted small">
                 Excel or CSV in the ZAPX template is imported exactly, with a confidence score per row. Word, PDF and text questionnaires

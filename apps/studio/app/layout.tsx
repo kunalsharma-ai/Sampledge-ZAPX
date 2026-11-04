@@ -5,6 +5,7 @@ import { DEFAULT_APPEARANCE, THEME_BOOT_SCRIPT, resolveTheme } from '@zapx/quant
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import './globals.css';
 import './quantum.css';
+import './neon.css';
 
 export const metadata = { title: 'ZAPX Studio', description: 'SAMPLEDGE ZAPX survey programming studio' };
 

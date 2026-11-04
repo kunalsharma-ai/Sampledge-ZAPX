@@ -30,7 +30,16 @@ import { defaultPresentation, type AnswerValue, type Answers, type Presentation,
 const WIDTHS = { desktop: undefined, tablet: 768, mobile: 375 } as const;
 type Device = keyof typeof WIDTHS;
 
-export function Preview({ def: sourceDef, presentation = defaultPresentation() }: { def: SurveyDefinition; presentation?: Presentation }) {
+/** `compact`: the dashboard's small live preview (no answers panel, short toolbar, phone width first). */
+export function Preview({
+  def: sourceDef,
+  presentation = defaultPresentation(),
+  compact = false,
+}: {
+  def: SurveyDefinition;
+  presentation?: Presentation;
+  compact?: boolean;
+}) {
   const [seed, setSeed] = useState(() => Math.random().toString(36).slice(2));
   const [language, setLanguage] = useState(sourceDef.language);
   const lang = presentation.languages.find((l) => l.tag === language);
@@ -41,7 +50,7 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
   const [pageAnswers, setPageAnswers] = useState<Answers>({});
   const [errors, setErrors] = useState<FieldErrors>({});
   const [outcome, setOutcome] = useState<string | null>(null);
-  const [device, setDevice] = useState<Device>('desktop');
+  const [device, setDevice] = useState<Device>(compact ? 'mobile' : 'desktop');
   const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
   // Preview photos stay in this browser tab; nothing is uploaded.
   const [shots] = useState(() => new Map<string, string>());
@@ -96,12 +105,12 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
   ];
 
   return (
-    <div className="grid2" style={{ gridTemplateColumns: 'minmax(0,1fr) 300px' }}>
+    <div className={compact ? 'preview-compact' : 'grid2'} style={compact ? undefined : { gridTemplateColumns: 'minmax(0,1fr) 300px' }}>
       <div>
         <div className="row" style={{ marginBottom: 8 }}>
           {(Object.keys(WIDTHS) as Device[]).map((d) => (
-            <button key={d} aria-pressed={device === d} onClick={() => setDevice(d)}>
-              {d === 'desktop' ? 'Desktop' : d === 'tablet' ? 'Tablet (768px)' : 'Phone (375px)'}
+            <button key={d} aria-pressed={device === d} onClick={() => setDevice(d)} className={compact ? 'small' : undefined}>
+              {d === 'desktop' ? 'Desktop' : d === 'tablet' ? (compact ? 'Tablet' : 'Tablet (768px)') : compact ? 'Phone' : 'Phone (375px)'}
             </button>
           ))}
           {languages.length > 1 ? (
@@ -113,15 +122,17 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
               ))}
             </select>
           ) : null}
-          <button onClick={restart}>Restart</button>
-          <span className="muted small">Preview runs your current, unsaved edits. Nothing is recorded.</span>
+          <button onClick={restart} className={compact ? 'small' : undefined}>
+            Restart
+          </button>
+          {compact ? null : <span className="muted small">Preview runs your current, unsaved edits. Nothing is recorded.</span>}
         </div>
         <div
           className="preview-frame"
           style={{ maxWidth: WIDTHS[device], margin: device === 'desktop' ? undefined : '0 auto' }}
           data-testid="preview-frame"
         >
-          <div className="zx-root" style={{ minHeight: 400 }} lang={language}>
+          <div className="zx-root" style={{ minHeight: compact ? 260 : 400 }} lang={language}>
             <style>{defaultThemeCss}</style>
             <style>{themeCss(presentation.theme, presentation.devices)}</style>
             <div className="zx-shell">
@@ -184,12 +195,14 @@ export function Preview({ def: sourceDef, presentation = defaultPresentation() }
           </div>
         </div>
       </div>
-      <aside className="panel">
-        <h3>Answers so far</h3>
-        <pre className="mono small" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-          {JSON.stringify(answers, null, 1)}
-        </pre>
-      </aside>
+      {compact ? null : (
+        <aside className="panel">
+          <h3>Answers so far</h3>
+          <pre className="mono small" style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
+            {JSON.stringify(answers, null, 1)}
+          </pre>
+        </aside>
+      )}
     </div>
   );
 }

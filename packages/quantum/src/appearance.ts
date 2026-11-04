@@ -26,8 +26,8 @@ export interface Appearance {
 
 export const DEFAULT_APPEARANCE: Appearance = {
   version: 1,
-  preset: 'quantum-midnight',
-  mode: 'system',
+  preset: 'neon-ai',
+  mode: 'dark',
   accent: null,
   background: 55,
   glass: 45,
