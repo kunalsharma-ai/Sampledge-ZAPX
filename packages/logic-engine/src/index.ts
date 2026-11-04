@@ -15,3 +15,5 @@ export * from './geo.js';
 export * from './choice-design.js';
 export * from './choice-analysis.js';
 export * from './quota-table.js';
+export * from './bank-block.js';
+export * from './suggest-cases.js';

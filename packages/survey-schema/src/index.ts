@@ -395,6 +395,13 @@ export const pageSchema = z.object({
 });
 export type Page = z.infer<typeof pageSchema>;
 
+/**
+ * Blueprint phase 4: a reusable block in the question bank, one or more pages with their questions
+ * (a standard demographics section, say). Inserted into a survey with its names made free there.
+ */
+export const bankBlockSchema = z.object({ pages: z.array(pageSchema).min(1).max(20) });
+export type BankBlock = z.infer<typeof bankBlockSchema>;
+
 /** Final statuses a respondent can reach. Each maps to a vendor redirect. */
 /** The same eight statuses as PROJEXA. `partial` = abandoned; `technical_error` = ZAPX could not continue. */
 export const OUTCOME_STATUSES = [

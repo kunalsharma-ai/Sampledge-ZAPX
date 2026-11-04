@@ -321,3 +321,17 @@ describe('least-fill quota groups', () => {
     expect((await prisma.response.findFirstOrThrow({ where: { surveyId: sid, uid: 'a8' } })).quotaCells).toEqual(['QB1', 'QALL']);
   });
 });
+
+describe('question bank blocks', () => {
+  it('saves a page of questions as a block and refuses invalid blocks', async () => {
+    const page = def.pages[0];
+    const item = (
+      await http.post('/api/library').set(admin).send({ kind: 'BLOCK', name: 'Screener block', category: 'Demographics', content: { pages: [page] } }).expect(201)
+    ).body;
+    expect(item.kind).toBe('BLOCK');
+    const list = (await http.get('/api/library?kind=BLOCK').set(admin).expect(200)).body;
+    expect(list.map((i: { id: string }) => i.id)).toEqual([item.id]);
+    expect(list[0].content.pages[0].questions.map((q: { id: string }) => q.id)).toEqual(['AGE', 'GENDER']);
+    await http.post('/api/library').set(admin).send({ kind: 'BLOCK', name: 'Bad', content: { pages: [] } }).expect(400);
+  });
+});

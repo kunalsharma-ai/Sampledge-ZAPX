@@ -18,7 +18,7 @@ import {
   UrlVariablesEditor,
   VariablesEditor,
 } from './FlowEditor';
-import { InsertFromBank, SaveQuestionToBank } from './QuestionBank';
+import { InsertBlockFromBank, InsertFromBank, SavePageToBank, SaveQuestionToBank } from './QuestionBank';
 
 type Selection = { kind: 'survey' } | { kind: 'page'; page: number } | { kind: 'question'; page: number; q: number };
 
@@ -302,6 +302,14 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
                     setSel({ kind: 'question', page: pi, q: p.questions.length });
                   }}
                 />
+                <InsertBlockFromBank
+                  def={def}
+                  after={pi}
+                  onInsert={(d) => {
+                    onChange(d);
+                    setSel({ kind: 'page', page: pi + 1 });
+                  }}
+                />
               </div>
             ) : null}
           </div>
@@ -343,6 +351,9 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
                   : undefined
               }
             />
+          ) : null}
+          {sel.kind === 'page' && selected && !readOnly ? (
+            <SavePageToBank page={selected as Page} />
           ) : null}
           {sel.kind === 'question' && selected ? (
             <QuestionForm

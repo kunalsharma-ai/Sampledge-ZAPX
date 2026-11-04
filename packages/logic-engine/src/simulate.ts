@@ -24,6 +24,8 @@ export interface SimulationOptions {
   simulateQuotas?: boolean;
   /** How many answer attempts per page before reporting the interview as stuck. */
   maxAttemptsPerPage?: number;
+  /** Called with every simulated interview (the report keeps only samples). */
+  onInterview?: (interview: SimulatedInterview) => void;
 }
 
 export type SimOutcome = 'complete' | 'terminate' | 'quality_fail' | 'quota_full' | 'stuck' | 'error';
@@ -478,6 +480,7 @@ export function simulateSurvey(source: SurveyDefinition, opts: SimulationOptions
     outcomes[outcome]++;
     paths.add(visited.join('>'));
     const interview: SimulatedInterview = { index: i, outcome, reason, pages: visited, answers };
+    opts.onInterview?.(interview);
     if (samples.length < 25 || outcome === 'stuck' || outcome === 'error') {
       if (samples.length < 60) samples.push(interview);
     }

@@ -196,7 +196,7 @@ describe('photo', () => {
     expect(normalizeAnswer(pq, '')).toEqual({ error: 'This question requires an answer.' });
   });
   it('keeps the capture settings and simulates', () => {
-    expect(photo.settings.capi).toEqual({ gps: 'required', audio: 'consent', geofences: [], interruptions: true });
+    expect(photo.settings.capi).toEqual({ gps: 'required', audio: 'consent', geofences: [], interruptions: true, video: false });
     expect(simulateSurvey(photo, { respondents: 20, seed: 'p' }).outcomes.complete).toBe(20);
     expect(conditionHolds('SHELF != null', photo, { SHELF: 'abcdefgh' })).toBe(true);
   });

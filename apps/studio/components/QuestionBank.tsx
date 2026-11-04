@@ -1,10 +1,12 @@
 'use client';
 /**
- * Question bank in the survey editor: save the selected question for reuse, and insert a saved
- * question into the current page (renamed when its variable name is already taken).
+ * Question bank in the survey editor: save the selected question (or a whole page, as a block) for
+ * reuse, and insert a saved question into the current page or a block after it (renamed when a
+ * variable name is already taken).
  */
 import { useState } from 'react';
-import type { Question, SurveyDefinition } from '@zapx/survey-schema';
+import type { BankBlock, Page, Question, SurveyDefinition } from '@zapx/survey-schema';
+import { insertBankBlock } from '@zapx/logic-engine';
 import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
 
@@ -35,6 +37,35 @@ export function withFreeId(q: Question, def: SurveyDefinition): Question {
 }
 
 export function SaveQuestionToBank({ q }: { q: Question }) {
+  return <SaveToBank kind="QUESTION" content={q} what={q.id} button="Save to question bank" defaultTitle={q.text.slice(0, 80) || q.id} />;
+}
+
+/** Blueprint phase 4: save a page with all its questions as a reusable block. */
+export function SavePageToBank({ page }: { page: Page }) {
+  return (
+    <SaveToBank
+      kind="BLOCK"
+      content={{ pages: [page] }}
+      what={`page ${page.id} (${page.questions.length} question${page.questions.length === 1 ? '' : 's'})`}
+      button="Save page to question bank as a block"
+      defaultTitle={page.title || page.id}
+    />
+  );
+}
+
+function SaveToBank({
+  kind,
+  content,
+  what,
+  button,
+  defaultTitle,
+}: {
+  kind: 'QUESTION' | 'BLOCK';
+  content: unknown;
+  what: string;
+  button: string;
+  defaultTitle: string;
+}) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('General');
@@ -48,11 +79,11 @@ export function SaveQuestionToBank({ q }: { q: Question }) {
         type="button"
         onClick={() => {
           setOpen(true);
-          setTitle(q.text.slice(0, 80) || q.id);
+          setTitle(defaultTitle);
           setState('idle');
         }}
       >
-        Save to question bank
+        {button}
       </button>
     );
 
@@ -62,14 +93,14 @@ export function SaveQuestionToBank({ q }: { q: Question }) {
     try {
       await api('/library', {
         body: {
-          kind: 'QUESTION',
-          name: title.trim() || q.id,
+          kind,
+          name: title.trim() || defaultTitle,
           category: category.trim() || 'General',
           tags: tags
             .split(',')
             .map((t) => t.trim())
             .filter(Boolean),
-          content: q,
+          content,
         },
       });
       setState('saved');
@@ -81,7 +112,7 @@ export function SaveQuestionToBank({ q }: { q: Question }) {
 
   return (
     <div className="flow-card stack">
-      <h3 style={{ margin: 0 }}>Save {q.id} to the question bank</h3>
+      <h3 style={{ margin: 0 }}>Save {what} to the question bank</h3>
       {state === 'saved' ? (
         <p className="small">Saved. Anyone in your organization can now insert it from the question bank.</p>
       ) : (
@@ -171,6 +202,78 @@ export function InsertFromBank({ def, onInsert }: { def: SurveyDefinition; onIns
             </span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+interface SavedBlock {
+  id: string;
+  name: string;
+  category: string;
+  tags: string[];
+  content: BankBlock;
+}
+
+/** Blueprint phase 4: insert a saved block of pages after a page, with clashing names renamed. */
+export function InsertBlockFromBank({
+  def,
+  after,
+  onInsert,
+}: {
+  def: SurveyDefinition;
+  after: number;
+  onInsert: (d: SurveyDefinition, renamed: Record<string, string>) => void;
+}) {
+  const [items, setItems] = useState<SavedBlock[] | null>(null);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<unknown>(null);
+  const show = async () => {
+    setOpen(true);
+    setError(null);
+    try {
+      setItems(await api<SavedBlock[]>('/library?kind=BLOCK'));
+    } catch (e) {
+      setError(e);
+    }
+  };
+  if (!open)
+    return (
+      <button type="button" className="link small" onClick={() => void show()}>
+        + block from bank
+      </button>
+    );
+  return (
+    <div className="flow-card stack" data-testid="insert-block">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <strong>Insert a block after {def.pages[after]?.id}</strong>
+        <button type="button" className="link small" onClick={() => setOpen(false)}>
+          Close
+        </button>
+      </div>
+      <ErrorNote error={error} />
+      {items === null ? <p className="muted small">Loading…</p> : null}
+      {items && !items.length ? <p className="muted small">No saved blocks yet. Select a page and save it to the bank as a block.</p> : null}
+      <div className="bank-picker">
+        {(items ?? []).map((i) => {
+          const questions = i.content.pages.reduce((n, p) => n + p.questions.length, 0);
+          return (
+            <button
+              type="button"
+              key={i.id}
+              onClick={() => {
+                const r = insertBankBlock(def, i.content, after);
+                onInsert(r.def, r.renamed);
+                setOpen(false);
+              }}
+            >
+              <strong className="small">{i.name}</strong>
+              <span className="muted small">
+                {i.category} · {i.content.pages.length} page{i.content.pages.length === 1 ? '' : 's'}, {questions} question{questions === 1 ? '' : 's'}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

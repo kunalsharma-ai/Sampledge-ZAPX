@@ -1029,6 +1029,8 @@ model RevokedSession {
 enum LibraryItemKind {
   QUESTION
   SURVEY
+  /// Blueprint phase 4: one or more pages of questions, inserted together.
+  BLOCK
 }
 
 /// Blueprint phase 1: the organization's question bank. A QUESTION item holds one question (without
