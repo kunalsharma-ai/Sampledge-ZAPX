@@ -7,6 +7,8 @@
  */
 import {
   CAPTURE_REF,
+  SIGNATURE_MAX_LENGTH,
+  SIGNATURE_PATTERN,
   scaleCodes,
   type AnswerValue,
   type Answers,
@@ -218,6 +220,14 @@ export const SYSTEM_MESSAGES = {
   photoFailed: 'The photo could not be uploaded. Try again.',
   photoMissing: 'Take or choose a photo.',
   photoSaved: 'Photo saved.',
+  signHere: 'Sign in the box with your finger, a pen or the mouse.',
+  clearSignature: 'Clear',
+  signatureMissing: 'Please sign in the box.',
+  scanCode: 'Scan with the camera',
+  stopScan: 'Stop scanning',
+  scanUnavailable: 'This device cannot scan codes. Type the code instead.',
+  codeInvalid: 'This code does not have the expected format.',
+  enterCode: 'Scan or type the code.',
   readAloud: 'Read aloud',
   stopReading: 'Stop reading',
   next: 'Next',
@@ -394,6 +404,24 @@ export function normalizeAnswer(
       if (typeof raw !== 'string' || !CAPTURE_REF.test(raw)) return { error: msg.photoMissing };
       return { value: raw };
     }
+    case 'signature': {
+      // At least two points: a tap is not a signature.
+      if (typeof raw !== 'string' || raw.length > SIGNATURE_MAX_LENGTH || !SIGNATURE_PATTERN.test(raw) || !/[ ;]/.test(raw))
+        return { error: msg.signatureMissing };
+      const ok = raw.split(/[ ;]/).every((p) => {
+        const [x, y] = p.split(',').map(Number);
+        return x! <= 1000 && y! <= 400;
+      });
+      return ok ? { value: raw } : { error: msg.signatureMissing };
+    }
+    case 'barcode': {
+      if (typeof raw !== 'string') return { error: msg.enterCode };
+      const code = raw.trim();
+      if (!code) return { error: msg.enterCode };
+      if (code.length > q.maxLength) return { error: fillMessage(msg.maxLength, { n: q.maxLength }) };
+      if (q.pattern && !new RegExp(q.pattern).test(code)) return { error: msg.codeInvalid };
+      return { value: code };
+    }
   }
 }
 
@@ -466,6 +494,7 @@ export function answerText(def: SurveyDefinition, id: string, answers: Answers):
   if (q.type === 'multi' && Array.isArray(v)) return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
   if (q.type === 'ranking' && Array.isArray(v)) return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
   if (q.type === 'hotspot' && Array.isArray(v)) return v.map((c) => q.regions.find((r) => r.code === c)?.label ?? String(c)).join(', ');
+  if (q.type === 'signature') return v ? 'signed' : '';
   if (typeof v === 'object') return '';
   return String(v);
 }

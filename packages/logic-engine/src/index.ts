@@ -11,3 +11,4 @@ export * from './xml.js';
 export * from './debug.js';
 export * from './translation-tools.js';
 export * from './voice.js';
+export * from './geo.js';

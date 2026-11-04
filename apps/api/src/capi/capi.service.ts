@@ -11,7 +11,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { Prisma, type ResponseStatus, type SurveyVersion } from '@zapx/db';
-import { classifyDevice, matchingQuotas, prepareSurvey, replayInterview } from '@zapx/logic-engine';
+import { checkGeofence, classifyDevice, matchingQuotas, prepareSurvey, replayInterview } from '@zapx/logic-engine';
 import { capiSettingsOf, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
@@ -37,6 +37,8 @@ export interface UploadedInterview {
   endedEarly?: boolean;
   location?: { start?: DevicePoint | null; end?: DevicePoint | null };
   audio?: 'recorded' | 'declined' | 'unavailable';
+  pageTimes?: Array<{ pageId: string; shownAt: string; ms: number }>;
+  interruptions?: Array<{ kind: 'hidden' | 'paused'; at: string; ms: number }>;
 }
 
 export interface DevicePoint {
@@ -270,6 +272,7 @@ export class CapiService {
             ...(capture.audio !== 'off' ? { audio: item.audio ?? 'unavailable' } : {}),
           }
         : null;
+    const evidence = interviewEvidence(def, item, capture);
     const base = {
       id,
       tenantId: user.tenantId,
@@ -291,6 +294,7 @@ export class CapiService {
       durationMs,
       lastPageId,
       ...(location ? { location: location as Prisma.InputJsonValue } : {}),
+      ...(evidence ? { evidence: evidence as unknown as Prisma.InputJsonValue } : {}),
     };
 
     let quality = {};
@@ -315,6 +319,8 @@ export class CapiService {
           gpsRequired: capture.gps === 'required',
           ...(capture.gps !== 'off' ? where : {}),
           overlapping,
+          ...(evidence?.geofence ? { geofence: evidence.geofence } : {}),
+          ...(evidence?.interruptions ? { interruptions: evidence.interruptions } : {}),
         },
       );
       quality = this.quality.fields(def, assessment, false);
@@ -353,6 +359,38 @@ export class CapiService {
     await this.webhooks.responseFinished(id, status.toLowerCase() as RedirectStatus);
     return { clientId: item.clientId, result: 'stored', status: status.toLowerCase(), ...(reason ? { reason } : {}) };
   }
+}
+
+export interface InterviewEvidence {
+  pageTimes?: Array<{ pageId: string; shownAt: string | null; ms: number }>;
+  interruptions?: { count: number; totalMs: number; log: Array<{ kind: 'hidden' | 'paused'; at: string | null; ms: number }> };
+  geofence?: { inside: boolean; nearest: { label: string; distanceM: number } | null };
+}
+
+const isoOrNull = (s: string) => (Number.isFinite(Date.parse(s)) ? new Date(s).toISOString() : null);
+
+/**
+ * What the device recorded about how the interview went, as kept with the response. Only pages of the
+ * survey are kept; the geofence is checked here, on the server, from the start location.
+ */
+export function interviewEvidence(
+  def: SurveyDefinition,
+  item: Pick<UploadedInterview, 'pageTimes' | 'interruptions' | 'location'>,
+  capture: ReturnType<typeof capiSettingsOf>,
+): InterviewEvidence | null {
+  const out: InterviewEvidence = {};
+  const pages = new Set(def.pages.map((p) => p.id));
+  const times = (item.pageTimes ?? []).filter((t) => pages.has(t.pageId));
+  if (times.length) out.pageTimes = times.map((t) => ({ pageId: t.pageId, shownAt: isoOrNull(t.shownAt), ms: Math.round(t.ms) }));
+  if (capture.interruptions && item.interruptions) {
+    const log = item.interruptions.map((i) => ({ kind: i.kind, at: isoOrNull(i.at), ms: Math.round(i.ms) }));
+    out.interruptions = { count: log.length, totalMs: log.reduce((n, i) => n + i.ms, 0), log };
+  }
+  if (capture.gps !== 'off' && capture.geofences.length) {
+    const c = checkGeofence(item.location?.start ?? null, capture.geofences);
+    out.geofence = { inside: c.inside, nearest: c.nearest };
+  }
+  return Object.keys(out).length ? out : null;
 }
 
 function clampDate(iso: string, now: number, max: number): Date {

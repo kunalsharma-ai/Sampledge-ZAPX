@@ -22,6 +22,8 @@ import { DesignStudio } from '@/components/DesignStudio';
 import { Languages } from '@/components/Languages';
 import { Quality } from '@/components/Quality';
 import { CapiAssignments } from '@/components/CapiAssignments';
+import { Supervisor } from '@/components/Supervisor';
+import { EmailInvitations } from '@/components/EmailInvitations';
 import { CatiCalls, DoNotCallList } from '@/components/CatiCalls';
 import { ExportJobs } from '@/components/ExportJobs';
 import { Analysis } from '@/components/Analysis';
@@ -274,7 +276,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             ['languages', 'Languages'],
             ['preview', 'Preview'],
             ['qa', 'QA lab'],
-            ['distribute', 'Links & status'],
+            ['distribute', 'Distribution'],
             ['capi', 'Interviewers'],
             ['quality', 'Quality & fieldwork'],
             ['results', 'Quotas & data'],
@@ -331,10 +333,16 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         />
       ) : null}
       {tab === 'qa' ? <QaLab surveyId={id} readOnly={readOnly} dirty={dirty} hasLive={!!survey.liveVersionId} /> : null}
-      {tab === 'distribute' ? <Distribute survey={survey} readOnly={readOnly} onChanged={load} /> : null}
+      {tab === 'distribute' ? (
+        <div className="stack">
+          <Distribute survey={survey} readOnly={readOnly} onChanged={load} />
+          <EmailInvitations surveyId={id} readOnly={readOnly} live={!!survey.liveVersionId} />
+        </div>
+      ) : null}
       {tab === 'capi' ? (
         <div className="stack">
           <CapiAssignments surveyId={id} readOnly={readOnly} hasLive={!!survey.liveVersionId} />
+          <Supervisor surveyId={id} readOnly={readOnly} />
           <CatiCalls surveyId={id} readOnly={readOnly} />
           {!readOnly ? <DoNotCallList /> : null}
         </div>

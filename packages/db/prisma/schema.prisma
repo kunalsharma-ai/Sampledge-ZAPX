@@ -439,6 +439,8 @@ model Response {
   /// CAPI: {start?, end?: {lat, lon, accuracy, at}} and {audioConsent?}. Rounded to about a metre.
   location     Json?
   captures     Capture[]
+  /// Blueprint phase 3, CAPI: {pageTimes: [{pageId, shownAt, ms}], interruptions: {count, totalMs, log}, geofence}.
+  evidence     Json?
 
   @@unique([surveyId, vendorId, uid])
   @@index([surveyId, reviewState])
@@ -1085,4 +1087,142 @@ model QaTestCase {
   updatedAt   DateTime @updatedAt
 
   @@index([surveyId])
+}
+
+// ---- Blueprint phase 3: fieldwork and security ------------------------------------------------
+
+enum BackCheckMethod {
+  PHONE
+  VISIT
+  RECORDING
+}
+
+enum BackCheckState {
+  PENDING
+  VERIFIED
+  FAILED
+  UNREACHABLE
+}
+
+/// A completed CAPI interview drawn for verification: a supervisor calls or visits the respondent,
+/// or listens to the recording, and records whether the interview really took place as recorded.
+model BackCheck {
+  id            String          @id @default(cuid())
+  tenantId      String
+  surveyId      String
+  responseId    String          @unique
+  /// The interviewer of the checked interview (kept here so per-interviewer rates need no join).
+  interviewerId String?
+  method        BackCheckMethod @default(PHONE)
+  state         BackCheckState  @default(PENDING)
+  /// Questions re-asked during the check whose answer did not match.
+  mismatches    String[]        @default([])
+  note          String?
+  sampledById   String
+  checkedById   String?
+  checkedAt     DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@index([surveyId, state])
+  @@index([surveyId, interviewerId])
+}
+
+enum AppealState {
+  OPEN
+  UPHELD
+  OVERTURNED
+}
+
+/// An interviewer asks for a quality decision on one of their interviews to be looked at again.
+model QualityAppeal {
+  id           String      @id @default(cuid())
+  tenantId     String
+  surveyId     String
+  /// One appeal per interview.
+  responseId   String      @unique
+  raisedById   String
+  message      String
+  state        AppealState @default(OPEN)
+  decisionNote String?
+  decidedById  String?
+  decidedAt    DateTime?
+  createdAt    DateTime    @default(now())
+
+  @@index([surveyId, state])
+  @@index([raisedById])
+}
+
+/// Someone a survey can be sent to by email (blueprint distribution).
+model Contact {
+  id             String    @id @default(cuid())
+  tenantId       String
+  surveyId       String
+  email          String
+  name           String?
+  language       String?
+  /// Extra columns from the import, passed to the survey as link parameters (e.g. region, panel id).
+  fields         Json      @default("{}")
+  unsubscribedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([surveyId, email])
+  @@index([tenantId])
+}
+
+enum DistributionState {
+  SCHEDULED
+  SENDING
+  SENT
+  CANCELLED
+}
+
+/// One email invitation wave: who, when, the message, and reminders to people who have not finished.
+model Distribution {
+  id              String            @id @default(cuid())
+  tenantId        String
+  surveyId        String
+  name            String
+  subject         String
+  /// Plain text; [link] becomes the person's own survey link, [name] their name, [unsubscribe] the opt-out link.
+  body            String
+  sendAt          DateTime
+  /// Remind people who have not completed this many days after the last email (0 = no reminders).
+  reminderDays    Int               @default(0)
+  maxReminders    Int               @default(0)
+  reminderSubject String?
+  state           DistributionState @default(SCHEDULED)
+  createdById     String
+  sentAt          DateTime?
+  createdAt       DateTime          @default(now())
+  invitations     Invitation[]
+
+  @@index([surveyId])
+  @@index([state, sendAt])
+}
+
+enum InvitationState {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Invitation {
+  id             String          @id @default(cuid())
+  tenantId       String
+  distributionId String
+  distribution   Distribution    @relation(fields: [distributionId], references: [id], onDelete: Cascade)
+  contactId      String
+  /// The respondent id in the person's survey link; random, so links cannot be guessed.
+  uid            String          @unique
+  state          InvitationState @default(QUEUED)
+  /// Emails sent: the invitation plus reminders.
+  sends          Int             @default(0)
+  lastSentAt     DateTime?
+  nextReminderAt DateTime?
+  error          String?
+  createdAt      DateTime        @default(now())
+
+  @@unique([distributionId, contactId])
+  @@index([nextReminderAt])
 }

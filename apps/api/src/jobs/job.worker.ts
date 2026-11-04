@@ -23,6 +23,7 @@ import { ExportRunner, type ExportOptions } from '../exports/export-runner.servi
 import { QaService, type QaRunInput } from '../qa/qa.service';
 import { FilesService } from './files.service';
 import { JOB_TYPES } from './jobs.service';
+import { DistributionService } from '../distribution/distribution.service';
 
 const LEASE_MS = 5 * 60_000;
 const RETRY_DELAY_MS = 30_000;
@@ -62,6 +63,7 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly captures: CaptureService,
     private readonly transcription: TranscriptionService,
     private readonly telephony: TelephonyService,
+    private readonly distribution: DistributionService,
   ) {}
 
   onApplicationBootstrap() {
@@ -100,6 +102,8 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
       if (!job) break;
       out[await this.execute(job)]++;
     }
+    // Blueprint phase 3: scheduled invitation emails and reminders.
+    await this.distribution.pass().catch((e) => this.log.error(`Email pass failed: ${(e as Error).message}`));
     if (Date.now() - this.lastHousekeeping > HOUSEKEEPING_MS) {
       this.lastHousekeeping = Date.now();
       await this.housekeeping().catch((e) => this.log.error(`Housekeeping failed: ${(e as Error).message}`));

@@ -116,3 +116,20 @@ marked as machine transcription.
 
 Interviewer device management, supervisor back-checks, and transcription of open answers spoken
 online (the runtime does not record voice answers).
+
+## Blueprint phase 3: evidence, supervision and appeals
+
+- **Interview areas** (`settings.capi.geofences`): circles where interviews may take place. The app
+  warns an interviewer who starts outside; the server re-checks the start location and flags
+  `outside_geofence`. GPS accuracy counts in the interviewer's favour, up to 1 km.
+- **Page timestamps and interruptions**: the app records when each page was shown and for how long,
+  and each time the interviewer left the app (2 s or more) or pressed Pause. Pauses do not count toward
+  the interview length. More than 5 interruptions or over 15 minutes in total flags `interrupted`.
+  Reviewers see both under the interview's evidence.
+- **Signature and barcode/QR questions**: see `docs/adr/0031-blueprint-fieldwork-and-security.md`.
+- **Supervisor dashboard** (Interviewers tab): productivity and quality per interviewer, exceptions,
+  a map of start points (no map tiles), back-checks and appeals.
+- **Back-checks**: draw a share of each interviewer's completes; record verified, unreachable or
+  failed. Failed rejects the interview through the quality review.
+- **Appeals**: interviewers appeal a rejected interview once from "Results and appeals" in the app;
+  a supervisor keeps the rejection or reinstates the interview (if its quotas have room).

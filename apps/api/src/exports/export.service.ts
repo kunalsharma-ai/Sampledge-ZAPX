@@ -99,6 +99,10 @@ export class ExportService {
         switch (q.type) {
           case 'info':
             break;
+          case 'signature':
+            // The drawing stays in ZAPX (shown in the review queue); the export says whether it was given.
+            add({ key: q.id, label: `${q.id}: signed (1/0)`, get: (r) => (ans(r)[q.id] === undefined ? null : ans(r)[q.id] ? 1 : 0) });
+            break;
           case 'hotspot':
             // Like multiple choice: one 0/1 column per area of the picture.
             for (const reg of q.regions)

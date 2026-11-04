@@ -237,6 +237,44 @@ export const photoQuestionSchema = z.object({
   type: z.literal('photo'),
 });
 
+/**
+ * Signature (blueprint phase 3): the respondent signs on screen with a finger, pen or mouse. The answer
+ * is the drawing itself as strokes on a 1000 x 400 grid ("x,y x,y;x,y ..."), small enough to keep with
+ * the answers. A signature shows that someone drew on the screen: it is not a qualified electronic
+ * signature and does not identify the signer.
+ */
+export const signatureQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('signature'),
+});
+
+/** Strokes of a signature: "x,y x,y;x,y x,y" with integers on a 1000 x 400 grid. */
+export const SIGNATURE_PATTERN = /^\d{1,4},\d{1,3}( \d{1,4},\d{1,3})*(;\d{1,4},\d{1,3}( \d{1,4},\d{1,3})*)*$/;
+export const SIGNATURE_MAX_LENGTH = 24_000;
+
+/**
+ * Barcode or QR code (blueprint phase 3): the interviewer or respondent scans a code with the camera
+ * where the browser can read codes (BarcodeDetector), or types it. The answer is the code's text.
+ */
+export const barcodeQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('barcode'),
+  /** Optional regular expression the code must match (for example a 13-digit EAN: ^\d{13}$). */
+  pattern: z
+    .string()
+    .max(200)
+    .refine((v) => {
+      try {
+        new RegExp(v);
+        return true;
+      } catch {
+        return false;
+      }
+    }, 'Not a valid regular expression')
+    .optional(),
+  maxLength: z.number().int().min(1).max(500).default(200),
+});
+
 /** Reference to a captured photo or recording, unique within one interview. */
 export const CAPTURE_REF = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -260,6 +298,8 @@ export const questionSchema = z.discriminatedUnion('type', [
   cardSortQuestionSchema,
   hotspotQuestionSchema,
   photoQuestionSchema,
+  signatureQuestionSchema,
+  barcodeQuestionSchema,
   infoElementSchema,
 ]);
 export type Question = z.infer<typeof questionSchema>;
@@ -275,6 +315,8 @@ export type ScaleQuestion = z.infer<typeof scaleQuestionSchema>;
 export type RankingQuestion = z.infer<typeof rankingQuestionSchema>;
 export type SumQuestion = z.infer<typeof sumQuestionSchema>;
 export type PhotoQuestion = z.infer<typeof photoQuestionSchema>;
+export type SignatureQuestion = z.infer<typeof signatureQuestionSchema>;
+export type BarcodeQuestion = z.infer<typeof barcodeQuestionSchema>;
 export type CardSortQuestion = z.infer<typeof cardSortQuestionSchema>;
 export type HotspotQuestion = z.infer<typeof hotspotQuestionSchema>;
 
@@ -493,6 +535,16 @@ export function qualitySettingsOf(def: { settings?: { quality?: unknown } }): Qu
 
 // ---- Face-to-face capture (Milestone 12) -----------------------------------------------------------
 
+/** An area where CAPI interviews of a survey may take place: a circle around a point. */
+export const geofenceSchema = z.object({
+  label: z.string().min(1).max(80),
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+  /** Radius in metres. */
+  radiusM: z.number().min(10).max(500_000),
+});
+export type Geofence = z.infer<typeof geofenceSchema>;
+
 export const capiSettingsSchema = z.object({
   /** Record where CAPI interviews happen (start and end). required: an interview cannot start without a location. */
   gps: z.enum(['off', 'optional', 'required']).default('off'),
@@ -500,6 +552,14 @@ export const capiSettingsSchema = z.object({
   audio: z.enum(['off', 'consent']).default('off'),
   /** What the interviewer reads out to ask for consent to record. */
   consentText: z.string().max(1000).optional(),
+  /**
+   * Blueprint phase 3: where interviews may take place. An interview that starts outside every area
+   * (or without a location while areas are set) is flagged for review; it is never thrown away.
+   * Needs gps optional or required.
+   */
+  geofences: z.array(geofenceSchema).max(50).default([]),
+  /** Keep a log of when the interviewer leaves the app or pauses during an interview. */
+  interruptions: z.boolean().default(true),
 });
 export type CapiSettings = z.infer<typeof capiSettingsSchema>;
 

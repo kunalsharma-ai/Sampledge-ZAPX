@@ -61,4 +61,13 @@ describe('face to face', () => {
     expect(far.flags[0]!.detail).toBe('The interview ended 2.1 km from where it started.');
     expect(far.flags[1]!.detail).toBe('The interviewer recorded 2 other interviews at the same time.');
   });
+  it('flags an interview outside the allowed areas and one often left', () => {
+    const outside = run({ capi: { gpsRequired: false, geofence: { inside: false, nearest: { label: 'Ward 4', distanceM: 2300 } } } });
+    expect(codes(outside)).toEqual(['outside_geofence']);
+    expect(outside.flags[0]!.detail).toBe('The interview started 2.3 km outside the nearest allowed area (Ward 4).');
+    expect(codes(run({ capi: { gpsRequired: false, geofence: { inside: true, nearest: null } } }))).toEqual([]);
+    expect(codes(run({ capi: { gpsRequired: false, interruptions: { count: 2, totalMs: 60_000 } } }))).toEqual([]);
+    const left = run({ capi: { gpsRequired: false, interruptions: { count: 7, totalMs: 20 * 60_000 } } });
+    expect(left.flags[0]!.detail).toBe('The interviewer left the interview 7 times for 20 min in total.');
+  });
 });
