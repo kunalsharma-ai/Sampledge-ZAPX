@@ -19,6 +19,7 @@ import {
   type PhotoHandler,
 } from '@zapx/survey-renderer';
 import type { AnswerValue, Answers, Theme } from '@zapx/survey-schema';
+import { textDirection } from '@zapx/survey-schema';
 
 interface Look {
   theme: Theme;
@@ -111,6 +112,7 @@ export function App() {
       if (s.state !== 'unavailable' && s.look) {
         setLook(s.look);
         document.documentElement.lang = s.look.language;
+        document.documentElement.dir = textDirection(s.look.language);
       }
       if (s.state === 'in_progress') {
         setAnswers(s.answers ?? {});

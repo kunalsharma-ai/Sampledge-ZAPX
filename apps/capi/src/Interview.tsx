@@ -32,6 +32,7 @@ import {
   defaultPresentation,
   parsePresentation,
   parseSurveyDefinition,
+  textDirection,
   type AnswerValue,
   type Answers,
 } from '@zapx/survey-schema';
@@ -196,7 +197,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   ];
 
   return (
-    <div className="zx-root" lang={current.language}>
+    <div className="zx-root" lang={current.language} dir={textDirection(current.language)}>
       <style>{defaultThemeCss}</style>
       <style>{themeCss(presentation.theme, presentation.devices)}</style>
       <div className="capi-bar">

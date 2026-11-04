@@ -183,6 +183,16 @@ export class ExportService {
             });
         }
       }
+      // URL variables: stored with the answers when the respondent entered.
+      for (const u of def.urlVariables ?? [])
+        add({
+          key: u.id,
+          label: u.label ?? `${u.id} (link parameter ${u.param})`,
+          get: (r) => {
+            const a = ans(r)[u.id];
+            return typeof a === 'number' || typeof a === 'string' ? a : null;
+          },
+        });
       // Calculated variables: worked out from each respondent's answers (formula of the first version that has it).
       for (const variable of def.variables ?? [])
         add({

@@ -380,6 +380,8 @@ model Response {
   /// Termination rule or quota that ended the interview, if any.
   outcomeReason    String?
   answers          Json           @default("{}")
+  /// Seed of this respondent's page order when it differs from the response id (least-fill blocks).
+  orderSeed        String?
   /// Index of the page currently shown; -1 once finished.
   currentPage      Int            @default(0)
   /// Extra entry parameters, available to redirects as [param:name].
@@ -451,11 +453,11 @@ model Response {
 }
 
 model QuotaCount {
-  id       String @id @default(cuid())
-  surveyId String
-  survey   Survey @relation(fields: [surveyId], references: [id])
-  quotaId  String
-  count    Int    @default(0)
+  id             String @id @default(cuid())
+  surveyId       String
+  survey         Survey @relation(fields: [surveyId], references: [id])
+  quotaId        String
+  count          Int    @default(0)
   /// Target changed while the survey is live (no republish). Null: the published target applies.
   targetOverride Int?
 
@@ -1040,4 +1042,47 @@ model LibraryItem {
   updatedAt   DateTime        @updatedAt
 
   @@index([tenantId, kind])
+}
+
+/// Blueprint phase 2: the organization's translation glossary. Terms are sent with AI translation
+/// requests and checked by per-language QA.
+model GlossaryTerm {
+  id          String   @id @default(cuid())
+  tenantId    String
+  /// Target language tag, e.g. "fr" or "es-MX".
+  language    String
+  source      String
+  target      String
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, language, source])
+}
+
+/// Blueprint phase 2: how often each page of a least-fill block has been picked for a respondent.
+model BlockExposure {
+  surveyId String
+  blockId  String
+  pageId   String
+  count    Int    @default(0)
+
+  @@id([surveyId, blockId, pageId])
+}
+
+/// Blueprint phase 2: saved QA test cases of a survey (answers plus expectations), run against
+/// every draft as a regression suite.
+model QaTestCase {
+  id          String   @id @default(cuid())
+  tenantId    String
+  surveyId    String
+  name        String
+  /// The case as `qaTestCaseSchema` (answers, seed, expect).
+  data        Json
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([surveyId])
 }

@@ -5,9 +5,10 @@
  * All survey text is rendered as plain text (never as HTML), so questionnaire content and piped
  * answers cannot inject markup or scripts.
  */
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { conditionHoldsFor } from '@zapx/logic-engine';
 import type { AnswerValue, Answers, DeviceSettings, Option, Question, QuestionMedia, Theme } from '@zapx/survey-schema';
+import { formatNumber, textDirection } from '@zapx/survey-schema';
 
 export type DisplayQuestion = Question & { renderedText?: string; condition?: string };
 
@@ -187,26 +188,35 @@ export function SurveyPage({
   const visible = visibleOnPage(questions, answers, context);
   const msg = { ...DEFAULT_RENDERER_MESSAGES, ...messages };
   return (
-    <div className="zx-page">
-      {visible.map((q) => (
-        <QuestionView
-          key={q.id}
-          question={q}
-          value={answers[q.id] ?? null}
-          error={errors[q.id]}
-          disabled={disabled}
-          onChange={(v) => onChange(q.id, v)}
-          mediaUrl={mediaUrl}
-          onMediaPlayed={onMediaPlayed ? () => onMediaPlayed(q.id) : undefined}
-          readAloud={readAloud}
-          language={language}
-          messages={msg}
-          photos={photos}
-        />
-      ))}
-    </div>
+    <LanguageContext.Provider value={language}>
+      <div className="zx-page" dir={textDirection(language)} lang={language}>
+        {visible.map((q) => (
+          <QuestionView
+            key={q.id}
+            question={q}
+            value={answers[q.id] ?? null}
+            error={errors[q.id]}
+            disabled={disabled}
+            onChange={(v) => onChange(q.id, v)}
+            mediaUrl={mediaUrl}
+            onMediaPlayed={onMediaPlayed ? () => onMediaPlayed(q.id) : undefined}
+            readAloud={readAloud}
+            language={language}
+            messages={msg}
+            photos={photos}
+          />
+        ))}
+      </div>
+    </LanguageContext.Provider>
   );
 }
+
+/** Language of the page, for number formats. */
+const LanguageContext = createContext<string | undefined>(undefined);
+const useNumber = () => {
+  const lang = useContext(LanguageContext);
+  return (n: number) => formatNumber(n, lang);
+};
 
 interface QuestionViewProps {
   question: DisplayQuestion;
@@ -521,10 +531,12 @@ function Slider({
   const max = q.max!;
   const n = typeof value === 'number' ? value : typeof value === 'string' && value !== '' ? Number(value) : null;
   const touched = n !== null && Number.isFinite(n);
+  const fmt = useNumber();
+  const shown = touched ? `${fmt(n!)}${q.unit ? ` ${q.unit}` : ''}` : '';
   return (
     <div className={`zx-slider${touched ? '' : ' zx-untouched'}`}>
       <div className="zx-slider-value" aria-hidden="true">
-        {touched ? `${n}${q.unit ? ` ${q.unit}` : ''}` : '–'}
+        {touched ? shown : '–'}
       </div>
       <input
         type="range"
@@ -534,13 +546,13 @@ function Slider({
         // Untouched sliders sit in the middle but have no answer until moved.
         value={touched ? n! : (min + max) / 2}
         aria-label={label}
-        aria-valuetext={touched ? `${n}${q.unit ? ` ${q.unit}` : ''}` : 'Not answered'}
+        aria-valuetext={touched ? shown : 'Not answered'}
         onChange={(e) => onChange(Number(e.target.value))}
         onClick={(e) => onChange(Number((e.target as HTMLInputElement).value))}
       />
       <div className="zx-scale-ends" aria-hidden="true">
-        <span>{q.minLabel ?? min}</span>
-        <span>{q.maxLabel ?? max}</span>
+        <span>{q.minLabel ?? fmt(min)}</span>
+        <span>{q.maxLabel ?? fmt(max)}</span>
       </div>
     </div>
   );
@@ -714,6 +726,7 @@ function ConstantSum({
 }) {
   const current = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, number | string>) : {};
   const total = Object.values(current).reduce<number>((a, v) => a + (Number(v) || 0), 0);
+  const fmt = useNumber();
   const remaining = Math.round((q.total - total) * 100) / 100;
   return (
     <div className="zx-sum">
@@ -740,7 +753,7 @@ function ConstantSum({
         </label>
       ))}
       <p className={`zx-sum-total${remaining === 0 ? ' zx-done' : remaining < 0 ? ' zx-over' : ''}`} aria-live="polite">
-        {messages.sumRemaining.replace('{n}', String(remaining))}
+        {messages.sumRemaining.replace('{n}', fmt(remaining))}
         {q.unit ? ` ${q.unit}` : ''}
       </p>
     </div>
@@ -959,7 +972,7 @@ export const defaultThemeCss = `
 .zx-grid-wrap{overflow-x:auto;}
 .zx-grid{border-collapse:collapse;width:100%;}
 .zx-grid th,.zx-grid td{padding:10px 8px;text-align:center;border-bottom:1px solid var(--zx-border);font-weight:400;}
-.zx-grid tbody th{text-align:left;}
+.zx-grid tbody th{text-align:start;}
 .zx-grid input{width:20px;height:20px;accent-color:var(--zx-accent);}
 .zx-error{color:var(--zx-error);margin:8px 0 0;font-size:.92rem;}
 .zx-has-error .zx-option,.zx-has-error .zx-input{border-color:var(--zx-error);}
@@ -968,7 +981,7 @@ export const defaultThemeCss = `
 .zx-button.zx-secondary{background:transparent;color:var(--zx-accent);}
 .zx-button:disabled{opacity:.6;cursor:default;}
 .zx-logo{display:block;max-height:48px;max-width:200px;margin:0 0 16px;}
-.zx-progress-text{color:var(--zx-muted);font-size:.85rem;margin:0 0 12px;text-align:right;}
+.zx-progress-text{color:var(--zx-muted);font-size:.85rem;margin:0 0 12px;text-align:end;}
 .zx-lang{display:flex;justify-content:flex-end;margin:0 0 8px;}
 .zx-lang select{font:inherit;padding:4px 8px;border:1px solid var(--zx-border);border-radius:8px;background:var(--zx-card);color:var(--zx-text);}
 .zx-test-banner{background:#fff4d6;color:#5c4400;border-radius:8px;padding:6px 10px;font-size:.85rem;margin:0 0 12px;}
@@ -1007,11 +1020,11 @@ export const defaultThemeCss = `
 .zx-rank-actions{display:flex;gap:4px;}
 .zx-icon-button{font:inherit;width:36px;height:36px;border:1px solid var(--zx-border);border-radius:8px;background:var(--zx-card);color:var(--zx-text);cursor:pointer;}
 .zx-icon-button:disabled{opacity:.35;cursor:default;}
-.zx-rank-add{font:inherit;text-align:left;background:var(--zx-card);color:var(--zx-text);width:100%;}
+.zx-rank-add{font:inherit;text-align:start;background:var(--zx-card);color:var(--zx-text);width:100%;}
 .zx-sum{display:flex;flex-direction:column;gap:8px;}
 .zx-sum-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--zx-border);}
 .zx-sum-row .zx-numeric{max-width:160px;}
-.zx-sum-total{font-weight:600;margin:4px 0 0;text-align:right;color:var(--zx-muted);}
+.zx-sum-total{font-weight:600;margin:4px 0 0;text-align:end;color:var(--zx-muted);}
 .zx-sum-total.zx-done{color:var(--zx-accent);}
 .zx-sum-total.zx-over{color:var(--zx-error);}
 .zx-cardsort{display:flex;flex-direction:column;gap:12px;}
@@ -1040,7 +1053,7 @@ export const defaultThemeCss = `
   .zx-grid thead{display:none;}
   .zx-grid tr{display:block;border-bottom:1px solid var(--zx-border);padding:8px 0;}
   .zx-grid tbody th{display:block;border:0;padding:4px 0;font-weight:600;}
-  .zx-grid td{display:flex;align-items:center;gap:10px;border:0;text-align:left;padding:6px 0;}
+  .zx-grid td{display:flex;align-items:center;gap:10px;border:0;text-align:start;padding:6px 0;}
   .zx-grid td::after{content:attr(data-label);}
   .zx-scale{grid-template-columns:repeat(min(var(--zx-points),6),minmax(0,1fr));}
 }

@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import type { QaReport } from '@zapx/logic-engine';
+import { TestCases } from './TestCases';
 import { api, waitForJob, type Job } from '@/lib/api';
 import { JobProgress } from './ExportJobs';
 import { ErrorNote } from './Shell';
@@ -137,6 +138,7 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
           <ErrorNote error={error} />
         </div>
         {current ? <QaResult version={current.version} report={current.report} /> : <p className="muted">Run QA to see a report.</p>}
+        <TestCases surveyId={surveyId} readOnly={readOnly} dirty={dirty} />
       </div>
       <aside className="panel">
         <h2>Past runs</h2>

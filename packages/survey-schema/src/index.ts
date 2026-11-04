@@ -377,8 +377,45 @@ export const blockSchema = z.object({
   pages: z.array(z.string().regex(PAGE_ID)).min(2).max(100),
   randomize: z.boolean().default(true),
   pick: z.number().int().min(1).optional(),
+  /**
+   * How `pick` chooses pages: `random` (seeded per respondent), or `least_fill` (the pages shown
+   * least so far, counted by the server; offline CAPI interviews fall back to random).
+   */
+  balance: z.enum(['random', 'least_fill']).default('random'),
 });
 export type Block = z.infer<typeof blockSchema>;
+
+/**
+ * URL variable (embedded data): a value passed on the survey link, e.g. `&seg=B2B`, stored with the
+ * response and usable in logic, quotas and piping like an answer. Never shown to the respondent as
+ * a question. `numeric` turns the value into a number (empty when it is not one).
+ */
+export const urlVariableSchema = z.object({
+  id: variableName,
+  /** Link parameter name. */
+  param: z.string().regex(/^[A-Za-z0-9_.-]{1,64}$/, 'Letters, digits, _ . - only'),
+  label: z.string().max(200).optional(),
+  numeric: z.boolean().default(false),
+});
+export type UrlVariable = z.infer<typeof urlVariableSchema>;
+
+/** Link parameters the platform uses itself; URL variables cannot read them. */
+export const RESERVED_LINK_PARAMS = ['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig', 'lang'];
+
+/** The answers a respondent's link parameters give the survey's URL variables. */
+export function urlVariableAnswers(def: { urlVariables?: UrlVariable[] }, params: Record<string, string>): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
+  for (const v of def.urlVariables ?? []) {
+    const raw = params[v.param];
+    if (raw === undefined || raw === '') continue;
+    const text = raw.slice(0, 500);
+    if (v.numeric) {
+      const n = Number(text);
+      if (Number.isFinite(n)) out[v.id] = n;
+    } else out[v.id] = text;
+  }
+  return out;
+}
 
 /**
  * Calculated variable (derived / embedded variable): a value worked out from answers with the logic
@@ -487,6 +524,7 @@ export const surveyDefinitionSchema = z.object({
   loops: z.array(loopSchema).max(50).default([]),
   blocks: z.array(blockSchema).max(50).default([]),
   variables: z.array(variableSchema).max(200).default([]),
+  urlVariables: z.array(urlVariableSchema).max(100).default([]),
   settings: z
     .object({
       allowBack: z.boolean().default(false),
@@ -645,3 +683,48 @@ export function defaultPresentation(): Presentation {
   return presentationSchema.parse({});
 }
 export * from './templates.js';
+
+/** Languages written right to left (by primary subtag). */
+const RTL_LANGUAGES = new Set(['ar', 'arc', 'ckb', 'dv', 'fa', 'he', 'iw', 'ks', 'ku', 'pa-arab', 'ps', 'sd', 'syr', 'ug', 'ur', 'yi']);
+
+/** Writing direction of a BCP 47 language tag: `rtl` for Arabic, Hebrew, Persian, Urdu and the like. */
+export function textDirection(tag: string | undefined): 'ltr' | 'rtl' {
+  if (!tag) return 'ltr';
+  const t = tag.toLowerCase();
+  if (/-arab\b/.test(t) && !t.startsWith('en')) return 'rtl';
+  if (/-(latn|cyrl)\b/.test(t)) return 'ltr';
+  return RTL_LANGUAGES.has(t.split('-')[0]!) ? 'rtl' : 'ltr';
+}
+
+/** A number written the way the language writes it (digits, decimal and grouping marks). */
+export function formatNumber(n: number, tag: string | undefined, maxFractionDigits = 2): string {
+  try {
+    return new Intl.NumberFormat(tag || 'en', { maximumFractionDigits: maxFractionDigits }).format(n);
+  } catch {
+    return String(n);
+  }
+}
+
+/**
+ * QA test case (blueprint phase 2): a set of answers and what must happen with them. Run against
+ * every draft as a regression suite. `shows` and `skips` hold page or question ids; `outcome` is
+ * `complete`, a termination status such as `terminate`, or `status:TERMINATION_ID`.
+ */
+export const qaTestCaseSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  answers: z.record(z.string().max(100), z.unknown()).default({}),
+  /** Seed for randomized blocks, so the case always sees the same pages. */
+  seed: z.string().max(100).default(''),
+  expect: z
+    .object({
+      outcome: z.string().max(100).optional(),
+      shows: z.array(z.string().max(100)).max(200).default([]),
+      skips: z.array(z.string().max(100)).max(200).default([]),
+      variables: z.record(z.string().max(100), z.union([z.string(), z.number(), z.boolean(), z.null()])).default({}),
+      /** Quotas the respondent must count toward (exactly this set when given). */
+      quotas: z.array(z.string().max(100)).max(100).optional(),
+    })
+    .prefault({}),
+});
+export type QaTestCase = z.infer<typeof qaTestCaseSchema>;
+export type QaTestCaseInput = z.input<typeof qaTestCaseSchema>;

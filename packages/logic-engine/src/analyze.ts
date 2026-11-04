@@ -179,6 +179,15 @@ export function analyzeSurvey(source: SurveyDefinition): AnalysisReport {
       add('warning', 'ZERO_QUOTA', `Quota ${q.id} has a target of 0; every matching respondent will be over quota.`, `quotas.${q.id}`);
   });
 
+  // URL variables are known before the first page, like an answer given on entry.
+  (def.urlVariables ?? []).forEach((u) => {
+    claim(u.id, `urlVariables.${u.id}`);
+    const pseudo = (u.numeric
+      ? { id: u.id, type: 'numeric', text: u.label ?? u.id, required: false, validations: [], integer: false, display: 'input' }
+      : { id: u.id, type: 'open', text: u.label ?? u.id, required: false, validations: [], multiline: false }) as unknown as Question;
+    symbols.set(u.id, { question: pseudo, pageIndex: -1, questionIndex: -1 });
+  });
+
   // Calculated variables behave like a question asked right after the last question they use.
   (def.variables ?? []).forEach((v, vi) => {
     const loc = `variables.${v.id}`;
