@@ -168,7 +168,7 @@ export class AnalysisService {
   }
 
   /** Rake the records to the targets and attach the weights. Returns the diagnostics. */
-  private applyWeights(vars: Variable[], records: AnalysisRecord[], w: NonNullable<Weighting>): WeightingSummary {
+  applyWeights(vars: Variable[], records: AnalysisRecord[], w: NonNullable<Weighting>): WeightingSummary {
     const dims = w.dimensions.map((d) => ({ variable: this.pick(vars, d.variable), targets: d.targets }));
     let result: RakeResult;
     try {

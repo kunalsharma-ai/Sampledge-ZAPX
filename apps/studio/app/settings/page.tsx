@@ -14,8 +14,8 @@ import { ApiKeys } from '@/components/ApiKeys';
 import { Webhooks } from '@/components/Webhooks';
 import { Billing, PlanUsage, ScimSettings, SsoSettings } from '@/components/Identity';
 
-type Task = 'architect' | 'translate';
-const TASK_NAMES: Record<Task, string> = { architect: 'AI Survey Architect (build and edit surveys)', translate: 'AI translation' };
+type Task = 'architect' | 'translate' | 'insights';
+const TASK_NAMES: Record<Task, string> = { architect: 'AI Survey Architect (build and edit surveys)', translate: 'AI translation', insights: 'AI research assistant (reads computed tables)' };
 
 interface Policy {
   enabled: boolean;

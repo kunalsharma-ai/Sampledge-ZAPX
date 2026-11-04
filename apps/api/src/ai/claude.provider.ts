@@ -5,10 +5,12 @@ import {
   AiProvider,
   type ArchitectRequest,
   type ArchitectResult,
+  type InsightsRequest,
+  type InsightsResult,
   type TranslateRequest,
   type TranslateResult,
 } from './ai-provider';
-import { ARCHITECT_SYSTEM, TRANSLATOR_SYSTEM } from './prompts';
+import { ARCHITECT_SYSTEM, INSIGHTS_SYSTEM, TRANSLATOR_SYSTEM } from './prompts';
 
 /** JSON schema the model's answer must follow (structured outputs). */
 const OUTPUT_SCHEMA = {
@@ -36,6 +38,25 @@ const TRANSLATION_SCHEMA = {
         properties: { key: { type: 'string' }, text: { type: 'string' } },
       },
     },
+  },
+} as const;
+
+const INSIGHTS_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['answer', 'findings', 'caveats'],
+  properties: {
+    answer: { type: 'string' },
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['statement', 'tables'],
+        properties: { statement: { type: 'string' }, tables: { type: 'array', items: { type: 'string' } } },
+      },
+    },
+    caveats: { type: 'array', items: { type: 'string' } },
   },
 } as const;
 
@@ -177,6 +198,53 @@ export class ClaudeAiProvider extends AiProvider {
     for (const t of parsed.translations ?? []) if (typeof t.key === 'string' && typeof t.text === 'string') translations[t.key] = t.text;
     return { translations, model: message.model, usage: usageOf(message) };
   }
+
+  async insights(req: InsightsRequest, model = this.model): Promise<InsightsResult> {
+    let message: BetaMessage;
+    try {
+      message = await this.client.beta.messages
+        .stream({
+          model,
+          max_tokens: 16000,
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+          thinking: { type: 'adaptive' },
+          output_config: { effort: 'medium', format: { type: 'json_schema', schema: INSIGHTS_SCHEMA } },
+          system: INSIGHTS_SYSTEM,
+          messages: [{ role: 'user', content: buildInsightsContent(req) }],
+        })
+        .finalMessage();
+    } catch (err) {
+      throw mapError(err);
+    }
+    let parsed: { answer?: unknown; findings?: Array<{ statement?: unknown; tables?: unknown }>; caveats?: unknown };
+    try {
+      parsed = JSON.parse(finalText(message));
+    } catch (e) {
+      if (e instanceof AiError) throw e;
+      throw new AiError('The AI returned an answer that could not be read. Try again.', 502, 'BAD_OUTPUT');
+    }
+    return {
+      answer: typeof parsed.answer === 'string' ? parsed.answer : '',
+      findings: (parsed.findings ?? []).flatMap((f) =>
+        typeof f.statement === 'string' && Array.isArray(f.tables)
+          ? [{ statement: f.statement, tables: f.tables.filter((t): t is string => typeof t === 'string') }]
+          : [],
+      ),
+      caveats: Array.isArray(parsed.caveats) ? parsed.caveats.filter((c): c is string => typeof c === 'string') : [],
+      model: message.model,
+      usage: usageOf(message),
+    };
+  }
+}
+
+export function buildInsightsContent(req: InsightsRequest): string {
+  const esc = (t: string) => t.replace(/<\/(table|question)/gi, '<\\/$1');
+  return (
+    `Survey: ${esc(req.surveyTitle)}\n\n` +
+    req.tables.map((t) => `<table id="${t.id}" title="${esc(t.title).replace(/"/g, "'")}">\n${esc(t.text)}\n</table>`).join('\n\n') +
+    `\n\nResearcher's question:\n<question>\n${esc(req.question)}\n</question>`
+  );
 }
 
 function usageOf(message: BetaMessage) {
@@ -223,6 +291,9 @@ export class UnconfiguredAiProvider extends AiProvider {
     return Promise.reject(notConfigured(this.reason));
   }
   translate(): Promise<TranslateResult> {
+    return Promise.reject(notConfigured(this.reason));
+  }
+  insights(): Promise<InsightsResult> {
     return Promise.reject(notConfigured(this.reason));
   }
 }
