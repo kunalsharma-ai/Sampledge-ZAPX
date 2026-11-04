@@ -50,6 +50,28 @@ export class AnalysisController {
     return this.analysis.crosstabs(user, id, parseBody(crosstabSchema, body));
   }
 
+  @Post('surveys/:id/analysis/choice/:questionId')
+  @Roles(...READERS)
+  @HttpCode(200)
+  choice(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('questionId') questionId: string, @Body() body: unknown) {
+    const input = parseBody(frequenciesSchema, body ?? {});
+    return this.analysis.choice(user, id, questionId, input.filters, input.weighting);
+  }
+
+  @Get('surveys/:id/analysis/choice/:questionId/design.csv')
+  @Roles(...READERS)
+  async design(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('questionId') questionId: string,
+    @Res() res: ExpressResponse,
+  ) {
+    const csv = await this.analysis.choiceDesignCsv(user, id, questionId);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${questionId.replace(/[^A-Za-z0-9_]/g, '')}-design.csv"`);
+    res.send(csv);
+  }
+
   @Post('surveys/:id/analysis/weights')
   @Roles(...READERS)
   @HttpCode(200)

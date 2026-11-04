@@ -99,6 +99,26 @@ export class ExportService {
         switch (q.type) {
           case 'info':
             break;
+          case 'maxdiff':
+          case 'conjoint': {
+            // The design version and each pick; the design itself is downloadable from Analysis.
+            const keys = [
+              'v',
+              ...(q.type === 'maxdiff'
+                ? Array.from({ length: q.sets }, (_, i) => [`b${i + 1}`, `w${i + 1}`]).flat()
+                : Array.from({ length: q.tasks }, (_, i) => `t${i + 1}`)),
+            ];
+            for (const k of keys)
+              add({
+                key: `${q.id}_${k}`,
+                label: `${q.id}: ${k === 'v' ? 'design version' : k.startsWith('b') ? `best in set ${k.slice(1)}` : k.startsWith('w') ? `worst in set ${k.slice(1)}` : `choice in task ${k.slice(1)} (0 = none)`}`,
+                get: (r) => {
+                  const a = ans(r)[q.id];
+                  return a && typeof a === 'object' && !Array.isArray(a) ? ((a as Record<string, number>)[k] ?? null) : null;
+                },
+              });
+            break;
+          }
           case 'signature':
             // The drawing stays in ZAPX (shown in the review queue); the export says whether it was given.
             add({ key: q.id, label: `${q.id}: signed (1/0)`, get: (r) => (ans(r)[q.id] === undefined ? null : ans(r)[q.id] ? 1 : 0) });

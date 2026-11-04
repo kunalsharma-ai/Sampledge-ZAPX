@@ -5,6 +5,7 @@
  * offline CAPI app, so a survey behaves identically in every mode. The server never trusts the
  * client's idea of routing: it recomputes visibility and validation from the stored answers.
  */
+import { conjointTasksFor, maxDiffDesign, maxDiffSetsFor } from './choice-design.js';
 import {
   CAPTURE_REF,
   SIGNATURE_MAX_LENGTH,
@@ -228,6 +229,11 @@ export const SYSTEM_MESSAGES = {
   scanUnavailable: 'This device cannot scan codes. Type the code instead.',
   codeInvalid: 'This code does not have the expected format.',
   enterCode: 'Scan or type the code.',
+  maxDiffPick: 'Choose one best and one different worst in every set.',
+  maxDiffSet: 'Set {n} of {total}',
+  conjointPick: 'Choose one option in every task.',
+  conjointTask: 'Choice {n} of {total}',
+  conjointOption: 'Option {n}',
   readAloud: 'Read aloud',
   stopReading: 'Stop reading',
   next: 'Next',
@@ -414,6 +420,44 @@ export function normalizeAnswer(
       });
       return ok ? { value: raw } : { error: msg.signatureMissing };
     }
+    case 'maxdiff': {
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { error: msg.maxDiffPick };
+      const o = raw as Record<string, unknown>;
+      const v = Number(o.v);
+      const design = maxDiffDesign(q);
+      if (!Number.isInteger(v) || !design[v]) return { error: msg.maxDiffPick };
+      const out: Record<string, number> = { v };
+      for (let i = 0; i < q.sets; i++) {
+        const set = design[v]![i]!;
+        const b = Number(o[`b${i + 1}`]);
+        const w = Number(o[`w${i + 1}`]);
+        if (!set.includes(b) || !set.includes(w) || b === w) return { error: msg.maxDiffPick };
+        out[`b${i + 1}`] = b;
+        out[`w${i + 1}`] = w;
+      }
+      return { value: out };
+    }
+    case 'conjoint': {
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { error: msg.conjointPick };
+      const o = raw as Record<string, unknown>;
+      const v = Number(o.v);
+      if (!Number.isInteger(v) || v < 0 || v >= q.versions) return { error: msg.conjointPick };
+      const out: Record<string, number> = { v };
+      for (let i = 1; i <= q.tasks; i++) {
+        const t = Number(o[`t${i}`]);
+        if (
+          !Number.isInteger(t) ||
+          t < (q.noneOption ? 0 : 1) ||
+          t > q.conceptsPerTask ||
+          o[`t${i}`] === null ||
+          o[`t${i}`] === undefined ||
+          o[`t${i}`] === ''
+        )
+          return { error: msg.conjointPick };
+        out[`t${i}`] = t;
+      }
+      return { value: out };
+    }
     case 'barcode': {
       if (typeof raw !== 'string') return { error: msg.enterCode };
       const code = raw.trim();
@@ -495,6 +539,7 @@ export function answerText(def: SurveyDefinition, id: string, answers: Answers):
   if (q.type === 'ranking' && Array.isArray(v)) return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
   if (q.type === 'hotspot' && Array.isArray(v)) return v.map((c) => q.regions.find((r) => r.code === c)?.label ?? String(c)).join(', ');
   if (q.type === 'signature') return v ? 'signed' : '';
+  if (q.type === 'maxdiff' || q.type === 'conjoint') return '';
   if (typeof v === 'object') return '';
   return String(v);
 }
@@ -542,7 +587,11 @@ export function seededOrder<T>(items: T[], seed: string, isAnchored: (item: T) =
 }
 
 /** A question prepared for display: piping applied and options in this respondent's order. */
-export type RenderedQuestion = Question & { renderedText: string };
+export type RenderedQuestion = Question & {
+  renderedText: string;
+  /** MaxDiff: this respondent's sets; conjoint: their tasks (concepts as level codes per attribute). */
+  design?: { version: number; sets?: number[][]; tasks?: number[][][] };
+};
 
 export function renderQuestion(template: Question, def: SurveyDefinition, answers: Answers, seed: string): RenderedQuestion {
   const q = withDynamicOptions(template, def, answers);
@@ -550,6 +599,8 @@ export function renderQuestion(template: Question, def: SurveyDefinition, answer
   if ((q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum' || q.type === 'cardsort') && q.randomize) {
     return { ...q, renderedText, options: seededOrder(q.options, `${seed}:${q.id}`, (o) => !!o.anchor) };
   }
+  if (q.type === 'maxdiff') return { ...q, renderedText, design: maxDiffSetsFor(q, seed) };
+  if (q.type === 'conjoint') return { ...q, renderedText, design: conjointTasksFor(q, seed) };
   if (q.type === 'grid' && q.randomizeRows) {
     const g: GridQuestion = { ...q, rows: seededOrder(q.rows, `${seed}:${q.id}`) };
     return { ...g, renderedText };

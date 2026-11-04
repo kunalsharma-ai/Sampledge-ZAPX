@@ -84,6 +84,18 @@ const XML_ELEMENTS: ElementSpec[] = [
   },
   { name: 'photo', attributes: QUESTION_ATTRS, children: ['text', 'help'] },
   { name: 'signature', attributes: QUESTION_ATTRS, children: ['text', 'help'] },
+  {
+    name: 'maxdiff',
+    attributes: [...QUESTION_ATTRS, 'itemsPerSet', 'sets', 'versions', 'bestLabel', 'worstLabel'],
+    children: ['text', 'help', 'option'],
+  },
+  {
+    name: 'conjoint',
+    attributes: [...QUESTION_ATTRS, 'tasks', 'conceptsPerTask', 'versions', 'noneOption', 'noneLabel'],
+    children: ['text', 'help', 'attribute'],
+  },
+  { name: 'attribute', attributes: ['id', 'label'], children: ['level'] },
+  { name: 'level', attributes: ['code'] },
   { name: 'barcode', attributes: [...QUESTION_ATTRS, 'pattern', 'maxLength'], children: ['text', 'help'] },
   { name: 'info', attributes: ['id', 'cond'], children: ['text', 'media'] },
   { name: 'option', attributes: ['code', 'anchor', 'exclusive', 'image'] },

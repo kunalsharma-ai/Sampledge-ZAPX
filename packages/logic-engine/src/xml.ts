@@ -28,6 +28,8 @@ import {
   photoQuestionSchema,
   signatureQuestionSchema,
   barcodeQuestionSchema,
+  maxDiffQuestionSchema,
+  conjointQuestionSchema,
   rankingQuestionSchema,
   scaleQuestionSchema,
   singleQuestionSchema,
@@ -219,6 +221,12 @@ function questionXml(q: Question, ind: string): string {
     if (!list) continue;
     for (const item of list) out += `${inner}<${name}${scalarAttrs(item, ['label'])}>${esc(String(item.label ?? ''))}</${name}>\n`;
   }
+  if (q.type === 'conjoint')
+    for (const a of q.attributes) {
+      out += `${inner}<attribute${attr('id', a.id)}${attr('label', a.label)}>\n`;
+      for (const l of a.levels) out += `${inner}  <level${attr('code', l.code)}>${esc(l.label)}</level>\n`;
+      out += `${inner}</attribute>\n`;
+    }
   if (q.type !== 'info') for (const v of q.validations) out += `${inner}<validate${attr('message', v.message)}>${esc(v.expr)}</validate>\n`;
   return `${out}${ind}</${q.type}>\n`;
 }
@@ -235,7 +243,10 @@ export function toZapxXml(def: SurveyDefinition): string {
   for (const c of st.quality.checks)
     out += `      <check${attr('id', c.id)}${attr('label', c.label)}${attr('weight', c.weight)}>${esc(c.condition)}</check>\n`;
   out += `    </quality>\n`;
-  out += `    <capi${attr('gps', st.capi.gps)}${attr('audio', st.capi.audio)}>${st.capi.consentText ? esc(st.capi.consentText) : ''}</capi>\n`;
+  out += `    <capi${attr('gps', st.capi.gps)}${attr('audio', st.capi.audio)}${attr('interruptions', st.capi.interruptions)}>${st.capi.consentText ? esc(st.capi.consentText) : ''}`;
+  for (const g of st.capi.geofences)
+    out += `<area${attr('label', g.label)}${attr('lat', g.lat)}${attr('lon', g.lon)}${attr('radiusM', g.radiusM)}/>`;
+  out += `</capi>\n`;
   out += `  </settings>\n`;
   for (const u of def.urlVariables ?? [])
     out += `  <urlvar${attr('id', u.id)}${attr('param', u.param)}${attr('label', u.label)}${attr('numeric', u.numeric)}/>\n`;
@@ -294,6 +305,14 @@ const NUMBER_KEYS = new Set([
   'straightlineMinRows',
   'reviewBelow',
   'rejectBelow',
+  'lat',
+  'lon',
+  'radiusM',
+  'itemsPerSet',
+  'sets',
+  'versions',
+  'tasks',
+  'conceptsPerTask',
 ]);
 const BOOLEAN_KEYS = new Set([
   'required',
@@ -313,6 +332,8 @@ const BOOLEAN_KEYS = new Set([
   'openEnds',
   'sameNetwork',
   'fraud',
+  'interruptions',
+  'noneOption',
 ]);
 const LIST_KEYS = new Set(['pages', 'countries']);
 
@@ -348,6 +369,8 @@ const QUESTION_SCHEMAS = {
   photo: photoQuestionSchema,
   signature: signatureQuestionSchema,
   barcode: barcodeQuestionSchema,
+  maxdiff: maxDiffQuestionSchema,
+  conjoint: conjointQuestionSchema,
   info: infoElementSchema,
 } as const;
 const shapeKeys = (schema: { shape: Record<string, unknown> }) => new Set(Object.keys(schema.shape));
@@ -413,9 +436,15 @@ export function fromZapxXml(src: string): XmlReadResult {
             });
             settings.quality = quality;
           } else if (s.name === 'capi') {
-            const capi = attrsTo(s, new Set(['gps', 'audio']));
-            const t = textOf(s);
+            const capi = attrsTo(s, new Set(['gps', 'audio', 'interruptions']));
+            const t = s.children
+              .map((c) => ('text' in c ? c.text : ''))
+              .join('')
+              .trim();
             if (t) capi.consentText = t;
+            capi.geofences = elements(s).flatMap((a) =>
+              a.name === 'area' ? [attrsTo(a, new Set(['label', 'lat', 'lon', 'radiusM']))] : (unexpected(a, '<capi>'), []),
+            );
             settings.capi = capi;
           } else unexpected(s, '<settings>');
         }
@@ -491,6 +520,16 @@ function readQuestion(el: XmlElement, warn: (w: XmlWarning) => void): Record<str
       const o: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(c.attrs)) o[k] = coerce(k, v, c.line, warn);
       q[c.name] = o;
+    } else if (c.name === 'attribute' && allowed.has('attributes')) {
+      ((q.attributes ??= []) as unknown[]).push({
+        id: c.attrs.id ?? '',
+        label: c.attrs.label ?? '',
+        levels: elements(c).flatMap((l) =>
+          l.name === 'level'
+            ? [{ code: coerce('code', l.attrs.code ?? '', l.line, warn), label: textOf(l) }]
+            : (warn({ line: l.line, message: `<${l.name}> is not supported inside <attribute>; it was ignored.` }), []),
+        ),
+      });
     } else if (listName[c.name] && allowed.has(listName[c.name]!)) {
       const item: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(c.attrs)) item[k] = coerce(k, v, c.line, warn);

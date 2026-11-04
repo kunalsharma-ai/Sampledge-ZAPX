@@ -3,6 +3,7 @@
  * Structured survey editor. It edits the canonical survey definition directly; the JSON view and
  * this editor are two views of the same object.
  */
+import { ConjointForm, MaxDiffForm } from './ChoiceForms';
 import { useState } from 'react';
 import type { Option, Page, Question, QuestionType, SurveyDefinition } from '@zapx/survey-schema';
 import { MediaLibraryProvider, OptionImagePicker, QuestionMediaEditor, useHasMediaLibrary } from './MediaLibrary';
@@ -34,6 +35,8 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   photo: 'Photo',
   signature: 'Signature',
   barcode: 'Barcode / QR code',
+  maxdiff: 'MaxDiff (best-worst)',
+  conjoint: 'Conjoint (choice-based)',
   info: 'Information',
 };
 
@@ -78,6 +81,49 @@ function newQuestion(def: SurveyDefinition, type: QuestionType): Question {
       return { ...base, type, text: 'Please sign to confirm' };
     case 'barcode':
       return { ...base, type, text: 'Scan the barcode on the pack', maxLength: 200 };
+    case 'maxdiff':
+      return {
+        ...base,
+        type,
+        text: 'Which of these matters MOST and which LEAST to you?',
+        options: Array.from({ length: 8 }, (_, i) => ({ code: i + 1, label: `Item ${i + 1}` })),
+        itemsPerSet: 4,
+        sets: 6,
+        versions: 10,
+        bestLabel: 'Most important',
+        worstLabel: 'Least important',
+      };
+    case 'conjoint':
+      return {
+        ...base,
+        type,
+        text: 'If these were your only options, which would you choose?',
+        attributes: [
+          {
+            id: 'price',
+            label: 'Price',
+            levels: [
+              { code: 1, label: 'Low' },
+              { code: 2, label: 'Medium' },
+              { code: 3, label: 'High' },
+            ],
+          },
+          {
+            id: 'brand',
+            label: 'Brand',
+            levels: [
+              { code: 1, label: 'Brand A' },
+              { code: 2, label: 'Brand B' },
+              { code: 3, label: 'Brand C' },
+            ],
+          },
+        ],
+        tasks: 8,
+        conceptsPerTask: 3,
+        versions: 10,
+        noneOption: true,
+        noneLabel: 'None of these',
+      };
     case 'cardsort':
       return {
         ...base,
@@ -775,6 +821,8 @@ function QuestionForm({
           <DynamicListEditor q={q} def={def} onChange={onChange} />
         </>
       ) : null}
+      {q.type === 'maxdiff' ? <MaxDiffForm q={q} onChange={onChange} OptionsEditor={OptionsEditor} /> : null}
+      {q.type === 'conjoint' ? <ConjointForm q={q} onChange={onChange} /> : null}
       {q.type === 'cardsort' ? <CardSortForm q={q} onChange={onChange} OptionsEditor={OptionsEditor} /> : null}
       {q.type === 'hotspot' ? <HotspotForm q={q} onChange={onChange} /> : null}
       {q.type === 'multi' ? (

@@ -275,6 +275,47 @@ export const barcodeQuestionSchema = z.object({
   maxLength: z.number().int().min(1).max(500).default(200),
 });
 
+/**
+ * MaxDiff (best-worst scaling, blueprint phase 4): the respondent sees several sets of items and picks
+ * the best and the worst in each. The sets come from a balanced design computed from the question
+ * (every item shown about equally often, pairs spread out), in `versions` variants assigned by the
+ * respondent's seed. Stored as {v: version, b1: best code, w1: worst code, b2: ...}.
+ */
+export const maxDiffQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('maxdiff'),
+  options: z.array(optionSchema).min(4).max(40),
+  itemsPerSet: z.number().int().min(3).max(6).default(4),
+  sets: z.number().int().min(2).max(30).default(6),
+  versions: z.number().int().min(1).max(50).default(10),
+  bestLabel: z.string().min(1).max(60).default('Most important'),
+  worstLabel: z.string().min(1).max(60).default('Least important'),
+});
+
+export const conjointLevelSchema = z.object({ code: z.number().int(), label: z.string().min(1).max(200) });
+export const conjointAttributeSchema = z.object({
+  id: variableName,
+  label: z.string().min(1).max(120),
+  levels: z.array(conjointLevelSchema).min(2).max(9),
+});
+
+/**
+ * Choice-based conjoint (CBC, blueprint phase 4): in each task the respondent picks one of several
+ * product concepts (one level of each attribute), or none when offered. Concepts come from a
+ * level-balanced design with minimal overlap, in `versions` variants. Stored as {v: version, t1:
+ * chosen concept 1..n (0 = none), t2: ...}.
+ */
+export const conjointQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('conjoint'),
+  attributes: z.array(conjointAttributeSchema).min(2).max(8),
+  tasks: z.number().int().min(2).max(20).default(8),
+  conceptsPerTask: z.number().int().min(2).max(4).default(3),
+  versions: z.number().int().min(1).max(50).default(10),
+  noneOption: z.boolean().default(true),
+  noneLabel: z.string().min(1).max(80).default('None of these'),
+});
+
 /** Reference to a captured photo or recording, unique within one interview. */
 export const CAPTURE_REF = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -300,6 +341,8 @@ export const questionSchema = z.discriminatedUnion('type', [
   photoQuestionSchema,
   signatureQuestionSchema,
   barcodeQuestionSchema,
+  maxDiffQuestionSchema,
+  conjointQuestionSchema,
   infoElementSchema,
 ]);
 export type Question = z.infer<typeof questionSchema>;
@@ -317,6 +360,9 @@ export type SumQuestion = z.infer<typeof sumQuestionSchema>;
 export type PhotoQuestion = z.infer<typeof photoQuestionSchema>;
 export type SignatureQuestion = z.infer<typeof signatureQuestionSchema>;
 export type BarcodeQuestion = z.infer<typeof barcodeQuestionSchema>;
+export type MaxDiffQuestion = z.infer<typeof maxDiffQuestionSchema>;
+export type ConjointQuestion = z.infer<typeof conjointQuestionSchema>;
+export type ConjointAttribute = z.infer<typeof conjointAttributeSchema>;
 export type CardSortQuestion = z.infer<typeof cardSortQuestionSchema>;
 export type HotspotQuestion = z.infer<typeof hotspotQuestionSchema>;
 
@@ -617,7 +663,7 @@ export type AnswerValue =
   | number // single, numeric
   | number[] // multi; ranking (codes in rank order); hotspot (region codes)
   | string // open; photo (capture reference)
-  | Record<string, number> // grid: rowId -> column code; sum: option code -> amount; cardsort: card -> group
+  | Record<string, number> // grid: rowId -> column code; sum: option code -> amount; cardsort: card -> group; maxdiff/conjoint: v, b1/w1 or t1
   | null;
 
 export type Answers = Record<string, AnswerValue>;

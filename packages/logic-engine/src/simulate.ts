@@ -14,7 +14,7 @@
 import { scaleCodes, type Answers, type AnswerValue, type Option, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 import { analyzeSurvey, type AnalysisReport } from './analyze.js';
 import { parseCached, references, type Node } from './expression.js';
-import { conditionHolds, renderQuestion, validatePage } from './interview.js';
+import { conditionHolds, renderQuestion, validatePage, type RenderedQuestion } from './interview.js';
 import { hasNoOptions, pageOrder, prepareSurvey } from './flow.js';
 
 export interface SimulationOptions {
@@ -202,6 +202,24 @@ function generateAnswer(q: Question, g: GenContext): AnswerValue | undefined {
     case 'photo':
       // A reference only: synthetic respondents never upload files.
       return `synthetic-photo-${++g.serial}`;
+    case 'maxdiff': {
+      const d = (q as RenderedQuestion).design;
+      if (!d?.sets) return undefined;
+      const out: Record<string, number> = { v: d.version };
+      d.sets.forEach((set, i) => {
+        const b = g.rng.pick(set);
+        out[`b${i + 1}`] = b;
+        out[`w${i + 1}`] = g.rng.pick(set.filter((c) => c !== b));
+      });
+      return out;
+    }
+    case 'conjoint': {
+      const d = (q as RenderedQuestion).design;
+      if (!d?.tasks) return undefined;
+      const out: Record<string, number> = { v: d.version };
+      d.tasks.forEach((_, i) => (out[`t${i + 1}`] = g.rng.int(q.noneOption ? 0 : 1, q.conceptsPerTask)));
+      return out;
+    }
     case 'signature':
       return `100,200 ${200 + (++g.serial % 700)},150 900,250`;
     case 'barcode': {
