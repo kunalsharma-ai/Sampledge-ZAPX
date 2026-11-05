@@ -6,8 +6,8 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import type { Response, SurveyVersion } from '@zapx/db';
-import { allQuestions, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
-import { codes, variables } from '@zapx/analysis-core';
+import { EYETRACK_STATUSES, allQuestions, parseEyeTrack, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
+import { aoiDwellShares, codes, variables } from '@zapx/analysis-core';
 import { computeVariables, prepareSurvey } from '@zapx/logic-engine';
 
 interface Column {
@@ -124,6 +124,31 @@ export class ExportService {
             // The drawing stays in ZAPX (shown in the review queue); the export says whether it was given.
             add({ key: q.id, label: `${q.id}: signed (1/0)`, get: (r) => (ans(r)[q.id] === undefined ? null : ans(r)[q.id] ? 1 : 0) });
             break;
+          case 'eyetrack': {
+            // Experimental webcam eye tracking: the outcome, the calibration error, and per area of
+            // interest the share of on-picture time spent in it. Raw gaze points stay in ZAPX (Analysis).
+            const read = (r: ExportRow) => parseEyeTrack(ans(r)[q.id]);
+            add({
+              key: `${q.id}_status`,
+              label: `${q.id}: eye tracking (${EYETRACK_STATUSES.join(', ')})`,
+              get: (r) => read(r)?.status ?? null,
+            });
+            add({
+              key: `${q.id}_error_pct`,
+              label: `${q.id}: calibration error (% of screen width)`,
+              get: (r) => read(r)?.errorPct ?? null,
+            });
+            for (const aoi of q.aois)
+              add({
+                key: `${q.id}_aoi${aoi.code}_dwell_pct`,
+                label: `${q.id}: ${aoi.label}, share of looking time (%)`,
+                get: (r) => {
+                  const a = read(r);
+                  return a && a.status === 'recorded' ? aoiDwellShares([aoi], a)[0]! : null;
+                },
+              });
+            break;
+          }
           case 'hotspot':
             // Like multiple choice: one 0/1 column per area of the picture.
             for (const reg of q.regions)

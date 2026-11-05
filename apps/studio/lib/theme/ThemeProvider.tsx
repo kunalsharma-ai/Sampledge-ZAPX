@@ -89,6 +89,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [module, setModule] = useState<ModuleId | null>(null);
   const signedIn = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Changes made before the account's settings have loaded; saved once they have.
+  const loading = useRef(true);
+  const pending = useRef<Partial<Appearance> | null>(null);
+  const current = useRef(appearance);
+  current.current = appearance;
+  const scheduleSave = useCallback(() => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    setSaveState('saving');
+    saveTimer.current = setTimeout(() => {
+      call('/me/preferences', 'PUT', { appearance: current.current })
+        .then((res) => setSaveState(res.ok ? 'saved' : 'error'))
+        .catch(() => setSaveState('error'));
+    }, 400);
+  }, []);
 
   // First load: the cached theme (already painted by the head script), then the account's settings.
   useEffect(() => {
@@ -104,19 +118,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         const body = (await res.json()) as { appearance: unknown; organizationDefault: unknown };
         const org = body.organizationDefault ? sanitizeAppearance(body.organizationDefault) : null;
         setOrgDefault(org);
-        if (body.appearance) {
-          setAppearance(sanitizeAppearance(body.appearance));
+        const base = body.appearance ? sanitizeAppearance(body.appearance) : (org ?? DEFAULT_APPEARANCE);
+        if (pending.current) {
+          // The member changed something while this was loading: keep it and save it.
+          const next = sanitizeAppearance({ ...base, ...pending.current }, base);
+          pending.current = null;
+          current.current = next;
+          setAppearance(next);
+          setSource('personal');
+          scheduleSave();
+        } else if (body.appearance) {
+          setAppearance(base);
           setSource('personal');
         } else {
-          setAppearance(org ?? DEFAULT_APPEARANCE);
+          setAppearance(base);
           setSource(org ? 'organization' : 'default');
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        loading.current = false;
+      });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [scheduleSave]);
 
   // Follow operating-system changes (dark mode at sunset, reduce motion) live.
   useEffect(() => {
@@ -138,26 +164,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     apply(effective, env, appearance);
   }, [effective, appearance, env]);
 
-  const current = useRef(appearance);
-  current.current = appearance;
-
-  const update = useCallback((patch: Partial<Appearance>) => {
-    const next = sanitizeAppearance({ ...current.current, ...patch }, current.current);
-    current.current = next;
-    setAppearance(next);
-    setSource('personal');
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    if (!signedIn.current) {
-      setSaveState('local');
-      return;
-    }
-    setSaveState('saving');
-    saveTimer.current = setTimeout(() => {
-      call('/me/preferences', 'PUT', { appearance: current.current })
-        .then((res) => setSaveState(res.ok ? 'saved' : 'error'))
-        .catch(() => setSaveState('error'));
-    }, 400);
-  }, []);
+  const update = useCallback(
+    (patch: Partial<Appearance>) => {
+      const next = sanitizeAppearance({ ...current.current, ...patch }, current.current);
+      current.current = next;
+      setAppearance(next);
+      setSource('personal');
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (!signedIn.current) {
+        if (loading.current) pending.current = { ...pending.current, ...patch };
+        setSaveState('local');
+        return;
+      }
+      scheduleSave();
+    },
+    [scheduleSave],
+  );
 
   const resetToOrganization = useCallback(async () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);

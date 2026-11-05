@@ -95,6 +95,23 @@ export interface Look {
     | 'photoFailed'
     | 'photoSaved'
     | 'unsorted'
+    | 'eyeIntro'
+    | 'eyeAgree'
+    | 'eyeSkip'
+    | 'eyeStarting'
+    | 'eyePosition'
+    | 'eyeStartCalibration'
+    | 'eyeCalibrate'
+    | 'eyeDot'
+    | 'eyeRetry'
+    | 'eyeLook'
+    | 'eyeStop'
+    | 'eyeDone'
+    | 'eyeSkipped'
+    | 'eyeUnavailable'
+    | 'eyeNoFace'
+    | 'eyeCalibrationFailed'
+    | 'eyeExperimental'
   >;
   /** Offer "Read aloud" on each question (the respondent's own device voices). */
   readAloud: boolean;
@@ -195,6 +212,23 @@ export function interviewContext(version: { definition: unknown; presentation: u
         photoFailed: msg.photoFailed,
         photoSaved: msg.photoSaved,
         unsorted: msg.unsorted,
+        eyeIntro: msg.eyeIntro,
+        eyeAgree: msg.eyeAgree,
+        eyeSkip: msg.eyeSkip,
+        eyeStarting: msg.eyeStarting,
+        eyePosition: msg.eyePosition,
+        eyeStartCalibration: msg.eyeStartCalibration,
+        eyeCalibrate: msg.eyeCalibrate,
+        eyeDot: msg.eyeDot,
+        eyeRetry: msg.eyeRetry,
+        eyeLook: msg.eyeLook,
+        eyeStop: msg.eyeStop,
+        eyeDone: msg.eyeDone,
+        eyeSkipped: msg.eyeSkipped,
+        eyeUnavailable: msg.eyeUnavailable,
+        eyeNoFace: msg.eyeNoFace,
+        eyeCalibrationFailed: msg.eyeCalibrationFailed,
+        eyeExperimental: msg.eyeExperimental,
       },
       readAloud: presentation.readAloud,
     },

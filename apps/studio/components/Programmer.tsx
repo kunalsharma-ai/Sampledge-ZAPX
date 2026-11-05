@@ -55,6 +55,7 @@ const XML_ELEMENTS: ElementSpec[] = [
       'photo',
       'signature',
       'barcode',
+      'eyetrack',
       'info',
     ],
   },
@@ -82,6 +83,11 @@ const XML_ELEMENTS: ElementSpec[] = [
     attributes: [...QUESTION_ATTRS, 'image', 'imageAlt', 'minSelected', 'maxSelected'],
     children: ['text', 'help', 'region', 'validate'],
   },
+  {
+    name: 'eyetrack',
+    attributes: [...QUESTION_ATTRS, 'image', 'imageAlt', 'durationSec', 'maxErrorPct', 'consentText'],
+    children: ['text', 'help', 'aoi'],
+  },
   { name: 'photo', attributes: QUESTION_ATTRS, children: ['text', 'help'] },
   { name: 'signature', attributes: QUESTION_ATTRS, children: ['text', 'help'] },
   {
@@ -104,6 +110,7 @@ const XML_ELEMENTS: ElementSpec[] = [
   // Card sort group (label as text) or recode group (label, values "1|2" or a min/max range).
   { name: 'group', attributes: ['code', 'label', 'values', 'min', 'max'] },
   { name: 'region', attributes: ['code', 'x', 'y', 'w', 'h'] },
+  { name: 'aoi', attributes: ['code', 'x', 'y', 'w', 'h'] },
   { name: 'optionsFrom', attributes: ['question', { name: 'include', values: ['selected', 'not_selected'] }] },
   { name: 'validate', attributes: ['message'] },
   { name: 'variable', attributes: ['id', 'label'] },

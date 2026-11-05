@@ -25,6 +25,7 @@ import { Quality } from '@/components/Quality';
 import { CapiAssignments } from '@/components/CapiAssignments';
 import { Supervisor } from '@/components/Supervisor';
 import { ChoiceResults } from '@/components/ChoiceResults';
+import { EyeTrackingResults } from '@/components/EyeTrackingResults';
 import { ResearchAssistant } from '@/components/ResearchAssistant';
 import { EmailInvitations } from '@/components/EmailInvitations';
 import { CatiCalls, DoNotCallList } from '@/components/CatiCalls';
@@ -358,6 +359,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         <div className="stack">
           <Analysis surveyId={id} readOnly={readOnly} />
           <ChoiceResults surveyId={id} def={def} />
+          <EyeTrackingResults surveyId={id} def={def} />
           <ResearchAssistant surveyId={id} aiConfigured={aiConfigured} />
         </div>
       ) : null}
