@@ -17,9 +17,14 @@ export async function issueSession(
   jwt: JwtService,
   res: Response,
   user: { id: string; tenantId: string; role: AuthUser['role']; email: string },
+  /** Make the session count as issued after this moment (used right after signing out other sessions). */
+  issuedAfter?: Date,
 ) {
+  // iatMs: issue time in milliseconds, so a session issued in the same second as "sign out other
+  // sessions" (password change) is told apart from the ones it signed out.
+  const iatMs = Math.max(Date.now(), (issuedAfter?.getTime() ?? 0) + 1);
   const token = await jwt.signAsync(
-    { sub: user.id, tid: user.tenantId, role: user.role, email: user.email },
+    { sub: user.id, tid: user.tenantId, role: user.role, email: user.email, iatMs },
     // jti lets one session be signed out on the server (Milestone 20) before it expires.
     { expiresIn: `${SESSION_HOURS}h`, algorithm: 'HS256', jwtid: randomBytes(16).toString('base64url') },
   );

@@ -25,9 +25,30 @@ These exist only on their branches. The stack is merged in order: #27 → #29 �
 
 Also open: Dependabot PRs #20–#25 (Node 26 and nginx 1.31 base images; GitHub Actions versions).
 
+### Security (branch `security-fixes`, on top of #35)
+
+- The vendor shared secret is returned only to ADMIN and PROGRAMMER; viewers no longer receive it.
+- Password change on My account (`POST /api/auth/change-password`), administrator one-time reset
+  links (`POST /api/users/:id/password-reset`), "forgot password" by email
+  (`POST /api/auth/forgot-password`) and `POST /api/auth/reset-password`.
+- Sessions carry their issue time in milliseconds (`iatMs`), so "sign out other sessions" keeps the
+  session that changed the password.
+- AWS: `SENDGRID_API_KEY` added to `app_secret_keys`; the Terraform README's example secret JSON
+  now lists every key.
+
+### Database
+
+- Migration `20261117000000_password_reset`: new table `PasswordReset`. Backward-compatible: yes.
+
+### Configuration
+
+- New variable `PASSWORD_RESET_HOURS` (default `24`), in `.env.example`.
+
 ### Documentation
 
-- Added this maintainer handbook in `docs/handbook/` (on top of #34).
+- Added this maintainer handbook in `docs/handbook/` (#35).
+- Root `README.md`, `docs/architecture.md`, `docs/operations/go-live.md` and `docs/security.md`
+  brought up to date past Milestone 13 (branch `security-fixes`).
 
 ## Milestone 20: security hardening (2026-11-02, PR #26)
 

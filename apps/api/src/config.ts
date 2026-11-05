@@ -250,6 +250,8 @@ const schema = z
     /** Milestone 20: wrong passwords in a row before an account is locked, and for how long. */
     LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(100).default(10),
     LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
+    /** Hours a password reset link works (administrator link or "forgot password" email). */
+    PASSWORD_RESET_HOURS: z.coerce.number().int().min(1).max(168).default(24),
   })
   .superRefine((c, ctx) => {
     if (c.EMAIL_PROVIDER === 'sendgrid' && (!c.SENDGRID_API_KEY || !/^[^@\s]+@[^@\s]+$/.test(c.EMAIL_FROM)))

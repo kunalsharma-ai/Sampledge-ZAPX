@@ -1,4 +1,4 @@
-# ZAPX architecture (Milestones 1 to 13)
+# ZAPX architecture (Milestones 1 to 20, and the open pull requests)
 
 The full plan, including the module map and roadmap, is in the project's
 "ZAPX architecture and first milestone" document. This file records what the code does today and
@@ -218,6 +218,63 @@ Details: [modules/rich-media.md](modules/rich-media.md).
   (`EDGE_SHARED_SECRET`). [Guide](../infra/terraform/README.md)
 - **PROJEXA check** `scripts/projexa-check.mjs`. [ADR 0019](adr/0019-production-readiness.md)
 
+## Edge protection, scaling and backups (Milestone 14)
+
+- **AWS WAF** in front of CloudFront (runtime, CAPI app) and the load balancer (studio, API). Managed
+  rules start in count mode (`waf_mode = "count"`); the per-address rate rule always blocks.
+- **Autoscaling** owns the API and studio task counts; **AWS Backup** covers RDS and the files bucket.
+  [ADR 0020](adr/0020-edge-protection-scaling-backups.md), [go-live checklist](operations/go-live.md)
+
+## Weighting (Milestone 15)
+
+- Rim weighting (raking) is a pure function in `@zapx/analysis-core`, computed per run and saved
+  with the report configuration, never stored per interview. Tables keep the unweighted base and use
+  the effective base for significance. [ADR 0021](adr/0021-weighting.md)
+
+## Provider adapters (Milestones 16 to 19)
+
+Each is an interface with one first provider, off by default, tested against a local stand-in:
+
+| Milestone | Adapter                     | Setting                     | What it does                                                     | ADR                                    |
+| --------- | --------------------------- | --------------------------- | ---------------------------------------------------------------- | -------------------------------------- |
+| 16        | `NetworkReputationProvider` | `NETWORK_REPUTATION=ipinfo` | Flags VPN, proxy, Tor and data-centre networks (words only)      | [0022](adr/0022-network-reputation.md) |
+| 17        | `SpeechToTextProvider`      | `TRANSCRIPTION=deepgram`    | Transcribes interview recordings on request, as a job            | [0023](adr/0023-transcription.md)      |
+| 18        | (in the CATI queue)         | survey calling hours        | Calling hours per time zone and an organization do-not-call list | [0024](adr/0024-calling-rules.md)      |
+| 19        | `TelephonyProvider`         | `TELEPHONY=twilio`          | Click-to-call, hidden numbers, call recording                    | [0025](adr/0025-dialer.md)             |
+
+## Security hardening (Milestone 20)
+
+- One network guard (`apps/api/src/common/net-guard.ts`) for every customer-configured outbound call.
+- Account lockout, `RevokedSession` (sign-out on the server), `User.sessionsRevokedAt` (sign out
+  everywhere), a common-password list, security headers in `bootstrap.ts`, and production settings
+  checks in `config.ts`. [ADR 0026](adr/0026-security-hardening.md)
+
+## Passwords (security fixes after the handbook review, branch `security-fixes`)
+
+- `POST /api/auth/change-password` (current password required) signs out the member's other sessions
+  and keeps this one: sessions carry their issue time in milliseconds (`iatMs`) so the new session is
+  told apart from those issued earlier in the same second.
+- `POST /api/users/:id/password-reset` (admins) creates a one-time link; `POST /api/auth/forgot-password`
+  emails one when `EMAIL_PROVIDER` is set and always answers 204; `POST /api/auth/reset-password`
+  uses it. Only a SHA-256 hash of the token is stored (`PasswordReset`); a link works once, for
+  `PASSWORD_RESET_HOURS`, and a newer link voids older ones. Code: `apps/api/src/auth/password-reset.service.ts`.
+- The vendor shared secret is returned only to admins and programmers (`presentVendor`).
+
+## On open pull requests (not yet on `main`)
+
+| PR  | Adds                                                                                     | ADR                                                  |
+| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| #27 | Quantum Design System: `@zapx/quantum` theme engine with enforced contrast               | [0027](adr/0027-quantum-design-system.md)            |
+| #29 | Neon AI theme (default), sidebar app shell, `GET /api/dashboard` home screen             | [0028](adr/0028-neon-dashboard.md)                   |
+| #30 | Loops, blocks and calculated variables compiled into ordinary pages; question bank       | [0029](adr/0029-blueprint-core-engineering.md)       |
+| #31 | Translation memory and glossary, right-to-left, URL variables, least fill, QA test cases | [0030](adr/0030-blueprint-multilingual-and-qa.md)    |
+| #32 | CAPI evidence and interview areas, supervision, appeals, email distribution              | [0031](adr/0031-blueprint-fieldwork-and-security.md) |
+| #33 | MaxDiff and conjoint (computed designs), recodes, AI research assistant, CAPI video      | [0032](adr/0032-blueprint-research-intelligence.md)  |
+| #34 | Automation rules, data residency and retention, cleaning, chart dashboards, SMS          | [0033](adr/0033-blueprint-enterprise-scale.md)       |
+| #35 | Maintainer handbook in [handbook/](handbook/README.md)                                   | —                                                    |
+
+They are stacked in that order. #28 (integrations set up in the CRM) is separate, based on `main`.
+
 ## Decisions, contracts and operations
 
 - Architecture decisions: [adr/](adr/README.md)
@@ -234,7 +291,9 @@ Details: [modules/rich-media.md](modules/rich-media.md).
   also by the member's project access. Postgres row-level security on `Response` backs up the
   studio's respondent-data reads (not system paths, and not other tables yet; see ADR 0012). It only
   applies when the API's database role is not a superuser; check `GET /api/audit/security`.
-- Rate limits on login, sign-up and respondent endpoints.
+- Rate limits on login, sign-up and respondent endpoints (in memory, per API process), plus
+  account lockout after repeated wrong passwords.
+- Passwords can be changed by their owner and reset with one-time links (see Passwords above).
 - Survey text and piped answers are rendered as text, never HTML.
 - Exports neutralize spreadsheet formulas in respondent text.
 - Dynamic return URLs must match the vendor's allowed hosts (no open redirects).
@@ -245,20 +304,22 @@ Details: [modules/rich-media.md](modules/rich-media.md).
   server, not AWS yet. Jobs are polled from PostgreSQL (fine for hundreds an hour).
 - AI proposals return a full definition, so very long questionnaires may need to be imported in parts.
 - The Claude provider has been tested with a scripted fake; it needs an API key to be exercised live.
-- Grid questions are single choice per row; MaxDiff, conjoint, ranking and media questions come later.
+- Grid questions are single choice per row. MaxDiff and conjoint are on open PR #33.
 - Back navigation is optional per survey and re-shows the previous visible page.
 - The fieldwork dashboard and review queue read response rows in the API process; very large
   surveys need SQL aggregates or a reporting store.
 - CAPI quotas are only known at sync, so the field can exceed a quota (kept as quota full).
-- The CAPI app is a web app: no audio, photo or GPS capture, and no device management yet.
-- Row-level security covers `Response` for studio reads only, and is bypassed by the local
+- The CAPI app is a web app (location, consented audio and photos since M12) with no device
+  management (MDM) yet.
+- Row-level security covers `Response` and `Capture` for studio reads only, and is bypassed by the local
   `docker compose` database role (a superuser). Other tables rely on application filters.
 - API keys are role-scoped only (no per-endpoint scopes or IP allow lists).
-- CATI has no dialer, call recording, time-zone calling windows or do-not-call list.
-- Media are public by id and served by the API from the file store; no recorded
-  voice-over, transcription, MaxDiff or conjoint.
-- Analysis is unweighted, reads rows in the API process (up to 200,000 interviews) and has no
-  nets, banner books, charts or scheduled delivery yet.
+- CATI has click-to-call and recording through Twilio (M19) and calling rules (M18), but no
+  predictive dialing, answering-machine detection or in-browser softphone.
+- Media are public by id and served by the API from the file store; no recorded voice-over.
+  Transcription of recordings exists (M17); transcription of typed open answers does not.
+- Analysis reads rows in the API process (up to 200,000 interviews); weighting exists (M15), but
+  nets, banner books and scheduled delivery do not (chart dashboards are on open PR #34).
 - SSO (OpenID Connect and SAML) has been tested against test providers, not a real one; SAML has
   no single logout or encrypted assertions. SCIM covers users, not groups. Billing (Stripe) is
   tested against a fake Stripe only.

@@ -19,6 +19,7 @@ import { TelephonyController } from './cati/telephony.controller';
 import { TelephonyService } from './cati/telephony.service';
 import { SsoController } from './auth/sso.controller';
 import { SsoService } from './auth/sso.service';
+import { PasswordResetService } from './auth/password-reset.service';
 import { SamlService } from './auth/saml.service';
 import { ScimController } from './scim/scim.controller';
 import { ScimAdminController } from './scim/scim-admin.controller';
@@ -136,6 +137,7 @@ import { GovernanceService } from './governance/governance.service';
     ResearchAssistantService,
     MediaService,
     SsoService,
+    PasswordResetService,
     SamlService,
     BillingService,
     ScimGuard,

@@ -189,23 +189,26 @@ sequenceDiagram
 
 Every route lives under `/api` (set in `bootstrap.ts`). Each controller declares a prefix with
 `@Controller('...')` and each method a path with `@Get`, `@Post`, `@Put`, `@Patch` or `@Delete`. The
-full list of 241 routes, with their files, is in [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
+full list of 246 routes, with their files, is in [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
 
 ### Studio routing (Next.js App Router, folder = URL)
 
-| URL               | File                                      | Shows                                                                                 |
-| ----------------- | ----------------------------------------- | ------------------------------------------------------------------------------------- |
-| `/login`          | `apps/studio/app/login/page.tsx`          | sign-in, sign-up, "Sign in with SSO"                                                  |
-| `/`               | `apps/studio/app/page.tsx`                | dashboard _(PR #29)_: counts, charts, latest projects, create survey                  |
-| `/projects`       | `apps/studio/app/projects/page.tsx`       | project list _(PR #29 moved it here)_                                                 |
-| `/projects/[id]`  | `apps/studio/app/projects/[id]/page.tsx`  | a project's surveys, vendors, access                                                  |
-| `/surveys/[id]`   | `apps/studio/app/surveys/[id]/page.tsx`   | the survey workspace with tabs (below); `?tab=…` opens a tab                          |
-| `/library`        | `apps/studio/app/library/page.tsx`        | question bank and templates _(PR #30)_                                                |
-| `/calls`          | `apps/studio/app/calls/page.tsx`          | CATI calling screen                                                                   |
-| `/automation`     | `apps/studio/app/automation/page.tsx`     | automation rules and runs _(PR #34)_                                                  |
-| `/appearance`     | `apps/studio/app/appearance/page.tsx`     | themes _(PR #27)_                                                                     |
-| `/settings`       | `apps/studio/app/settings/page.tsx`       | team, AI, redirect defaults, SSO, SCIM, plan, billing, API keys, webhooks, governance |
-| `/settings/audit` | `apps/studio/app/settings/audit/page.tsx` | audit log viewer                                                                      |
+| URL                | File                                       | Shows                                                                                 |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `/login`           | `apps/studio/app/login/page.tsx`           | sign-in, sign-up, "Sign in with SSO"                                                  |
+| `/forgot-password` | `apps/studio/app/forgot-password/page.tsx` | ask for a reset link by email _(branch `security-fixes`)_                             |
+| `/reset-password`  | `apps/studio/app/reset-password/page.tsx`  | set a new password from a one-time link _(branch `security-fixes`)_                   |
+| `/account`         | `apps/studio/app/account/page.tsx`         | My account: change password _(branch `security-fixes`)_                               |
+| `/`                | `apps/studio/app/page.tsx`                 | dashboard _(PR #29)_: counts, charts, latest projects, create survey                  |
+| `/projects`        | `apps/studio/app/projects/page.tsx`        | project list _(PR #29 moved it here)_                                                 |
+| `/projects/[id]`   | `apps/studio/app/projects/[id]/page.tsx`   | a project's surveys, vendors, access                                                  |
+| `/surveys/[id]`    | `apps/studio/app/surveys/[id]/page.tsx`    | the survey workspace with tabs (below); `?tab=…` opens a tab                          |
+| `/library`         | `apps/studio/app/library/page.tsx`         | question bank and templates _(PR #30)_                                                |
+| `/calls`           | `apps/studio/app/calls/page.tsx`           | CATI calling screen                                                                   |
+| `/automation`      | `apps/studio/app/automation/page.tsx`      | automation rules and runs _(PR #34)_                                                  |
+| `/appearance`      | `apps/studio/app/appearance/page.tsx`      | themes _(PR #27)_                                                                     |
+| `/settings`        | `apps/studio/app/settings/page.tsx`        | team, AI, redirect defaults, SSO, SCIM, plan, billing, API keys, webhooks, governance |
+| `/settings/audit`  | `apps/studio/app/settings/audit/page.tsx`  | audit log viewer                                                                      |
 
 Survey workspace tabs (`TABS` in `apps/studio/app/surveys/[id]/page.tsx`): `build`
 (`VisualEditor`), `json`, `code` (`Programmer`, XML view), `assist` (`Assist`, AI and import),

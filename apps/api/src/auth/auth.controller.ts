@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   ForbiddenException,
@@ -25,6 +26,7 @@ import { issueSession, sessionCookieOptions } from './session';
 import { verifySession } from './auth.guard';
 import { isCommonPassword } from './password-policy';
 import { SsoService } from './sso.service';
+import { PasswordResetService, newPasswordSchema } from './password-reset.service';
 import { ALL_ROLES, CurrentUser, Public, Roles } from './decorators';
 
 const loginSchema = z.object({ email: z.string().email().toLowerCase(), password: z.string().min(1).max(200) });
@@ -39,6 +41,10 @@ const registerSchema = z.object({
     .refine((p) => !isCommonPassword(p), 'This password is too common. Choose another one.'),
 });
 
+const changePasswordSchema = z.object({ currentPassword: z.string().min(1).max(200), newPassword: newPasswordSchema });
+const forgotSchema = z.object({ email: z.string().email().toLowerCase() });
+const resetSchema = z.object({ token: z.string().min(20).max(200), password: newPasswordSchema });
+
 /** Used when the email is unknown so that response timing does not reveal which accounts exist. */
 const DUMMY_HASH = hashSync('zapx-timing-equalizer', 10);
 
@@ -49,6 +55,7 @@ export class AuthController {
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
     private readonly sso: SsoService,
+    private readonly resets: PasswordResetService,
   ) {}
 
   private issue(res: Response, user: { id: string; tenantId: string; role: AuthUser['role']; email: string }) {
@@ -161,6 +168,75 @@ export class AuthController {
     await this.prisma.user.update({ where: { id: user.id }, data: { sessionsRevokedAt: new Date() } });
     res.clearCookie(AUTH_COOKIE, sessionCookieOptions());
     await this.audit.record(user, 'auth.logout_all', 'user', user.id);
+  }
+
+  /**
+   * Change my own password. Needs the current one; signs out my other sessions and keeps this one
+   * (a new session cookie is set). Not for API keys or members who must use single sign-on.
+   */
+  @Post('change-password')
+  @Roles(...ALL_ROLES)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @HttpCode(200)
+  async changePassword(@CurrentUser() user: AuthUser, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    if (user.apiKeyId) throw new ForbiddenException('Changing a password needs a signed-in session, not an API key');
+    const input = parseBody(changePasswordSchema, body);
+    const member = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    if (await this.sso.passwordBlocked(member.tenantId, member.role)) {
+      throw new ForbiddenException({ message: 'Your organization signs in with single sign-on.', code: 'SSO_REQUIRED' });
+    }
+    // 400, not 401: a wrong current password must not look like an expired session to the studio.
+    if (!(await compare(input.currentPassword, member.passwordHash))) throw new BadRequestException('Your current password is incorrect');
+    if (input.currentPassword === input.newPassword) throw new BadRequestException('Choose a password different from the current one');
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: member.id },
+        data: { passwordHash: await hash(input.newPassword, 10), failedLogins: 0, lockedUntil: null, sessionsRevokedAt: now },
+      }),
+      this.prisma.passwordReset.updateMany({ where: { userId: member.id, usedAt: null }, data: { usedAt: now } }),
+    ]);
+    // Every session issued before now is signed out, this one included; the new cookie keeps the member signed in.
+    await issueSession(this.jwt, res, member, now);
+    await this.audit.record(user, 'auth.password_change', 'user', member.id);
+    return { ok: true };
+  }
+
+  /**
+   * Forgot password: emails a one-time link when email is set up (EMAIL_PROVIDER). Always answers
+   * 204, whether or not the account exists, so the form cannot be used to find accounts.
+   */
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('forgot-password')
+  @HttpCode(204)
+  async forgot(@Body() body: unknown) {
+    const { email } = parseBody(forgotSchema, body);
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user || user.disabledAt) return;
+    if (await this.sso.passwordBlocked(user.tenantId, user.role)) return;
+    if (await this.resets.recentlySent(user.id)) return;
+    const link = await this.resets.create(user, null);
+    const sent = await this.resets.email({ email: user.email, name: user.name }, link.url, link.expiresAt, false);
+    await this.audit.record({ tenantId: user.tenantId, id: user.id }, 'auth.password_reset_requested', 'user', user.id, { emailed: sent });
+  }
+
+  /** Whether "forgot password" can send email, so the sign-in page can say what will happen. */
+  @Public()
+  @Get('password-options')
+  passwordOptions() {
+    return { forgotPasswordEmail: config().EMAIL_PROVIDER !== 'off' };
+  }
+
+  /** Sets a new password from a reset link. Signs out every session; the member then signs in. */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('reset-password')
+  @HttpCode(204)
+  async reset(@Body() body: unknown) {
+    const input = parseBody(resetSchema, body);
+    const user = await this.resets.consume(input.token, input.password);
+    await this.audit.record({ tenantId: user.tenantId, id: user.id }, 'auth.password_reset', 'user', user.id);
   }
 
   @Get('me')

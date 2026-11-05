@@ -106,8 +106,9 @@ first.
 1. Terraform state bucket, ACM certificates (one in us-east-1 for CloudFront), DNS validation.
 2. `terraform apply` with `waf_mode = "count"` (`infra/terraform/<env>.tfvars`).
 3. Put the app secret JSON in Secrets Manager. Every key in `app_secret_keys`
-   (`infra/terraform/variables.tf`) must be present, including `TWILIO_AUTH_TOKEN` (empty string if
-   unused); see [CONFIGURATION.md](CONFIGURATION.md#gaps-found).
+   (`infra/terraform/variables.tf`) must be present, empty if unused. The example JSON in the
+   Terraform README lists them all (fixed on branch `security-fixes`; before it, `TWILIO_AUTH_TOKEN`
+   and `SENDGRID_API_KEY` were missing); see [CONFIGURATION.md](CONFIGURATION.md#gaps-found).
 4. First release (below), then create the first organization with a temporary
    `ALLOW_SIGNUP = "true"` and remove it again.
 
@@ -265,9 +266,11 @@ Improvements worth planning (details in [SECURITY_REVIEW.md](SECURITY_REVIEW.md)
 
 1. **Merge or close the open stack** (#27 → #34, and #28 separately). Eight unmerged branches make
    every fix harder; the longer they stay open the more conflicts they collect.
-2. **Fix the documentation drift**: the root `README.md` and `docs/architecture.md` stop at
-   milestone 13.
-3. **Password reset**: there is no route to reset or change a password.
+2. **Done on branch `security-fixes`:** the root `README.md`, `docs/architecture.md` and
+   `go-live.md` now go past milestone 13; password change and reset exist; the vendor secret is
+   hidden from viewers; the AWS secret list matches its README.
+3. **Seal the vendor shared secret at rest** with `SecretBox`, like the partner secret (needs a
+   data migration).
 4. **Shared rate limiting**: the throttler is per process; with two or more API tasks the limits
    multiply. A shared store (database or Valkey) would make them exact.
 5. **Studio unit tests** and a coverage report (section 1).

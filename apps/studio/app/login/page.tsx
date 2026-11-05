@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -86,6 +87,11 @@ function LoginForm() {
         <button type="button" onClick={sso} disabled={busy}>
           Sign in with SSO
         </button>
+      ) : null}
+      {mode === 'login' ? (
+        <Link href="/forgot-password" className="link">
+          Forgot your password?
+        </Link>
       ) : null}
       <button type="button" className="link" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>
         {mode === 'login' ? 'New here? Create an organization' : 'Have an account? Sign in'}

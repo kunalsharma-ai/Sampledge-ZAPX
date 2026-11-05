@@ -7,7 +7,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccessService } from '../common/access.service';
 import { parseBody } from '../common/validation';
-import type { AuthUser } from '../auth/auth.types';
+import type { AuthUser, RoleName } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { RedirectService } from '../integrations/redirect.service';
 import { SecretBox } from '../platform/secret-box';
@@ -62,10 +62,14 @@ const previewSchema = z.object({
 
 const RESERVED_PARAMS = ['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig', 'lang'];
 
-/** What the studio sees: never the encrypted partner secret, only whether one is set. */
-export function presentVendor(v: Vendor) {
-  const { partnerSecretEnc, ...rest } = v;
-  return { ...rest, partnerSecretSet: !!partnerSecretEnc };
+/**
+ * What the studio sees: never the encrypted partner secret, only whether one is set. The shared
+ * secret signs entry links, redirects and callbacks and authenticates the vendor API, so only the
+ * roles that may change vendors (CAN_EDIT) receive it; viewers see only that one exists.
+ */
+export function presentVendor(v: Vendor, role: RoleName) {
+  const { partnerSecretEnc, secret, ...rest } = v;
+  return { ...rest, ...(CAN_EDIT.includes(role) ? { secret } : {}), partnerSecretSet: !!partnerSecretEnc };
 }
 
 /** Sample vendors, their redirect and callback configuration and redirect QA (preview). */
@@ -126,7 +130,7 @@ export class VendorsController {
       where: { projectId, ...this.access.vendors(user) },
       orderBy: { createdAt: 'asc' },
     });
-    return rows.map(presentVendor);
+    return rows.map((v) => presentVendor(v, user.role));
   }
 
   @Post('projects/:projectId/vendors')
@@ -147,12 +151,12 @@ export class VendorsController {
       data: { ...data, tenantId: user.tenantId, projectId, secret: randomBytes(32).toString('hex') },
     });
     await this.audit.record(user, 'vendor.create', 'vendor', vendor.id, { code: vendor.code, ...VendorsController.summary(vendor) });
-    return presentVendor(vendor);
+    return presentVendor(vendor, user.role);
   }
 
   @Get('vendors/:id')
   async get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return presentVendor(await this.own(user, id));
+    return presentVendor(await this.own(user, id), user.role);
   }
 
   @Put('vendors/:id')
@@ -169,7 +173,7 @@ export class VendorsController {
       before: VendorsController.summary(before),
       after: VendorsController.summary(vendor),
     });
-    return presentVendor(vendor);
+    return presentVendor(vendor, user.role);
   }
 
   /** Soft delete: links stop working, history (responses, redirects, callbacks) is kept. */
@@ -188,7 +192,7 @@ export class VendorsController {
     await this.own(user, id);
     const vendor = await this.prisma.vendor.update({ where: { id }, data: { secret: randomBytes(32).toString('hex') } });
     await this.audit.record(user, 'vendor.rotate_secret', 'vendor', id);
-    return presentVendor(vendor);
+    return presentVendor(vendor, user.role);
   }
 
   /** Redirect QA: show exactly where a respondent would be sent for each status. */

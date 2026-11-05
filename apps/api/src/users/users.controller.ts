@@ -1,4 +1,15 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
 import { isCommonPassword } from '../auth/password-policy';
@@ -8,6 +19,7 @@ import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser, Roles } from '../auth/decorators';
 import { PlanService } from '../plans/plan.service';
+import { PasswordResetService } from '../auth/password-reset.service';
 
 const createSchema = z.object({
   name: z.string().min(1).max(120),
@@ -54,7 +66,27 @@ export class UsersController {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly plans: PlanService,
+    private readonly resets: PasswordResetService,
   ) {}
+
+  /**
+   * One-time link for a member to set a new password (security fix after the handbook review).
+   * The link is returned once for the administrator to pass on and, when email is set up, also
+   * emailed to the member. It voids the member's older links; their current password keeps
+   * working until the link is used.
+   */
+  @Post(':id/password-reset')
+  @HttpCode(201)
+  async resetLink(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    const member = await this.prisma.user.findFirst({ where: { id, tenantId: user.tenantId } });
+    if (!member) throw new NotFoundException('Member not found');
+    if (member.disabledAt) throw new BadRequestException('Enable this member before resetting their password');
+    if (id === user.id) throw new BadRequestException('Change your own password in your profile instead');
+    const link = await this.resets.create(member, user.id);
+    const emailed = await this.resets.email({ email: member.email, name: member.name }, link.url, link.expiresAt, true);
+    await this.audit.record(user, 'user.password_reset_link', 'user', id, { emailed });
+    return { url: link.url, expiresAt: link.expiresAt, emailed };
+  }
 
   @Get()
   list(@CurrentUser() user: AuthUser) {
