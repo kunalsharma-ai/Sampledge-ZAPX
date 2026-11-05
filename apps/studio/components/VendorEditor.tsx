@@ -29,7 +29,7 @@ export interface Vendor {
   partnerBaseUrl: string | null;
   partnerSecretSet: boolean;
   partnerS2s: boolean;
-  /** Only for roles that can edit vendors (admins and programmers). */
+  /** Only for administrators. */
   secret?: string;
 }
 

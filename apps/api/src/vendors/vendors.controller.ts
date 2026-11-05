@@ -62,14 +62,18 @@ const previewSchema = z.object({
 
 const RESERVED_PARAMS = ['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig', 'lang'];
 
+/** Roles that receive the vendor's shared secret. ADMIN is the highest role (there is no separate super admin). */
+export const SEES_VENDOR_SECRET: RoleName[] = ['ADMIN'];
+
 /**
  * What the studio sees: never the encrypted partner secret, only whether one is set. The shared
- * secret signs entry links, redirects and callbacks and authenticates the vendor API, so only the
- * roles that may change vendors (CAN_EDIT) receive it; viewers see only that one exists.
+ * secret signs entry links, redirects and callbacks and authenticates the vendor API, so only
+ * administrators receive it (Kunal's decision, 2026-11-05); programmers and viewers get the rest of
+ * the vendor without it.
  */
 export function presentVendor(v: Vendor, role: RoleName) {
   const { partnerSecretEnc, secret, ...rest } = v;
-  return { ...rest, ...(CAN_EDIT.includes(role) ? { secret } : {}), partnerSecretSet: !!partnerSecretEnc };
+  return { ...rest, ...(SEES_VENDOR_SECRET.includes(role) ? { secret } : {}), partnerSecretSet: !!partnerSecretEnc };
 }
 
 /** Sample vendors, their redirect and callback configuration and redirect QA (preview). */
