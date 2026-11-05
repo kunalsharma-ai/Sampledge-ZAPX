@@ -226,6 +226,11 @@ const schema = z
     BILLING_FALLBACK_PLAN: z.enum(['free', 'team', 'business', 'enterprise']).default('free'),
     /** Public address of the studio; SSO callbacks are ${STUDIO_URL}/api/auth/sso/callback. */
     STUDIO_URL: z.string().url().default('http://localhost:3000'),
+    /** Oldest ZAPX mobile app version allowed to sign in (e.g. 1.2.0); older apps are asked to update. */
+    MOBILE_MIN_VERSION: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/)
+      .optional(),
     /** Development and tests only: allow http and private-network identity providers. */
     SSO_ALLOW_INSECURE_ISSUER: z
       .string()

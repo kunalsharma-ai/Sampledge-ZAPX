@@ -1,5 +1,7 @@
 packages:
   - 'apps/*'
+  # The mobile app is an Expo project with its own npm lockfile (apps/mobile/README.md).
+  - '!apps/mobile'
   - 'packages/*'
   - 'e2e'
 onlyBuiltDependencies:

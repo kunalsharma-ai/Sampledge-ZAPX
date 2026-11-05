@@ -206,9 +206,10 @@ export class AuthController {
       this.prisma.passwordReset.updateMany({ where: { userId: member.id, usedAt: null }, data: { usedAt: now } }),
     ]);
     // Every session issued before now is signed out, this one included; the new cookie keeps the member signed in.
-    await issueSession(this.jwt, res, member, now);
+    // Bearer clients (the mobile app) get the new token in the body, as at sign-in.
+    const token = await issueSession(this.jwt, res, member, now);
     await this.audit.record(user, 'auth.password_change', 'user', member.id);
-    return { ok: true };
+    return { ok: true, token };
   }
 
   /**

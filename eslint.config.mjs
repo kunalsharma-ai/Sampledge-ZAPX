@@ -19,6 +19,10 @@ export default tseslint.config(
       '**/.terraform/**',
       // MediaPipe's WebAssembly loader, copied from node_modules at build time (not our code).
       'apps/runtime/public/eyetracking/wasm/**',
+      'apps/mobile/.expo/**',
+      'apps/mobile/expo-env.d.ts',
+      'apps/mobile/android/**',
+      'apps/mobile/ios/**',
     ],
   },
   js.configs.recommended,
@@ -39,7 +43,7 @@ export default tseslint.config(
     rules: { '@typescript-eslint/consistent-type-imports': 'off' },
   },
   {
-    files: ['apps/studio/**/*.tsx', 'apps/runtime/**/*.tsx', 'packages/survey-renderer/**/*.tsx'],
+    files: ['apps/studio/**/*.tsx', 'apps/runtime/**/*.tsx', 'packages/survey-renderer/**/*.tsx', 'apps/mobile/**/*.tsx'],
     plugins: { 'react-hooks': reactHooks },
     rules: { 'react-hooks/rules-of-hooks': 'error', 'react-hooks/exhaustive-deps': 'warn' },
   },
