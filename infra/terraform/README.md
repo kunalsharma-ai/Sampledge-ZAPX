@@ -60,6 +60,7 @@ terraform apply -var-file=staging.tfvars
 aws secretsmanager put-secret-value --secret-id "$(terraform output -raw app_secret_arn)" --secret-string '{
   "JWT_SECRET": "<openssl rand -hex 32>",
   "SECRETS_KEY": "<openssl rand -base64 32>",
+  "SIGNING_KEYS_SECRET": "<openssl rand -hex 32>",
   "EDGE_SHARED_SECRET": "<the same value as edge_shared_secret>",
   "ANTHROPIC_API_KEY": "",
   "STRIPE_SECRET_KEY": "",

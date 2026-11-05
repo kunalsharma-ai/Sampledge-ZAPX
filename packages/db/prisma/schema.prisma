@@ -1443,3 +1443,14 @@ model PlatformAutomationRun {
   @@unique([automationId, dedupeKey])
   @@index([createdAt])
 }
+
+/// Rate-limit counters shared by every API process (security review S4, THROTTLE_STORE=database).
+model RateLimitBucket {
+  /// "<throttler>:<client and route>", as built by the throttler guard.
+  key          String    @id
+  hits         Int
+  windowEnds   DateTime
+  blockedUntil DateTime?
+
+  @@index([windowEnds])
+}

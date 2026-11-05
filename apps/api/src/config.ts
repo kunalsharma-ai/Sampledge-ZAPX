@@ -76,6 +76,11 @@ const schema = z
     AI_DEFAULT_RPD: z.coerce.number().int().min(0).max(1_000_000).default(500),
     /** Key for encrypting partner secrets at rest (32+ chars). Falls back to a key derived from JWT_SECRET. */
     SECRETS_KEY: optionalString.refine((v) => !v || v.length >= 32, 'SECRETS_KEY must be at least 32 characters'),
+    /**
+     * Derives the keys for test links, network/device hashes and SSO state (security review S5), so
+     * they survive a JWT_SECRET rotation. 32+ chars; required in production. Unset: derived from JWT_SECRET.
+     */
+    SIGNING_KEYS_SECRET: optionalString.refine((v) => !v || v.length >= 32, 'SIGNING_KEYS_SECRET must be at least 32 characters'),
     NODE_ENV: z.string().default('development'),
     /** Callback outbox worker. "off" leaves delivery to another process (or to tests). */
     CALLBACK_WORKER: z.enum(['on', 'off']).default('on'),
@@ -258,6 +263,11 @@ const schema = z
       .optional()
       .transform((v) => v === 'true'),
     /** Sign-in attempts allowed per minute from one address (raise only for automated test runs). */
+    /**
+     * Where rate-limit counters live (security review S4): `database` shares them between every API
+     * process; `memory` counts per process. Default: database in production, memory otherwise.
+     */
+    THROTTLE_STORE: z.enum(['database', 'memory']).optional(),
     LOGIN_RATE_PER_MINUTE: z.coerce.number().int().min(1).max(1000).default(10),
     /** Milestone 20: wrong passwords in a row before an account is locked, and for how long. */
     LOGIN_MAX_FAILURES: z.coerce.number().int().min(3).max(100).default(10),
@@ -309,6 +319,16 @@ const schema = z
     }
     if (c.NODE_ENV === 'production' && !c.SECRETS_KEY)
       ctx.addIssue({ code: 'custom', path: ['SECRETS_KEY'], message: 'SECRETS_KEY is required in production' });
+    if (c.NODE_ENV === 'production' && !c.SIGNING_KEYS_SECRET)
+      ctx.addIssue({ code: 'custom', path: ['SIGNING_KEYS_SECRET'], message: 'SIGNING_KEYS_SECRET is required in production' });
+    if (
+      c.NODE_ENV === 'production' &&
+      c.SIGNING_KEYS_SECRET &&
+      (c.SIGNING_KEYS_SECRET === c.JWT_SECRET ||
+        c.SIGNING_KEYS_SECRET === c.SECRETS_KEY ||
+        KNOWN_DEV_SECRETS.some((d) => c.SIGNING_KEYS_SECRET!.includes(d)))
+    )
+      ctx.addIssue({ code: 'custom', path: ['SIGNING_KEYS_SECRET'], message: 'must be its own random value' });
     if (c.NODE_ENV === 'production' && c.CALLBACK_ALLOW_PRIVATE_HOSTS) {
       ctx.addIssue({ code: 'custom', path: ['CALLBACK_ALLOW_PRIVATE_HOSTS'], message: 'must be false in production' });
     }

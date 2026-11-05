@@ -5,6 +5,7 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
+import security from 'eslint-plugin-security';
 
 export default tseslint.config(
   {
@@ -35,6 +36,27 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': ['error', { fixStyle: 'inline-type-imports', disallowTypeAnnotations: false }],
       eqeqeq: ['error', 'smart'],
       'no-console': ['error', { allow: ['warn', 'error'] }],
+    },
+  },
+  {
+    // Static security analysis that runs with every `pnpm lint` (security review S8; GitHub's CodeQL
+    // never runs on this plan). Only the rules that flag real risks without drowning in noise;
+    // detect-unsafe-regex is left out: its 21 hits on main were all delimited or bounded patterns,
+    // reviewed by hand (docs/handbook/SECURITY_REVIEW.md, S8).
+    plugins: { security },
+    rules: {
+      'security/detect-eval-with-expression': 'error',
+      'security/detect-non-literal-require': 'error',
+      'security/detect-child-process': 'error',
+      'security/detect-buffer-noassert': 'error',
+      'security/detect-new-buffer': 'error',
+      'security/detect-pseudoRandomBytes': 'error',
+      'security/detect-disable-mustache-escape': 'error',
+      'security/detect-no-csrf-before-method-override': 'error',
+      'security/detect-bidi-characters': 'error',
+      'security/detect-possible-timing-attacks': 'error',
+      'no-new-func': 'error',
+      'no-implied-eval': 'error',
     },
   },
   {

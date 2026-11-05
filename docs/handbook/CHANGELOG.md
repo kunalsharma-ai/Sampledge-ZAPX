@@ -9,6 +9,10 @@ release. ZAPX has no version numbers or git tags yet, so entries are grouped by 
 
 ## Unreleased (open pull requests, not on `main`)
 
+- 2026-11-05, branch `security-s4-s9`: security review findings S4–S9 fixed (shared rate-limit store,
+  `SIGNING_KEYS_SECRET`, studio script nonce, no session token in browser bodies, security lint rules,
+  row-level security on seven more tables). Migration `20261120000000_security_hardening`.
+
 These exist only on their branches. The stack is merged in order: #27 → #29 → #30 → #31 → #32 →
 #33 → #34 → #35 → #36 → #37 → #38 → #39 → #41 → #40 (note #41 before #40). PR #28 is based on
 `main`; its work was rebuilt on the stack as #38.

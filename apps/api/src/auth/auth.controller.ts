@@ -22,7 +22,7 @@ import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { parseBody } from '../common/validation';
 import { AUTH_COOKIE, type AuthUser } from './auth.types';
-import { issueSession, sessionCookieOptions } from './session';
+import { bodyToken, issueSession, sessionCookieOptions } from './session';
 import { verifySession } from './auth.guard';
 import { isCommonPassword } from './password-policy';
 import { SsoService } from './sso.service';
@@ -70,7 +70,7 @@ export class AuthController {
   @Throttle({ default: { limit: () => config().LOGIN_RATE_PER_MINUTE, ttl: 60_000 } })
   @Post('login')
   @HttpCode(200)
-  async login(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+  async login(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { email, password } = parseBody(loginSchema, body);
     const user = await this.prisma.user.findUnique({ where: { email } });
     // Compare against a dummy hash when the user does not exist to keep timing uniform.
@@ -105,14 +105,14 @@ export class AuthController {
     }
     const token = await this.issue(res, user);
     await this.audit.record({ ...user, role: user.role }, 'auth.login', 'user', user.id);
-    return { user: { id: user.id, email: user.email, name: user.name, role: user.role }, token };
+    return { user: { id: user.id, email: user.email, name: user.name, role: user.role }, token: bodyToken(req, token) };
   }
 
   /** Self-service sign-up creating a new tenant. Disabled unless ALLOW_SIGNUP=true. */
   @Public()
   @Throttle({ default: { limit: () => config().SIGNUP_RATE_PER_MINUTE, ttl: 60_000 } })
   @Post('register')
-  async register(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+  async register(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     if (!config().ALLOW_SIGNUP) throw new ForbiddenException('Sign-up is disabled');
     const input = parseBody(registerSchema, body);
     if (await this.prisma.user.findUnique({ where: { email: input.email } }))
@@ -131,7 +131,7 @@ export class AuthController {
     });
     const token = await this.issue(res, user);
     await this.audit.record(user, 'auth.register', 'tenant', user.tenantId);
-    return { user: { id: user.id, email: user.email, name: user.name, role: user.role }, token };
+    return { user: { id: user.id, email: user.email, name: user.name, role: user.role }, token: bodyToken(req, token) };
   }
 
   private async recordFailure(user: { id: string; tenantId: string; role: AuthUser['role']; email: string }) {
@@ -187,7 +187,12 @@ export class AuthController {
   @Roles(...ALL_ROLES)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @HttpCode(200)
-  async changePassword(@CurrentUser() user: AuthUser, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() body: unknown,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     if (user.apiKeyId) throw new ForbiddenException('Changing a password needs a signed-in session, not an API key');
     const input = parseBody(changePasswordSchema, body);
     const member = await this.prisma.user.findUniqueOrThrow({ where: { id: user.id } });
@@ -209,7 +214,7 @@ export class AuthController {
     // Bearer clients (the mobile app) get the new token in the body, as at sign-in.
     const token = await issueSession(this.jwt, res, member, now);
     await this.audit.record(user, 'auth.password_change', 'user', member.id);
-    return { ok: true, token };
+    return { ok: true, token: bodyToken(req, token) };
   }
 
   /**

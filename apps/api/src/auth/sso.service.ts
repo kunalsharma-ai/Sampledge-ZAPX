@@ -15,6 +15,7 @@ import type { AuthUser } from './auth.types';
 
 import { SsoError } from './sso-error';
 import { normalizeCerts, SamlService, SsoVerifyError } from './saml.service';
+import { signingKey } from '../common/signing-keys';
 
 export { SsoError };
 
@@ -97,7 +98,7 @@ export class SsoService {
   }
 
   private stateKey() {
-    return createHmac('sha256', config().JWT_SECRET).update('zapx-sso-state').digest();
+    return signingKey('sso-state', (legacy) => createHmac('sha256', legacy).update('zapx-sso-state').digest());
   }
 
   /** Identity provider addresses must be https on a public host (unless SSO_ALLOW_INSECURE_ISSUER). */

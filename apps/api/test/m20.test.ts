@@ -260,7 +260,12 @@ describe('production settings', () => {
       });
       resetConfig();
       expect(() => config()).toThrow(/COOKIE_SECURE.*JWT_SECRET.*SECRETS_KEY/);
-      Object.assign(process.env, { JWT_SECRET: 'a'.repeat(16) + 'b'.repeat(32), SECRETS_KEY: 'c'.repeat(48), COOKIE_SECURE: 'true' });
+      Object.assign(process.env, {
+        JWT_SECRET: 'a'.repeat(16) + 'b'.repeat(32),
+        SECRETS_KEY: 'c'.repeat(48),
+        SIGNING_KEYS_SECRET: 'd'.repeat(48),
+        COOKIE_SECURE: 'true',
+      });
       resetConfig();
       expect(config().COOKIE_SECURE).toBe(true);
     } finally {

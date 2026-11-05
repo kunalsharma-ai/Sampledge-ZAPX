@@ -66,7 +66,9 @@ export class DistributionService {
   async contacts(user: AuthUser, surveyId: string) {
     await this.survey(user, surveyId);
     const [rows, total, unsubscribed] = await Promise.all([
-      this.prisma.contact.findMany({ where: { surveyId, tenantId: user.tenantId }, orderBy: { createdAt: 'asc' }, take: 200 }),
+      this.prisma
+        .forTenant(user.tenantId)
+        .contact.findMany({ where: { surveyId, tenantId: user.tenantId }, orderBy: { createdAt: 'asc' }, take: 200 }),
       this.prisma.contact.count({ where: { surveyId, tenantId: user.tenantId } }),
       this.prisma.contact.count({ where: { surveyId, tenantId: user.tenantId, unsubscribedAt: { not: null } } }),
     ]);
@@ -302,8 +304,9 @@ export class DistributionService {
     const d = await this.prisma.distribution.findFirst({ where: { id, surveyId, tenantId: user.tenantId } });
     if (!d) throw new NotFoundException('Wave not found');
     await this.invite(d);
-    const inv = await this.prisma.invitation.findMany({ where: { distributionId: id }, orderBy: { createdAt: 'asc' } });
-    const contacts = await this.prisma.contact.findMany({ where: { id: { in: inv.map((i) => i.contactId) } } });
+    const db = this.prisma.forTenant(user.tenantId);
+    const inv = await db.invitation.findMany({ where: { distributionId: id, tenantId: user.tenantId }, orderBy: { createdAt: 'asc' } });
+    const contacts = await db.contact.findMany({ where: { id: { in: inv.map((i) => i.contactId) }, tenantId: user.tenantId } });
     const esc = (v: string) =>
       /[",\n\r]/.test(v) || /^[=+\-@]/.test(v) ? `"${(/^[=+\-@]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"` : v;
     const lines = ['email,phone,name,link,unsubscribed'];

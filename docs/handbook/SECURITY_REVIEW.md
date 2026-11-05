@@ -44,12 +44,12 @@ For the project's own security notes, which this review does not replace, see
 | S1  | Medium   | Vendor shared secret is readable by every role, including VIEWER                                      | **Fixed** on branch `security-fixes` (ADMIN only) |
 | S2  | Medium   | Terraform secret list and the documented secret JSON disagree                                         | **Fixed** on branch `security-fixes`              |
 | S3  | Medium   | No way to reset or change a password                                                                  | **Fixed** on branch `security-fixes`              |
-| S4  | Low–Med  | Rate limits are per API process                                                                       | open                                              |
-| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                                                            | open                                              |
-| S6  | Low      | Studio content security policy does not restrict scripts                                              | open                                              |
-| S7  | Low      | Login answers with the session token in the body too                                                  | open                                              |
-| S8  | Low      | Automated security scanning never runs on GitHub                                                      | open                                              |
-| S9  | Info     | Row-level security covers two tables only                                                             | open                                              |
+| S4  | Low–Med  | Rate limits are per API process                                                                       | **Fixed** on branch `security-s4-s9`              |
+| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                                                            | **Fixed** on branch `security-s4-s9`              |
+| S6  | Low      | Studio content security policy does not restrict scripts                                              | **Fixed** on branch `security-s4-s9`              |
+| S7  | Low      | Login answers with the session token in the body too                                                  | **Fixed** on branch `security-s4-s9`              |
+| S8  | Low      | Automated security scanning never runs on GitHub                                                      | **Fixed** on branch `security-s4-s9`              |
+| S9  | Info     | Row-level security covers two tables only                                                             | **Fixed** on branch `security-s4-s9`              |
 | S10 | Low–Med  | Feature gating is a list of route patterns; unlisted routes are open _(PR #41)_                       | open                                              |
 | S11 | Low      | The oldest organization becomes the platform operator automatically _(PR #38)_                        | open                                              |
 | S12 | Info     | Super admins saw the vendor secret only if they were also ADMIN of that organization _(PR #36 + #41)_ | **Fixed** on branch `vendor-secret-super-admin`   |
@@ -122,6 +122,12 @@ finding ends with what the fix changed.
 - **Consider:** a shared throttler store (PostgreSQL or Valkey) when exact limits matter, for example
   for the vendor API (120/min) and AI routes.
 
+- **Fixed (branch `security-s4-s9`):** `THROTTLE_STORE=database` (the default in production) keeps the
+  counters in the `RateLimitBucket` table (`apps/api/src/common/db-throttler-storage.ts`): one upsert
+  per request, fixed windows, blocks shared by every task; finished rows are swept every 5 minutes. If
+  the database cannot be reached the process counts on its own (logged) instead of failing requests.
+  Test: `apps/api/test/security-hardening.test.ts`.
+
 ### S5. `JWT_SECRET` keys several unrelated things (Low–Medium, operations)
 
 - **Seen:** besides sessions (`app.module.ts`), `JWT_SECRET` keys test-link signatures
@@ -136,6 +142,12 @@ finding ends with what the fix changed.
 - **Consider:** document this in the rotation procedure now; later derive separate keys for each
   purpose from a dedicated secret.
 
+- **Fixed (branch `security-s4-s9`):** new `SIGNING_KEYS_SECRET` (required in production, its own
+  value; in Terraform's `app_secret_keys`). Test links, network and device hashes and SSO state each
+  use their own key derived from it with HKDF (`apps/api/src/common/signing-keys.ts`). Unset
+  (development) the old JWT_SECRET derivation is kept, so nothing changes until it is set. The rotation
+  table is in [DEPLOYMENT.md](DEPLOYMENT.md#rotating-secrets).
+
 ### S6. Studio CSP does not restrict scripts (Low)
 
 - **Seen:** `apps/studio/next.config.mjs` sets `frame-ancestors`, `object-src`, `base-uri`,
@@ -145,6 +157,12 @@ finding ends with what the fix changed.
 - **Why it matters:** if an XSS bug appears, the CSP will not stop injected script. React's escaping
   is the main defence. `connect-src 'self'` does limit where stolen data can be sent with `fetch`.
 - **Consider:** a nonce-based `script-src` through Next.js middleware.
+
+- **Fixed (branch `security-s4-s9`):** `apps/studio/middleware.ts` sends
+  `script-src 'self' 'nonce-…' 'strict-dynamic'` with a new nonce per page; Next.js puts it on its own
+  scripts and `app/layout.tsx` on the theme boot script. Pages are now rendered per request (they
+  were client-rendered behind sign-in anyway). The milestone 20 browser test checks the header and
+  that an injected inline event handler does not run.
 
 ### S7. Session token also in the login response body (Low)
 
@@ -159,6 +177,12 @@ finding ends with what the fix changed.
   cookie). Any change here must keep a way for the app to get it, for example only when the request
   carries `X-ZAPX-Client: mobile`.
 
+- **Fixed (branch `security-s4-s9`):** sign-in, sign-up and change-password leave `token` out of the
+  body when the request has `Sec-Fetch-Mode`, which every current browser sends and page scripts
+  cannot remove (`bodyToken` in `auth/session.ts`). The mobile app, scripts and tests send no such
+  header and still get the token. (A custom header such as `X-ZAPX-Client` would not do: a script can
+  set it.)
+
 ### S8. Automated security scanning never runs on GitHub (Low, process)
 
 - **Seen:** `.github/workflows/ci.yml` and `codeql.yml` exist but the free plan has no Actions (ADR
@@ -166,6 +190,14 @@ finding ends with what the fix changed.
   CodeQL locally.
 - **Consider:** run CodeQL CLI or Semgrep locally before releases, or enable Actions if the plan
   changes. Keep Dependabot PRs (#20–#25) moving.
+
+- **Fixed (branch `security-s4-s9`):** `pnpm lint` (so `pnpm check`) now runs
+  `eslint-plugin-security` rules as errors: eval with expressions, `new Function`, child processes,
+  non-literal `require`, `new Buffer`, pseudo-random bytes, timing-attack comparisons, bidi characters
+  and more. Its `detect-unsafe-regex` rule is off: the 21 regexes it flagged on `main` were reviewed by
+  hand and all are anchored and delimited or bounded (no nested ambiguous repetition), so none can
+  backtrack badly. For a release, a CodeQL CLI or Semgrep run is still worthwhile. The Dependabot PRs
+  are handled on branch `dependency-updates`.
 
 ### S9. Row-level security covers two tables (Info)
 
@@ -175,6 +207,12 @@ finding ends with what the fix changed.
   existing routes, but nothing stops a new route from forgetting.
 - **Consider:** keep the review rule "every `findMany` has `tenantId`" in PR reviews, and extend RLS
   to other personal-data tables (for example CATI call lists) when convenient.
+
+- **Fixed (branch `security-s4-s9`):** migration `20261120000000_security_hardening` adds the same
+  policy to `CatiCase`, `CatiCall`, `DoNotCall`, `Contact`, `Invitation`, `BackCheck` and
+  `QualityAppeal`, and the studio reads of call cases, call history, the do-not-call list, contacts
+  and wave links now go through `forTenant`. A test checks the policy on all nine tables and that a
+  plain database role sees only its own tenant's rows. Keep the review rule for new queries.
 
 ### S10. Feature gating fails open for routes not in the map (Low–Medium) _(PR #41)_
 

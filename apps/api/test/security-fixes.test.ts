@@ -260,6 +260,7 @@ describe('AWS app secret', () => {
     for (const k of [
       'JWT_SECRET',
       'SECRETS_KEY',
+      'SIGNING_KEYS_SECRET',
       'ANTHROPIC_API_KEY',
       'STRIPE_SECRET_KEY',
       'STRIPE_WEBHOOK_SECRET',

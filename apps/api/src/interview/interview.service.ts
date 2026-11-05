@@ -47,7 +47,6 @@ import {
   type SurveyDefinition,
   type Theme,
 } from '@zapx/survey-schema';
-import { config } from '../config';
 import { firstFullSlot, takeQuotaPlaces } from '../quotas/quota-places';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -58,6 +57,7 @@ import { NetworkReputationService } from '../quality/network-reputation.service'
 import { CaptureService } from '../captures/capture.service';
 import type { BrowserSignals } from '@zapx/quality-core';
 import { PlanService } from '../plans/plan.service';
+import { signingKey } from '../common/signing-keys';
 
 const MAX_PARAMS = 30;
 const MAX_PARAM_LENGTH = 2000;
@@ -267,9 +267,14 @@ function addSignals(prior: unknown, page: Page, answered: Answers, s: PageSignal
   return out;
 }
 
-/** Test links are signed with the server secret so that only the studio can create them. */
+/** Test links are signed with a server key so that only the studio can create them. */
 export function testSignature(surveyId: string, uid: string): string {
-  return createHmac('sha256', config().JWT_SECRET).update(`test:${surveyId}:${uid}`).digest('hex');
+  return createHmac(
+    'sha256',
+    signingKey('test-link', (legacy) => legacy),
+  )
+    .update(`test:${surveyId}:${uid}`)
+    .digest('hex');
 }
 
 function validTestSignature(surveyId: string, uid: string, sig: string | undefined): boolean {

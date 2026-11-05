@@ -1,5 +1,5 @@
 import type { JwtService } from '@nestjs/jwt';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { randomBytes } from 'node:crypto';
 import { config } from '../config';
 import { AUTH_COOKIE, type AuthUser } from './auth.types';
@@ -30,4 +30,14 @@ export async function issueSession(
   );
   res.cookie(AUTH_COOKIE, token, { ...sessionCookieOptions(), maxAge: SESSION_HOURS * 3600 * 1000 });
   return token;
+}
+
+/**
+ * The session token for the response body (security review S7). Browsers get the httpOnly cookie
+ * only, so a script injected into the sign-in page cannot read the token from the body either.
+ * Browsers always send Sec-Fetch-Mode on requests (scripts cannot remove it); the mobile app, API
+ * scripts and tests do not, and they still receive the token to send as a Bearer header.
+ */
+export function bodyToken(req: Request, token: string): string | undefined {
+  return req.headers['sec-fetch-mode'] ? undefined : token;
 }

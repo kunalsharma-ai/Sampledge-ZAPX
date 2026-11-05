@@ -14,6 +14,18 @@ test('security headers, weak passwords and sign out everywhere', async ({ page, 
   const headers = res!.headers();
   expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
   expect(headers['x-frame-options']).toBe('DENY');
+  // Security review S6: scripts need this response's nonce, so an injected script does not run.
+  expect(headers['content-security-policy']).toMatch(/script-src 'self' 'nonce-[A-Za-z0-9+/=]+' 'strict-dynamic'/);
+  const injected = await page.evaluate(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const w = window as unknown as { zapxInjected?: boolean };
+        // What an HTML-injection bug would insert: an inline event handler.
+        document.body.insertAdjacentHTML('beforeend', '<img alt="" src="data:," onerror="window.zapxInjected = true">');
+        setTimeout(() => resolve(w.zapxInjected === true), 300);
+      }),
+  );
+  expect(injected).toBe(false);
 
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
   await page.getByLabel('Organization').fill(`E2E M20 ${run}`);

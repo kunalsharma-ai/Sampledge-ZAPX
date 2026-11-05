@@ -172,9 +172,9 @@ export class CatiService {
 
   async listCases(user: AuthUser, surveyId: string, status?: string) {
     await this.survey(user, surveyId);
-    const where: Prisma.CatiCaseWhereInput = { surveyId };
+    const where: Prisma.CatiCaseWhereInput = { surveyId, tenantId: user.tenantId };
     if (status) where.status = status as CatiCase['status'];
-    const rows = await this.prisma.catiCase.findMany({ where, orderBy: [{ nextCallAt: 'asc' }], take: 200 });
+    const rows = await this.prisma.forTenant(user.tenantId).catiCase.findMany({ where, orderBy: [{ nextCallAt: 'asc' }], take: 200 });
     return rows.map((c) => this.present(c, false));
   }
 
@@ -373,7 +373,9 @@ export class CatiService {
   async doNotCall(user: AuthUser) {
     const [count, latest] = await Promise.all([
       this.prisma.doNotCall.count({ where: { tenantId: user.tenantId } }),
-      this.prisma.doNotCall.findMany({ where: { tenantId: user.tenantId }, orderBy: { createdAt: 'desc' }, take: 100 }),
+      this.prisma
+        .forTenant(user.tenantId)
+        .doNotCall.findMany({ where: { tenantId: user.tenantId }, orderBy: { createdAt: 'desc' }, take: 100 }),
     ]);
     return { count, latest: latest.map((d) => ({ id: d.id, hint: `…${d.hint}`, source: d.source, note: d.note, createdAt: d.createdAt })) };
   }
@@ -414,7 +416,9 @@ export class CatiService {
   private async opened(user: AuthUser, c: CatiCase) {
     // Revealing a phone number is personal data access, so it is audited.
     await this.audit.record(user, 'cati.case_open', 'survey', c.surveyId, { caseId: c.id, code: c.code });
-    const calls = await this.prisma.catiCall.findMany({ where: { caseId: c.id }, orderBy: { endedAt: 'desc' }, take: 20 });
+    const calls = await this.prisma
+      .forTenant(user.tenantId)
+      .catiCall.findMany({ where: { caseId: c.id, tenantId: user.tenantId }, orderBy: { endedAt: 'desc' }, take: 20 });
     // Milestone 19: on surveys that use the dialer the interviewer never sees the number.
     const dialer = await this.prisma.catiDialer.findUnique({ where: { surveyId: c.surveyId } });
     const dialed = integration('twilio').enabled && !!dialer?.enabled;
