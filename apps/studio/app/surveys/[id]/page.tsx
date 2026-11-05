@@ -14,6 +14,7 @@ import { useMe } from '@/lib/useMe';
 import { CopyField, ErrorNote, Shell } from '@/components/Shell';
 import { VisualEditor } from '@/components/VisualEditor';
 import { Preview } from '@/components/Preview';
+import { Programmer } from '@/components/Programmer';
 import { Assist } from '@/components/Assist';
 import { QaLab } from '@/components/QaLab';
 import { DesignStudio } from '@/components/DesignStudio';
@@ -45,6 +46,7 @@ interface DraftVersion {
 const TABS = [
   'build',
   'json',
+  'code',
   'assist',
   'design',
   'languages',
@@ -247,6 +249,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
           [
             ['build', 'Build'],
             ['json', 'JSON'],
+            ['code', 'Programmer'],
             ['assist', 'AI & import'],
             ['design', 'Design'],
             ['languages', 'Languages'],
@@ -277,6 +280,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
           <LogicReport schemaIssues={report.schemaIssues} analysis={report.analysis} languageBlockers={languageBlockers} />
         </div>
       ) : null}
+      {tab === 'code' ? <Programmer surveyId={id} def={def} onApply={edit} readOnly={readOnly} /> : null}
       {tab === 'preview' ? <Preview key={JSON.stringify(def).length + draft.version} def={def} presentation={pres} /> : null}
       {tab === 'design' ? <DesignStudio def={def} presentation={pres} readOnly={readOnly} onChange={editPres} /> : null}
       {tab === 'languages' ? (
@@ -316,7 +320,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         </div>
       ) : null}
       {tab === 'quality' ? <Quality surveyId={id} def={def} readOnly={readOnly} onChange={edit} /> : null}
-      {tab === 'results' ? <Results surveyId={id} /> : null}
+      {tab === 'results' ? <Results surveyId={id} readOnly={readOnly} /> : null}
       {tab === 'analysis' ? <Analysis surveyId={id} readOnly={readOnly} /> : null}
     </Shell>
   );
@@ -577,6 +581,8 @@ interface QuotaRow {
   label: string;
   condition: string;
   target: number;
+  publishedTarget?: number;
+  overridden?: boolean;
   count: number;
 }
 interface ResponseRow {
@@ -598,8 +604,18 @@ interface ResponseRow {
   interviewer: { name: string } | null;
 }
 
-function Results({ surveyId }: { surveyId: string }) {
+function Results({ surveyId, readOnly }: { surveyId: string; readOnly?: boolean }) {
   const [quotas, setQuotas] = useState<QuotaRow[]>([]);
+  const [editing, setEditing] = useState<Record<string, string>>({});
+  const saveTarget = async (q: QuotaRow, target: number | null) => {
+    try {
+      await api(`/surveys/${surveyId}/quotas/${encodeURIComponent(q.id)}`, { method: 'PUT', body: { target } });
+      setEditing(({ [q.id]: _, ...rest }) => rest);
+      await load();
+    } catch (e) {
+      setError(e);
+    }
+  };
   const [responses, setResponses] = useState<ResponseRow[]>([]);
   const [includeTest, setIncludeTest] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -644,7 +660,36 @@ function Results({ surveyId }: { surveyId: string }) {
                   <td>{q.label}</td>
                   <td className="mono small">{q.condition}</td>
                   <td>{q.count}</td>
-                  <td>{q.target}</td>
+                  <td>
+                    {readOnly ? (
+                      q.target
+                    ) : (
+                      <span className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                        <input
+                          type="number"
+                          min={0}
+                          style={{ width: 90 }}
+                          aria-label={`Live target for ${q.label}`}
+                          value={editing[q.id] ?? String(q.target)}
+                          onChange={(e) => setEditing({ ...editing, [q.id]: e.target.value })}
+                        />
+                        {editing[q.id] !== undefined && editing[q.id] !== String(q.target) && editing[q.id] !== '' ? (
+                          <button className="small" onClick={() => void saveTarget(q, Number(editing[q.id]))}>
+                            Save
+                          </button>
+                        ) : null}
+                        {q.overridden ? (
+                          <button
+                            className="link small"
+                            title={`Published target: ${q.publishedTarget}`}
+                            onClick={() => void saveTarget(q, null)}
+                          >
+                            Reset to {q.publishedTarget}
+                          </button>
+                        ) : null}
+                      </span>
+                    )}
+                  </td>
                   <td>
                     <div className="bar" title={`${q.count} of ${q.target}`}>
                       <div style={{ width: `${q.target ? Math.min(100, (q.count / q.target) * 100) : 100}%` }} />

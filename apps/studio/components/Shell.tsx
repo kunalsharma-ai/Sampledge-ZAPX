@@ -6,6 +6,7 @@ import {
   FolderKanban,
   KeyRound,
   LayoutDashboard,
+  Library,
   LogOut,
   Menu,
   Palette,
@@ -40,9 +41,10 @@ function navFor(me: Me | null): NavItem[] {
   const items: NavItem[] = [
     { href: '/', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/projects', label: 'Projects', icon: FolderKanban, match: ['/projects', '/surveys'] },
+    { href: '/library', label: 'Question bank', icon: Library },
   ];
-  if (me.role !== 'VIEWER') items.push({ href: '/calls', label: 'Calls', icon: PhoneCall });
-  items.push({ href: '/appearance', label: 'Appearance', icon: Palette });
+  if (me.role !== 'VIEWER') items.push({ href: '/calls', label: 'Fieldwork calls', icon: PhoneCall });
+  items.push({ href: '/appearance', label: 'Themes & appearance', icon: Palette });
   if (me.role === 'ADMIN') {
     items.push({ href: '/settings', label: 'Settings', icon: Settings });
     items.push({ href: '/settings/audit', label: 'Audit log', icon: ScrollText });

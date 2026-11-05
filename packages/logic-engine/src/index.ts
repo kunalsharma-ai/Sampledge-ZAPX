@@ -6,3 +6,6 @@ export * from './diff.js';
 export * from './localize.js';
 export * from './device.js';
 export * from './replay.js';
+export * from './flow.js';
+export * from './xml.js';
+export * from './debug.js';

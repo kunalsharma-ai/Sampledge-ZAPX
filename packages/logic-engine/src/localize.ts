@@ -24,6 +24,7 @@ export function textKeys(def: SurveyDefinition, presentation?: Pick<Presentation
   add('survey.title', def.title, 'Survey title');
   add('survey.welcome', def.welcome, 'Welcome text');
   add('survey.thankYou', def.thankYou, 'Thank-you text');
+  for (const l of def.loops ?? []) l.items.forEach((it) => add(`loop.${l.id}.item.${it.code}`, it.label, `Loop ${l.id} item ${it.code}`));
   for (const p of def.pages) {
     add(`page.${p.id}.title`, p.title, `Page ${p.id} title`);
     for (const q of p.questions) {
@@ -35,8 +36,13 @@ export function textKeys(def: SurveyDefinition, presentation?: Pick<Presentation
       if (q.type === 'info') continue;
       add(`q.${q.id}.help`, q.help, `${q.id} help text`);
       q.validations.forEach((v, i) => add(`q.${q.id}.val.${i}`, v.message, `${q.id} validation message`));
-      if (q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum')
-        q.options.forEach((o) => add(`q.${q.id}.opt.${o.code}`, o.label, `${q.id} answer ${o.code}`));
+      if (q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum' || q.type === 'cardsort')
+        q.options.forEach((o) => add(`q.${q.id}.opt.${o.code}`, o.label, `${q.id} ${q.type === 'cardsort' ? 'card' : 'answer'} ${o.code}`));
+      if (q.type === 'cardsort') q.groups.forEach((o) => add(`q.${q.id}.group.${o.code}`, o.label, `${q.id} group ${o.code}`));
+      if (q.type === 'hotspot') {
+        add(`q.${q.id}.imageAlt`, q.imageAlt, `${q.id} picture description`);
+        q.regions.forEach((r) => add(`q.${q.id}.region.${r.code}`, r.label, `${q.id} area ${r.code}`));
+      }
       if (q.type === 'scale' || q.type === 'numeric') {
         add(`q.${q.id}.minLabel`, q.minLabel, `${q.id} low end label`);
         add(`q.${q.id}.maxLabel`, q.maxLabel, `${q.id} high end label`);
@@ -81,6 +87,10 @@ export function localizeDefinition(def: SurveyDefinition, lang: Language | undef
     title: t('survey.title', def.title),
     welcome: tOpt('survey.welcome', def.welcome),
     thankYou: tOpt('survey.thankYou', def.thankYou),
+    loops: (def.loops ?? []).map((l) => ({
+      ...l,
+      items: l.items.map((it) => ({ ...it, label: t(`loop.${l.id}.item.${it.code}`, it.label) })),
+    })),
     pages: def.pages.map((p) => ({
       ...p,
       title: tOpt(`page.${p.id}.title`, p.title),
@@ -101,6 +111,18 @@ export function localizeDefinition(def: SurveyDefinition, lang: Language | undef
           const opts = { ...base, options: base.options.map((o) => ({ ...o, label: t(`q.${q.id}.opt.${o.code}`, o.label) })) };
           return opts.type === 'sum' ? { ...opts, unit: tOpt(`q.${q.id}.unit`, opts.unit) } : opts;
         }
+        if (base.type === 'cardsort')
+          return {
+            ...base,
+            options: base.options.map((o) => ({ ...o, label: t(`q.${q.id}.opt.${o.code}`, o.label) })),
+            groups: base.groups.map((o) => ({ ...o, label: t(`q.${q.id}.group.${o.code}`, o.label) })),
+          };
+        if (base.type === 'hotspot')
+          return {
+            ...base,
+            imageAlt: t(`q.${q.id}.imageAlt`, base.imageAlt),
+            regions: base.regions.map((r) => ({ ...r, label: t(`q.${q.id}.region.${r.code}`, r.label) })),
+          };
         if (base.type === 'scale') {
           return {
             ...base,

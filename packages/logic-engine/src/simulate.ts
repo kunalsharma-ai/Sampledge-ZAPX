@@ -15,6 +15,7 @@ import { scaleCodes, type Answers, type AnswerValue, type Option, type Question,
 import { analyzeSurvey, type AnalysisReport } from './analyze.js';
 import { parseCached, references, type Node } from './expression.js';
 import { conditionHolds, renderQuestion, validatePage } from './interview.js';
+import { hasNoOptions, pageOrder, prepareSurvey } from './flow.js';
 
 export interface SimulationOptions {
   respondents: number;
@@ -218,6 +219,23 @@ function generateAnswer(q: Question, g: GenContext): AnswerValue | undefined {
       }
       return [first.code, ...rest].slice(0, Math.min(q.rankCount ?? q.options.length, q.options.length));
     }
+    case 'cardsort': {
+      const sorted = q.options.filter(() => !q.allowUnsorted || g.rng.chance(0.85));
+      return Object.fromEntries((sorted.length ? sorted : q.options).map((o) => [String(o.code), pickOption(q, q.groups, g).code]));
+    }
+    case 'hotspot': {
+      const first = pickOption(
+        q,
+        q.regions.map((r) => ({ code: r.code, label: r.label })),
+        g,
+      ).code;
+      const min = Math.max(1, q.minSelected ?? 1);
+      const max = Math.min(q.maxSelected ?? 3, q.regions.length);
+      const size = Math.max(min, g.rng.int(1, Math.max(1, max)));
+      const chosen = new Set([first]);
+      while (chosen.size < size) chosen.add(g.rng.pick(q.regions).code);
+      return [...chosen];
+    }
     case 'sum': {
       // Split the total at random cut points; whole numbers when required.
       const n = q.options.length;
@@ -233,13 +251,14 @@ function generateAnswer(q: Question, g: GenContext): AnswerValue | undefined {
 
 // ---- simulation -----------------------------------------------------------------------------
 
-export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): QaReport {
+export function simulateSurvey(source: SurveyDefinition, opts: SimulationOptions): QaReport {
   const started = Date.now();
+  const def = prepareSurvey(source);
   const seed = opts.seed ?? 'zapx';
   const n = Math.max(1, Math.min(10000, Math.floor(opts.respondents)));
   const simulateQuotas = opts.simulateQuotas ?? true;
   const maxAttempts = opts.maxAttemptsPerPage ?? 25;
-  const staticAnalysis = analyzeSurvey(def);
+  const staticAnalysis = analyzeSurvey(source);
 
   const items = new Map<string, CoverageItem>();
   const item = (kind: CoverageKind, id: string, label: string) => {
@@ -270,6 +289,8 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
         for (const o of q.options) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" chosen`);
       if (q.type === 'ranking') for (const o of q.options) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" ranked first`);
       if (q.type === 'grid') for (const o of q.columns) item('option', `${q.id}=${o.code}`, `${q.id}: "${o.label}" chosen in a row`);
+      if (q.type === 'hotspot') for (const r of q.regions) item('option', `${q.id}=${r.code}`, `${q.id}: area "${r.label}" chosen`);
+      if (q.type === 'cardsort') for (const o of q.groups) item('option', `${q.id}=${o.code}`, `${q.id}: a card sorted into "${o.label}"`);
     }
   }
   for (const t of def.terminations) item('termination', t.id, `Termination ${t.id} triggered`);
@@ -298,12 +319,14 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
     let outcome: SimOutcome = 'complete';
     let reason: string | undefined;
     try {
-      let pageIndex = -1;
+      // This respondent's page order (randomized blocks), seeded like a live interview.
+      const order = pageOrder(def, `${seed}:${i}`);
+      let position = -1;
       for (;;) {
         // Find the next page, recording each page condition evaluated on the way.
         let next = -1;
-        for (let k = pageIndex + 1; k < def.pages.length; k++) {
-          const p = def.pages[k]!;
+        for (let k = position + 1; k < order.length; k++) {
+          const p = def.pages[order[k]!]!;
           if (p.condition) {
             const ok = conditionHolds(p.condition, def, answers);
             recordCond(`page:${p.id}`, ok);
@@ -313,8 +336,8 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
           break;
         }
         if (next === -1) break;
-        pageIndex = next;
-        const page = def.pages[pageIndex]!;
+        position = next;
+        const page = def.pages[order[position]!]!;
 
         // Answer the page, retrying with new random answers if validation rejects them.
         let accepted: Answers | null = null;
@@ -325,6 +348,7 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
           for (const q of page.questions) {
             if (!conditionHolds(q.condition, def, shownNow)) continue;
             const rendered = renderQuestion(q, def, shownNow, `${seed}:${i}`);
+            if (hasNoOptions(rendered)) continue;
             const v = generateAnswer(rendered as Question, g);
             if (v !== undefined) {
               submitted[q.id] = v;
@@ -369,7 +393,7 @@ export function simulateSurvey(def: SurveyDefinition, opts: SimulationOptions): 
                 : v
               : typeof v === 'number' && q.type === 'single'
                 ? [v]
-                : q.type === 'grid' && typeof v === 'object'
+                : (q.type === 'grid' || q.type === 'cardsort') && typeof v === 'object'
                   ? Object.values(v as Record<string, number>)
                   : [];
             for (const c of codes) {

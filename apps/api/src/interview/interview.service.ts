@@ -4,13 +4,17 @@
  * The browser only renders what it is given.
  */
 import { ConflictException, HttpException, Injectable, Logger, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type { Prisma, Response, Survey, Vendor } from '@zapx/db';
 import {
   firstMatchingTermination,
   matchingQuotas,
   nextPageIndex,
-  pageIsVisible,
+  prevPageIndex,
+  prepareSurvey,
+  contextFor,
+  hasNoOptions,
+  withDynamicOptions,
   parseCached,
   progressPercent,
   references,
@@ -31,6 +35,7 @@ import {
   parsePresentation,
   qualitySettingsOf,
   type Answers,
+  type AnswerValue,
   type DeviceType,
   type OutcomeStatus,
   type Page,
@@ -85,6 +90,7 @@ export interface Look {
     | 'photoUploading'
     | 'photoFailed'
     | 'photoSaved'
+    | 'unsorted'
   >;
   /** Offer "Read aloud" on each question (the respondent's own device voices). */
   readAloud: boolean;
@@ -152,7 +158,7 @@ export function interviewContext(version: { definition: unknown; presentation: u
   const lang = offered.find((l) => l.tag === requested);
   const msg = localizeMessages(presentation, lang);
   return {
-    def: localizeDefinition(source, lang),
+    def: prepareSurvey(localizeDefinition(source, lang)),
     presentation,
     msg,
     look: {
@@ -182,6 +188,7 @@ export function interviewContext(version: { definition: unknown; presentation: u
         photoUploading: msg.photoUploading,
         photoFailed: msg.photoFailed,
         photoSaved: msg.photoSaved,
+        unsorted: msg.unsorted,
       },
       readAloud: presentation.readAloud,
     },
@@ -341,12 +348,15 @@ export class InterviewService {
       );
     }
 
-    const def = sourceDef;
+    const def = ctx.def;
     const token = randomBytes(32).toString('base64url');
-    const firstPage = nextPageIndex(def, {}, -1);
+    // The response id also seeds this respondent's randomized block order, so it is chosen here.
+    const responseId = randomUUID();
+    const firstPage = nextPageIndex(def, {}, -1, responseId);
     try {
       const response = await this.prisma.response.create({
         data: {
+          id: responseId,
           tenantId: survey.tenantId,
           surveyId,
           versionId: version.id,
@@ -405,11 +415,13 @@ export class InterviewService {
       throw new ConflictException("Your organization has used this month's completes on its plan");
     }
     const version = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: survey.liveVersionId } });
-    const def = version.definition as unknown as SurveyDefinition;
-    const ctx = interviewContext(version, def.language);
-    const firstPage = nextPageIndex(def, {}, -1);
+    const ctx = interviewContext(version, (version.definition as unknown as SurveyDefinition).language);
+    const def = ctx.def;
+    const responseId = randomUUID();
+    const firstPage = nextPageIndex(def, {}, -1, responseId);
     const response = await this.prisma.response.create({
       data: {
+        id: responseId,
         tenantId: survey.tenantId,
         surveyId: survey.id,
         versionId: version.id,
@@ -543,6 +555,10 @@ export class InterviewService {
     const contextVars = new Set<string>();
     for (const q of page.questions) {
       let dynamic = false;
+      // A dynamic list fed by an earlier page that leaves nothing to choose is skipped.
+      const listFromSamePage =
+        (q.type === 'single' || q.type === 'multi' || q.type === 'ranking') && !!q.optionsFrom && samePage.has(q.optionsFrom.question);
+      if (!listFromSamePage && hasNoOptions(withDynamicOptions(q, def, answers))) continue;
       if (q.condition) {
         const refs = references(parseCached(q.condition)).map((x) => x.name);
         dynamic = refs.some((n) => samePage.has(n));
@@ -556,8 +572,10 @@ export class InterviewService {
     const pageAnswers: Answers = {};
     for (const q of page.questions) if (answers[q.id] !== undefined) pageAnswers[q.id] = answers[q.id]!;
     const context: Answers = {};
-    for (const v of contextVars) context[v] = answers[v] ?? null;
-    const first = nextPageIndex(def, answers, -1);
+    const lookup = contextFor(def, answers);
+    // Calculated variables are worked out here; the browser only sees their current values.
+    for (const v of contextVars) context[v] = (answers[v] ?? (lookup.lookup(v) as AnswerValue | undefined) ?? null) as AnswerValue;
+    const first = nextPageIndex(def, answers, -1, r.id);
     return {
       state: 'in_progress',
       look: ctx.look,
@@ -571,7 +589,7 @@ export class InterviewService {
       page: { id: page.id, title: page.title, questions },
       answers: pageAnswers,
       context,
-      progress: progressPercent(def, r.currentPage),
+      progress: progressPercent(def, r.currentPage, r.id),
       isFirstPage: r.currentPage === first,
       isTest: r.isTest,
     };
@@ -654,7 +672,7 @@ export class InterviewService {
       if (full) return this.finish(r, ctx, vendor, answers, 'quota_full', full, timing);
     }
 
-    const next = nextPageIndex(def, answers, r.currentPage);
+    const next = nextPageIndex(def, answers, r.currentPage, r.id);
     if (next === -1) return this.complete(r, ctx, vendor, answers, timing);
 
     const moved = await this.prisma.response.updateMany({
@@ -679,13 +697,7 @@ export class InterviewService {
     const vendor = await this.vendorOf(r);
     if (r.status !== 'IN_PROGRESS' || !def.settings.allowBack) return this.stateOf(r, ctx, vendor);
     const answers = (r.answers ?? {}) as Answers;
-    let prev = -1;
-    for (let i = r.currentPage - 1; i >= 0; i--) {
-      if (pageIsVisible(def.pages[i]!, def, answers)) {
-        prev = i;
-        break;
-      }
-    }
+    const prev = prevPageIndex(def, answers, r.currentPage, r.id);
     if (prev === -1) return this.stateOf(r, ctx, vendor);
     await this.prisma.response.update({
       where: { id: r.id },
@@ -699,8 +711,8 @@ export class InterviewService {
     if (matching.length === 0) return null;
     const counts = await this.prisma.quotaCount.findMany({ where: { surveyId, quotaId: { in: matching.map((q) => q.id) } } });
     for (const q of matching) {
-      const count = counts.find((c) => c.quotaId === q.id)?.count ?? 0;
-      if (count >= q.target) return q.id;
+      const c = counts.find((x) => x.quotaId === q.id);
+      if ((c?.count ?? 0) >= (c?.targetOverride ?? q.target)) return q.id;
     }
     return null;
   }
@@ -724,7 +736,7 @@ export class InterviewService {
       await this.prisma.$transaction(async (tx) => {
         for (const q of quotas) {
           const n = await tx.$executeRaw`UPDATE "QuotaCount" SET "count" = "count" + 1
-            WHERE "surveyId" = ${r.surveyId} AND "quotaId" = ${q.id} AND "count" < ${q.target}`;
+            WHERE "surveyId" = ${r.surveyId} AND "quotaId" = ${q.id} AND "count" < COALESCE("targetOverride", ${q.target})`;
           if (n === 0) throw new QuotaFull(q.id);
         }
         const done = await tx.response.updateMany({

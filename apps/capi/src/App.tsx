@@ -4,7 +4,7 @@
  * or with "Sync now".
  */
 import { useCallback, useEffect, useState } from 'react';
-import { nextPageIndex } from '@zapx/logic-engine';
+import { nextPageIndex, prepareSurvey } from '@zapx/logic-engine';
 import { capiSettingsOf, parseSurveyDefinition } from '@zapx/survey-schema';
 import { locate } from './capture';
 import { NotSignedIn, downloadPackage, signIn, signOut, syncNow } from './api';
@@ -136,14 +136,15 @@ export function App() {
         );
       location = { start: at, end: null };
     }
+    const clientId = crypto.randomUUID();
     const record: LocalInterview = {
-      clientId: crypto.randomUUID(),
+      clientId,
       interviewerId: me.id,
       surveyId: s.surveyId,
       versionId: s.version.id,
       surveyName: s.name,
       answers: {},
-      pageIndex: nextPageIndex(parsed.definition, {}, -1),
+      pageIndex: nextPageIndex(prepareSurvey(parsed.definition), {}, -1, clientId),
       language: parsed.definition.language,
       startedAt: new Date().toISOString(),
       finishedAt: null,

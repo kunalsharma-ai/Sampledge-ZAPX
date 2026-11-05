@@ -1247,7 +1247,7 @@ a.nx-cap:hover {
   backdrop-filter: blur(6px);
 }
 .nx-modal {
-  width: min(560px, 100%);
+  width: min(680px, 100%);
   max-height: calc(100vh - 32px);
   overflow: auto;
   background: var(--q-surface) !important;
@@ -1257,7 +1257,7 @@ a.nx-cap:hover {
 }
 .nx-start-options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 .nx-start-option {
@@ -1280,10 +1280,43 @@ a.nx-cap:hover {
   background: var(--q-accent-soft) !important;
   box-shadow: 0 0 0 1px var(--q-accent-text) inset;
 }
-@media (max-width: 560px) {
+@media (max-width: 760px) {
+  .nx-start-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 420px) {
   .nx-start-options {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+.nx-template-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  max-height: 46vh;
+  overflow: auto;
+  padding: 2px;
+}
+.nx-template {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  padding: 12px !important;
+  height: auto;
+}
+.nx-template[aria-checked='true'] {
+  border-color: var(--q-accent-text) !important;
+  background: var(--q-accent-soft) !important;
+  box-shadow: 0 0 0 1px var(--q-accent-text) inset;
+}
+.nx-template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
 }
 
 /* ---- Other pages: neon accents ---- */

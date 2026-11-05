@@ -10,7 +10,9 @@ import {
   localizeDefinition,
   localizeMessages,
   matchingQuotas,
+  hasNoOptions,
   nextPageIndex,
+  prepareSurvey,
   progressPercent,
   renderQuestion,
   validatePage,
@@ -43,9 +45,9 @@ export function Preview({
   const [seed, setSeed] = useState(() => Math.random().toString(36).slice(2));
   const [language, setLanguage] = useState(sourceDef.language);
   const lang = presentation.languages.find((l) => l.tag === language);
-  const def = useMemo(() => localizeDefinition(sourceDef, lang), [sourceDef, lang]);
+  const def = useMemo(() => prepareSurvey(localizeDefinition(sourceDef, lang)), [sourceDef, lang]);
   const msg = useMemo(() => localizeMessages(presentation, lang), [presentation, lang]);
-  const [pageIndex, setPageIndex] = useState(() => nextPageIndex(sourceDef, {}, -1));
+  const [pageIndex, setPageIndex] = useState(() => nextPageIndex(prepareSurvey(sourceDef), {}, -1, seed));
   const [answers, setAnswers] = useState<Answers>({});
   const [pageAnswers, setPageAnswers] = useState<Answers>({});
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -64,8 +66,9 @@ export function Preview({
   };
 
   const restart = () => {
-    setSeed(Math.random().toString(36).slice(2));
-    setPageIndex(nextPageIndex(def, {}, -1));
+    const fresh = Math.random().toString(36).slice(2);
+    setSeed(fresh);
+    setPageIndex(nextPageIndex(def, {}, -1, fresh));
     setAnswers({});
     setPageAnswers({});
     setErrors({});
@@ -74,7 +77,7 @@ export function Preview({
 
   const page = pageIndex >= 0 ? def.pages[pageIndex] : undefined;
   const questions = useMemo(
-    () => (page ? page.questions.map((q) => renderQuestion(q, def, answers, seed)) : []),
+    () => (page ? page.questions.map((q) => renderQuestion(q, def, answers, seed)).filter((q) => !hasNoOptions(q)) : []),
     [page, def, answers, seed],
   );
   const blocked = !presentation.devices.allowed.includes(device);
@@ -91,7 +94,7 @@ export function Preview({
     setPlayed(new Set());
     const t = firstMatchingTermination(def, merged);
     if (t) return setOutcome(`${t.status} (rule ${t.id})`);
-    const n = nextPageIndex(def, merged, pageIndex);
+    const n = nextPageIndex(def, merged, pageIndex, seed);
     if (n === -1) {
       const q = matchingQuotas(def, merged).map((x) => x.id);
       return setOutcome(`complete${q.length ? ` · counts toward ${q.join(', ')}` : ''}`);
@@ -161,7 +164,7 @@ export function Preview({
                 >
                   <SurveyHeader
                     theme={presentation.theme}
-                    progress={def.settings.showProgress ? progressPercent(def, pageIndex) : undefined}
+                    progress={def.settings.showProgress ? progressPercent(def, pageIndex, seed) : undefined}
                     progressLabel="Progress"
                   />
                   {page.title ? <h1 className="zx-title">{page.title}</h1> : null}

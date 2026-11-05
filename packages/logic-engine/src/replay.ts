@@ -5,6 +5,7 @@
  */
 import type { Answers, SurveyDefinition } from '@zapx/survey-schema';
 import { firstMatchingTermination, nextPageIndex, validatePage, type FieldError } from './interview.js';
+import { prepareSurvey } from './flow.js';
 
 export type ReplayResult =
   | { outcome: 'complete'; answers: Answers; lastPageId: string }
@@ -14,9 +15,11 @@ export type ReplayResult =
   /** The answers do not satisfy the published version (tampering, or a device bug). */
   | { outcome: 'invalid'; pageId: string; errors: FieldError[]; answers: Answers };
 
-export function replayInterview(def: SurveyDefinition, uploaded: Record<string, unknown>): ReplayResult {
+/** `seed` is the interview's id on the device, which also ordered its randomized blocks. */
+export function replayInterview(source: SurveyDefinition, uploaded: Record<string, unknown>, seed = ''): ReplayResult {
+  const def = prepareSurvey(source);
   let answers: Answers = {};
-  let index = nextPageIndex(def, answers, -1);
+  let index = nextPageIndex(def, answers, -1, seed);
   let lastPageId: string | null = null;
   for (let guard = 0; index !== -1 && guard <= def.pages.length; guard++) {
     const page = def.pages[index]!;
@@ -37,7 +40,7 @@ export function replayInterview(def: SurveyDefinition, uploaded: Record<string, 
     lastPageId = page.id;
     const t = firstMatchingTermination(def, answers);
     if (t) return { outcome: t.status, reason: t.id, answers, lastPageId };
-    index = nextPageIndex(def, answers, index);
+    index = nextPageIndex(def, answers, index, seed);
   }
   if (lastPageId === null) return { outcome: 'incomplete', answers, lastPageId: null };
   return { outcome: 'complete', answers, lastPageId };

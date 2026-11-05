@@ -9,7 +9,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
 import { Prisma, type Response } from '@zapx/db';
-import { matchingQuotas } from '@zapx/logic-engine';
+import { matchingQuotas, prepareSurvey } from '@zapx/logic-engine';
 import {
   MIN_COMPLETES_FOR_MEDIAN,
   assessQuality,
@@ -219,7 +219,7 @@ export class QualityService {
     const openIds = new Map(
       versions.map((v) => [
         v.id,
-        allQuestions(v.definition as unknown as SurveyDefinition)
+        allQuestions(prepareSurvey(v.definition as unknown as SurveyDefinition))
           .filter((q) => q.type === 'open')
           .map((q) => q.id),
       ]),
@@ -236,7 +236,7 @@ export class QualityService {
     const photoIds = new Map(
       versions.map((v) => [
         v.id,
-        allQuestions(v.definition as unknown as SurveyDefinition)
+        allQuestions(prepareSurvey(v.definition as unknown as SurveyDefinition))
           .filter((q) => q.type === 'photo')
           .map((q) => q.id),
       ]),

@@ -440,3 +440,28 @@ export function parseCached(src: string): Node {
   }
   return ast;
 }
+
+/**
+ * Rewrite variable names in an expression's source text, keeping everything else as written.
+ * `rename` receives the variable name (the part before any `.member`) and returns the replacement
+ * text, or undefined to keep it. Function names and keywords are never passed to `rename`.
+ * Throws ExpressionError for text that does not tokenize.
+ */
+export function rewriteVariables(src: string, rename: (name: string) => string | undefined): string {
+  const tokens = tokenize(src);
+  let out = '';
+  let last = 0;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]!;
+    if (t.t !== 'ident' || KEYWORDS.has(t.v.toLowerCase())) continue;
+    const next = tokens[i + 1];
+    if (next && next.t === 'op' && next.v === '(') continue;
+    const dot = t.v.indexOf('.');
+    const name = dot < 0 ? t.v : t.v.slice(0, dot);
+    const replacement = rename(name);
+    if (replacement === undefined) continue;
+    out += src.slice(last, t.p) + replacement + (dot < 0 ? '' : t.v.slice(dot));
+    last = t.p + t.v.length;
+  }
+  return out + src.slice(last);
+}

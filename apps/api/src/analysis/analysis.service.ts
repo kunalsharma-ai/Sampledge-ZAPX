@@ -13,6 +13,7 @@ import {
   type Variable,
 } from '@zapx/analysis-core';
 import { parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
+import { prepareSurvey } from '@zapx/logic-engine';
 import { z } from 'zod';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -108,7 +109,7 @@ export class AnalysisService {
       : await this.prisma.surveyVersion.findFirst({ where: { surveyId, status: 'DRAFT' } });
     const parsed = parseSurveyDefinition(version?.definition);
     if (!parsed.ok) throw new NotFoundException('This survey has no definition to analyse');
-    return parsed.definition;
+    return prepareSurvey(parsed.definition);
   }
 
   private where(surveyId: string, f: Filters): Prisma.ResponseWhereInput {

@@ -19,6 +19,7 @@ import {
   type Quota,
 } from '@zapx/survey-schema';
 import { evaluate, parseCached, references, truthy, type EvalContext, type Value } from './expression.js';
+import { hasNoOptions, pageOrder, withDynamicOptions } from './flow.js';
 
 /**
  * The value of `Q.member`: a grid row's column code, a constant sum option's amount, or a ranked
@@ -36,8 +37,23 @@ function memberOf(v: unknown, member: string): Value {
 /** Build an evaluation context over a set of answers. Grid rows are Q.row; ranks and sums Q.code. */
 export function contextFor(def: SurveyDefinition, answers: Answers): EvalContext {
   const known = new Set(def.pages.flatMap((p) => p.questions.map((q) => q.id)));
-  return {
+  const variables = new Map((def.variables ?? []).map((v) => [v.id, v.expr] as const));
+  const computing = new Set<string>();
+  const ctx: EvalContext = {
     lookup(name, member) {
+      const expr = variables.get(name);
+      if (expr !== undefined) {
+        // Calculated variable: worked out from the answers each time (a cycle evaluates to null).
+        if (member !== undefined || computing.has(name)) return null;
+        computing.add(name);
+        try {
+          return evaluate(parseCached(expr), ctx);
+        } catch {
+          return null;
+        } finally {
+          computing.delete(name);
+        }
+      }
       if (!known.has(name)) return undefined;
       const v = Object.hasOwn(answers, name) ? answers[name] : undefined;
       if (v === undefined || v === null) return null;
@@ -45,6 +61,15 @@ export function contextFor(def: SurveyDefinition, answers: Answers): EvalContext
       return v as Value;
     },
   };
+  return ctx;
+}
+
+/** Values of the survey's calculated variables for one respondent (exported as their own columns). */
+export function computeVariables(def: SurveyDefinition, answers: Answers): Record<string, Value> {
+  const ctx = contextFor(def, answers);
+  const out: Record<string, Value> = {};
+  for (const v of def.variables ?? []) out[v.id] = ctx.lookup(v.id) ?? null;
+  return out;
 }
 
 /**
@@ -85,7 +110,7 @@ export function conditionHolds(expr: string | undefined, def: SurveyDefinition, 
  * questions on the same page; renderers re-evaluate this as the respondent answers.
  */
 export function visibleQuestions(page: Page, def: SurveyDefinition, answers: Answers): Question[] {
-  return page.questions.filter((q) => conditionHolds(q.condition, def, answers));
+  return page.questions.filter((q) => conditionHolds(q.condition, def, answers) && !hasNoOptions(withDynamicOptions(q, def, answers)));
 }
 
 /**
@@ -96,6 +121,10 @@ export function pageIsVisible(page: Page, def: SurveyDefinition, answers: Answer
   if (!conditionHolds(page.condition, def, answers)) return false;
   const samePage = new Set(page.questions.map((q) => q.id));
   return page.questions.some((q) => {
+    // A dynamic list fed by an earlier page can leave nothing to choose: the question is skipped.
+    const listFromSamePage =
+      (q.type === 'single' || q.type === 'multi' || q.type === 'ranking') && !!q.optionsFrom && samePage.has(q.optionsFrom.question);
+    if (!listFromSamePage && hasNoOptions(withDynamicOptions(q, def, answers))) return false;
     if (conditionHolds(q.condition, def, answers)) return true;
     return dependsOn(q.condition, samePage);
   });
@@ -110,10 +139,26 @@ function dependsOn(expr: string | undefined, ids: Set<string>): boolean {
   }
 }
 
-/** Index of the next visible page after `fromIndex` (use -1 to start), or -1 when the survey ends. */
-export function nextPageIndex(def: SurveyDefinition, answers: Answers, fromIndex: number): number {
-  for (let i = fromIndex + 1; i < def.pages.length; i++) {
-    if (pageIsVisible(def.pages[i]!, def, answers)) return i;
+/**
+ * Index (into `def.pages`) of the next visible page after `fromIndex` (use -1 to start), or -1 when
+ * the survey ends. `seed` (the interview id) decides the order of randomized blocks.
+ */
+export function nextPageIndex(def: SurveyDefinition, answers: Answers, fromIndex: number, seed = ''): number {
+  const order = pageOrder(def, seed);
+  const from = fromIndex < 0 ? -1 : order.indexOf(fromIndex);
+  if (fromIndex >= 0 && from < 0) return -1;
+  for (let k = from + 1; k < order.length; k++) {
+    if (pageIsVisible(def.pages[order[k]!]!, def, answers)) return order[k]!;
+  }
+  return -1;
+}
+
+/** Index of the previous visible page before `fromIndex` in this respondent's order, or -1. */
+export function prevPageIndex(def: SurveyDefinition, answers: Answers, fromIndex: number, seed = ''): number {
+  const order = pageOrder(def, seed);
+  const from = order.indexOf(fromIndex);
+  for (let k = from - 1; k >= 0; k--) {
+    if (pageIsVisible(def.pages[order[k]!]!, def, answers)) return order[k]!;
   }
   return -1;
 }
@@ -160,6 +205,10 @@ export const SYSTEM_MESSAGES = {
   sumTotal: 'The amounts must add up to {n}.',
   sumAmounts: 'Enter an amount of 0 or more for each item.',
   sumRemaining: 'Remaining: {n}',
+  sortCards: 'Put each card in a group.',
+  sortListed: 'Put the cards only in the listed groups.',
+  unsorted: 'Not sorted',
+  hotspotListed: 'Choose only the marked areas of the picture.',
   rankUp: 'Move up',
   rankDown: 'Move down',
   playToEnd: 'Please play the media to the end to continue.',
@@ -316,6 +365,31 @@ export function normalizeAnswer(
       for (const o of q.options) out[String(o.code)] ??= 0;
       return { value: out };
     }
+    case 'cardsort': {
+      if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return { error: msg.sortCards };
+      const cards = new Set(q.options.map((o) => String(o.code)));
+      const groups = optionCodes(q.groups);
+      const out: Record<string, number> = {};
+      for (const [card, v] of Object.entries(raw as Record<string, unknown>)) {
+        if (!cards.has(card)) return { error: msg.sortListed };
+        if (v === null || v === undefined || v === '') continue;
+        const n = typeof v === 'string' ? Number(v) : v;
+        if (typeof n !== 'number' || !groups.has(n)) return { error: msg.sortListed };
+        out[card] = n;
+      }
+      if (!q.allowUnsorted && q.options.some((o) => out[String(o.code)] === undefined)) return { error: msg.sortCards };
+      if (!Object.keys(out).length) return q.required ? { error: msg.sortCards } : { value: null };
+      return { value: out };
+    }
+    case 'hotspot': {
+      if (!Array.isArray(raw)) return { error: msg.hotspotListed };
+      const codes = new Set(q.regions.map((r) => r.code));
+      const vals = [...new Set(raw.map((x) => (typeof x === 'string' ? Number(x) : x)))];
+      if (!vals.every((v): v is number => typeof v === 'number' && codes.has(v))) return { error: msg.hotspotListed };
+      if (q.minSelected !== undefined && vals.length < q.minSelected) return { error: fillMessage(msg.minSelected, { n: q.minSelected }) };
+      if (q.maxSelected !== undefined && vals.length > q.maxSelected) return { error: fillMessage(msg.maxSelected, { n: q.maxSelected }) };
+      return { value: vals.sort((a, b) => a - b) };
+    }
     case 'photo': {
       if (typeof raw !== 'string' || !CAPTURE_REF.test(raw)) return { error: msg.photoMissing };
       return { value: raw };
@@ -339,8 +413,10 @@ export function validatePage(
   const pageAnswers: Answers = {};
   const visible: Question[] = [];
   const errors: FieldError[] = [];
-  for (const q of page.questions) {
-    const shown = conditionHolds(q.condition, def, { ...priorAnswers, ...pageAnswers });
+  for (const template of page.questions) {
+    const sofar = { ...priorAnswers, ...pageAnswers };
+    const q = withDynamicOptions(template, def, sofar);
+    const shown = conditionHolds(q.condition, def, sofar) && !hasNoOptions(q);
     if (shown) visible.push(q);
     if (q.type === 'info') continue;
     if (!shown) {
@@ -374,11 +450,18 @@ export function validatePage(
 
 /** Text form of an answer, used for piping ({{Q1}}). */
 export function answerText(def: SurveyDefinition, id: string, answers: Answers): string {
+  if ((def.variables ?? []).some((x) => x.id === id)) {
+    const value = contextFor(def, answers).lookup(id);
+    if (value === null || value === undefined || typeof value === 'object') return '';
+    return typeof value === 'number' ? String(Math.round(value * 100) / 100) : String(value);
+  }
   const q = def.pages.flatMap((p) => p.questions).find((x) => x.id === id);
   const v = answers[id];
   if (!q || v === null || v === undefined) return '';
   if (q.type === 'single') return q.options.find((o) => o.code === v)?.label ?? String(v);
   if (q.type === 'multi' && Array.isArray(v)) return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
+  if (q.type === 'ranking' && Array.isArray(v)) return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
+  if (q.type === 'hotspot' && Array.isArray(v)) return v.map((c) => q.regions.find((r) => r.code === c)?.label ?? String(c)).join(', ');
   if (typeof v === 'object') return '';
   return String(v);
 }
@@ -428,9 +511,10 @@ export function seededOrder<T>(items: T[], seed: string, isAnchored: (item: T) =
 /** A question prepared for display: piping applied and options in this respondent's order. */
 export type RenderedQuestion = Question & { renderedText: string };
 
-export function renderQuestion(q: Question, def: SurveyDefinition, answers: Answers, seed: string): RenderedQuestion {
+export function renderQuestion(template: Question, def: SurveyDefinition, answers: Answers, seed: string): RenderedQuestion {
+  const q = withDynamicOptions(template, def, answers);
   const renderedText = pipeText(q.text, def, answers);
-  if ((q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum') && q.randomize) {
+  if ((q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum' || q.type === 'cardsort') && q.randomize) {
     return { ...q, renderedText, options: seededOrder(q.options, `${seed}:${q.id}`, (o) => !!o.anchor) };
   }
   if (q.type === 'grid' && q.randomizeRows) {
@@ -440,8 +524,10 @@ export function renderQuestion(q: Question, def: SurveyDefinition, answers: Answ
   return { ...q, renderedText };
 }
 
-/** Rough progress through the survey, 0..100, based on page position. */
-export function progressPercent(def: SurveyDefinition, pageIndex: number): number {
+/** Rough progress through the survey, 0..100, based on the page's position in this respondent's order. */
+export function progressPercent(def: SurveyDefinition, pageIndex: number, seed = ''): number {
   if (pageIndex < 0) return 100;
-  return Math.round((pageIndex / def.pages.length) * 100);
+  const order = pageOrder(def, seed);
+  const pos = order.indexOf(pageIndex);
+  return Math.round(((pos < 0 ? pageIndex : pos) / Math.max(1, order.length)) * 100);
 }

@@ -456,6 +456,8 @@ model QuotaCount {
   survey   Survey @relation(fields: [surveyId], references: [id])
   quotaId  String
   count    Int    @default(0)
+  /// Target changed while the survey is live (no republish). Null: the published target applies.
+  targetOverride Int?
 
   @@unique([surveyId, quotaId])
 }
@@ -1016,4 +1018,26 @@ model RevokedSession {
   createdAt DateTime @default(now())
 
   @@index([expiresAt])
+}
+
+enum LibraryItemKind {
+  QUESTION
+  SURVEY
+}
+
+/// Blueprint phase 1: the organization's question bank. A QUESTION item holds one question (without
+/// its page); a SURVEY item holds a whole definition used as an organization template.
+model LibraryItem {
+  id          String          @id @default(cuid())
+  tenantId    String
+  kind        LibraryItemKind
+  name        String
+  category    String          @default("General")
+  tags        String[]        @default([])
+  content     Json
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([tenantId, kind])
 }

@@ -6,6 +6,7 @@ import {
   mediaIdsOf,
   parsePresentation,
   parseSurveyDefinition,
+  surveyTemplate,
   type SchemaIssue,
   type SurveyDefinition,
 } from '@zapx/survey-schema';
@@ -48,18 +49,36 @@ export class SurveysService {
     return survey;
   }
 
-  async create(user: AuthUser, projectId: string, name: string) {
+  async create(user: AuthUser, projectId: string, name: string, from: { template?: string; libraryItemId?: string } = {}) {
     const project = await this.prisma.project.findFirst({ where: { id: projectId, ...this.access.projects(user) } });
     if (!project) throw new NotFoundException('Project not found');
+    const definition = await this.startingDefinition(user, name, from);
     const survey = await this.prisma.$transaction(async (tx) => {
       const s = await tx.survey.create({ data: { tenantId: user.tenantId, projectId, name } });
       await tx.surveyVersion.create({
-        data: { surveyId: s.id, version: 1, definition: emptySurvey(name) as unknown as Prisma.InputJsonValue, createdById: user.id },
+        data: { surveyId: s.id, version: 1, definition: definition as unknown as Prisma.InputJsonValue, createdById: user.id },
       });
-      await this.audit.record(user, 'survey.create', 'survey', s.id, { name }, tx);
+      await this.audit.record(user, 'survey.create', 'survey', s.id, { name, ...from }, tx);
       return s;
     });
     return survey;
+  }
+
+  /** An empty survey, a built-in template, or a survey from the organization's question bank. */
+  private async startingDefinition(user: AuthUser, name: string, from: { template?: string; libraryItemId?: string }) {
+    let base: unknown = emptySurvey(name);
+    if (from.template) {
+      const t = surveyTemplate(from.template);
+      if (!t) throw new BadRequestException('Unknown survey template');
+      base = t.definition;
+    } else if (from.libraryItemId) {
+      const item = await this.prisma.libraryItem.findFirst({ where: { id: from.libraryItemId, tenantId: user.tenantId, kind: 'SURVEY' } });
+      if (!item) throw new NotFoundException('Saved survey not found');
+      base = item.content;
+    }
+    const parsed = parseSurveyDefinition(base);
+    if (!parsed.ok) throw new BadRequestException('The template is not a valid survey');
+    return { ...parsed.definition, title: name };
   }
 
   async detail(user: AuthUser, id: string) {
@@ -249,6 +268,26 @@ export class SurveysService {
     return updated;
   }
 
+  /** Every version of the survey, newest first (Programmer workspace history). Definitions not included. */
+  async versions(user: AuthUser, id: string) {
+    await this.getSurvey(user, id);
+    const rows = await this.prisma.surveyVersion.findMany({
+      where: { surveyId: id },
+      orderBy: { version: 'desc' },
+      select: { id: true, version: true, status: true, createdAt: true, updatedAt: true, publishedAt: true, createdById: true },
+    });
+    const authors = await this.prisma.user.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.createdById).filter((x): x is string => !!x))] }, tenantId: user.tenantId },
+      select: { id: true, name: true },
+    });
+    const responses = await this.prisma.response.groupBy({ by: ['versionId'], where: { surveyId: id, isTest: false }, _count: true });
+    return rows.map((r) => ({
+      ...r,
+      createdBy: authors.find((a) => a.id === r.createdById)?.name ?? null,
+      responses: responses.find((x) => x.versionId === r.id)?._count ?? 0,
+    }));
+  }
+
   async version(user: AuthUser, id: string, version: number) {
     await this.getSurvey(user, id);
     const v = await this.prisma.surveyVersion.findUnique({ where: { surveyId_version: { surveyId: id, version } } });
@@ -262,13 +301,45 @@ export class SurveysService {
     const live = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: survey.liveVersionId } });
     const def = live.definition as unknown as SurveyDefinition;
     const counts = await this.prisma.quotaCount.findMany({ where: { surveyId: id } });
-    return def.quotas.map((q) => ({
-      id: q.id,
-      label: q.label ?? q.id,
-      condition: q.condition,
-      target: q.target,
-      count: counts.find((c) => c.quotaId === q.id)?.count ?? 0,
-    }));
+    return def.quotas.map((q) => {
+      const c = counts.find((x) => x.quotaId === q.id);
+      return {
+        id: q.id,
+        label: q.label ?? q.id,
+        condition: q.condition,
+        /** The target in force: the live override when one is set, else the published one. */
+        target: c?.targetOverride ?? q.target,
+        publishedTarget: q.target,
+        overridden: c?.targetOverride !== null && c?.targetOverride !== undefined,
+        count: c?.count ?? 0,
+      };
+    });
+  }
+
+  /**
+   * Change a quota's target while the survey is live, without republishing (live adjustment).
+   * `target: null` goes back to the published target. Lowering a target below the count closes
+   * the quota; completes already counted are kept.
+   */
+  async setQuotaTarget(user: AuthUser, id: string, quotaId: string, target: number | null) {
+    const survey = await this.getSurvey(user, id);
+    if (!survey.liveVersionId) throw new ConflictException('Publish the survey before changing quota targets live');
+    const live = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: survey.liveVersionId } });
+    const quota = (live.definition as unknown as SurveyDefinition).quotas.find((q) => q.id === quotaId);
+    if (!quota) throw new NotFoundException('This quota is not in the live version');
+    const before = await this.prisma.quotaCount.findUnique({ where: { surveyId_quotaId: { surveyId: id, quotaId } } });
+    await this.prisma.quotaCount.upsert({
+      where: { surveyId_quotaId: { surveyId: id, quotaId } },
+      create: { surveyId: id, quotaId, targetOverride: target },
+      update: { targetOverride: target },
+    });
+    await this.audit.record(user, 'survey.quota_target', 'survey', id, {
+      quota: quotaId,
+      from: before?.targetOverride ?? quota.target,
+      to: target ?? quota.target,
+      reset: target === null,
+    });
+    return (await this.quotas(user, id)).find((q) => q.id === quotaId);
   }
 
   async responses(user: AuthUser, id: string, opts: { includeTest: boolean; take: number }) {
