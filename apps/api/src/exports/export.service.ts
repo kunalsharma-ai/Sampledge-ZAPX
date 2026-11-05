@@ -7,6 +7,7 @@ import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
 import type { Response, SurveyVersion } from '@zapx/db';
 import { allQuestions, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
+import { codes, variables } from '@zapx/analysis-core';
 import { computeVariables, prepareSurvey } from '@zapx/logic-engine';
 
 interface Column {
@@ -99,6 +100,26 @@ export class ExportService {
         switch (q.type) {
           case 'info':
             break;
+          case 'maxdiff':
+          case 'conjoint': {
+            // The design version and each pick; the design itself is downloadable from Analysis.
+            const keys = [
+              'v',
+              ...(q.type === 'maxdiff'
+                ? Array.from({ length: q.sets }, (_, i) => [`b${i + 1}`, `w${i + 1}`]).flat()
+                : Array.from({ length: q.tasks }, (_, i) => `t${i + 1}`)),
+            ];
+            for (const k of keys)
+              add({
+                key: `${q.id}_${k}`,
+                label: `${q.id}: ${k === 'v' ? 'design version' : k.startsWith('b') ? `best in set ${k.slice(1)}` : k.startsWith('w') ? `worst in set ${k.slice(1)}` : `choice in task ${k.slice(1)} (0 = none)`}`,
+                get: (r) => {
+                  const a = ans(r)[q.id];
+                  return a && typeof a === 'object' && !Array.isArray(a) ? ((a as Record<string, number>)[k] ?? null) : null;
+                },
+              });
+            break;
+          }
           case 'signature':
             // The drawing stays in ZAPX (shown in the review queue); the export says whether it was given.
             add({ key: q.id, label: `${q.id}: signed (1/0)`, get: (r) => (ans(r)[q.id] === undefined ? null : ans(r)[q.id] ? 1 : 0) });
@@ -204,6 +225,33 @@ export class ExportService {
           label: variable.label ?? `${variable.id} = ${variable.expr}`,
           get: (r) => toCell(computeVariables(def, ans(r))[variable.id]),
         });
+      // Recodes: group codes worked out from their source variable (multi-answer recodes as codes joined by ";").
+      if ((def.recodes ?? []).length) {
+        const vars = variables(def);
+        for (const rc of def.recodes ?? []) {
+          const v = vars.find((x) => x.id === rc.id && x.derivation?.kind === 'recode');
+          if (!v) continue;
+          add({
+            key: rc.id,
+            label: v.label,
+            get: (r) => {
+              const a = ans(r);
+              const c = codes(v, {
+                answers: a,
+                system: {
+                  status: r.status.toLowerCase(),
+                  mode: r.mode.toLowerCase(),
+                  language: r.language,
+                  device: r.device,
+                  vendor: r.vendor?.code ?? null,
+                },
+                ...((def.variables ?? []).length ? { derived: computeVariables(def, a) } : {}),
+              });
+              return c.length ? (v.kind === 'multi' ? c.join(';') : (c[0] as number)) : null;
+            },
+          });
+        }
+      }
     }
     return cols;
   }

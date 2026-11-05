@@ -28,6 +28,7 @@ import {
 } from '@zapx/survey-renderer';
 import {
   DEFAULT_RECORDING_CONSENT,
+  DEFAULT_VIDEO_CONSENT,
   capiSettingsOf,
   defaultPresentation,
   parsePresentation,
@@ -184,10 +185,11 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   const consent = async (agreed: boolean) => {
     if (!agreed) return save({ ...current, audio: 'declined' });
     const r = new InterviewRecorder(current.clientId, current.surveyId);
-    const ok = await r.start();
+    const ok = await r.start({ video: !!capture?.video });
     if (ok) {
       recorder.current = r;
       setRecording(true);
+      if (capture?.video && !r.video) setNotice('No camera is available, so only the sound of this interview is recorded.');
     } else setNotice('No microphone is available, so this interview is not recorded. Carry on with the questions.');
     await save({ ...current, audio: ok ? 'recorded' : 'unavailable' });
   };
@@ -245,7 +247,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
         </span>
         {recording ? (
           <span className="capi-pill capi-recording" role="status">
-            ● Recording
+            {recorder.current?.video ? '● Recording video' : '● Recording'}
           </span>
         ) : null}
         {languages.length > 1 && current.state === 'in_progress' ? (
@@ -288,7 +290,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
           <div className="zx-card capi-consent" data-testid="capi-consent">
             <h1 className="zx-title">Ask before recording</h1>
             <p>Read this to the respondent:</p>
-            <blockquote>{capture?.consentText ?? DEFAULT_RECORDING_CONSENT}</blockquote>
+            <blockquote>{capture?.consentText ?? (capture?.video ? DEFAULT_VIDEO_CONSENT : DEFAULT_RECORDING_CONSENT)}</blockquote>
             <div className="zx-actions">
               <button type="button" className="zx-button zx-secondary" onClick={() => void consent(false)}>
                 Respondent declines

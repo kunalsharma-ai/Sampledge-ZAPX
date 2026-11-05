@@ -36,7 +36,7 @@ const XML_ELEMENTS: ElementSpec[] = [
     name: 'survey',
     top: true,
     attributes: ['schemaVersion', 'title', 'language'],
-    children: ['welcome', 'thankYou', 'settings', 'variable', 'page', 'loop', 'block', 'termination', 'quota'],
+    children: ['welcome', 'thankYou', 'settings', 'variable', 'recode', 'page', 'loop', 'block', 'termination', 'quota'],
   },
   {
     name: 'page',
@@ -84,21 +84,36 @@ const XML_ELEMENTS: ElementSpec[] = [
   },
   { name: 'photo', attributes: QUESTION_ATTRS, children: ['text', 'help'] },
   { name: 'signature', attributes: QUESTION_ATTRS, children: ['text', 'help'] },
+  {
+    name: 'maxdiff',
+    attributes: [...QUESTION_ATTRS, 'itemsPerSet', 'sets', 'versions', 'bestLabel', 'worstLabel'],
+    children: ['text', 'help', 'option'],
+  },
+  {
+    name: 'conjoint',
+    attributes: [...QUESTION_ATTRS, 'tasks', 'conceptsPerTask', 'versions', 'noneOption', 'noneLabel'],
+    children: ['text', 'help', 'attribute'],
+  },
+  { name: 'attribute', attributes: ['id', 'label'], children: ['level'] },
+  { name: 'level', attributes: ['code'] },
   { name: 'barcode', attributes: [...QUESTION_ATTRS, 'pattern', 'maxLength'], children: ['text', 'help'] },
   { name: 'info', attributes: ['id', 'cond'], children: ['text', 'media'] },
   { name: 'option', attributes: ['code', 'anchor', 'exclusive', 'image'] },
   { name: 'row', attributes: ['id'] },
   { name: 'col', attributes: ['code'] },
-  { name: 'group', attributes: ['code'] },
+  // Card sort group (label as text) or recode group (label, values "1|2" or a min/max range).
+  { name: 'group', attributes: ['code', 'label', 'values', 'min', 'max'] },
   { name: 'region', attributes: ['code', 'x', 'y', 'w', 'h'] },
   { name: 'optionsFrom', attributes: ['question', { name: 'include', values: ['selected', 'not_selected'] }] },
   { name: 'validate', attributes: ['message'] },
   { name: 'variable', attributes: ['id', 'label'] },
+  { name: 'recode', attributes: ['id', 'label', 'source'], children: ['group', 'otherwise'] },
+  { name: 'otherwise', attributes: ['code', 'label'] },
   { name: 'loop', attributes: ['id', 'label', 'pages', 'source'], children: ['item'] },
   { name: 'item', attributes: ['code'] },
   { name: 'block', attributes: ['id', 'label', 'pages', 'randomize', 'pick'] },
   { name: 'termination', attributes: ['id', { name: 'status', values: ['terminate', 'quality_fail'] }, 'label'] },
-  { name: 'quota', attributes: ['id', 'label', 'target'] },
+  { name: 'quota', attributes: ['id', 'label', 'target', 'group'] },
 ];
 
 /** Problems in an XML text, by line: reader errors, unknown parts, schema and logic issues. */

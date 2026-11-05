@@ -23,6 +23,8 @@ import { Languages } from '@/components/Languages';
 import { Quality } from '@/components/Quality';
 import { CapiAssignments } from '@/components/CapiAssignments';
 import { Supervisor } from '@/components/Supervisor';
+import { ChoiceResults } from '@/components/ChoiceResults';
+import { ResearchAssistant } from '@/components/ResearchAssistant';
 import { EmailInvitations } from '@/components/EmailInvitations';
 import { CatiCalls, DoNotCallList } from '@/components/CatiCalls';
 import { ExportJobs } from '@/components/ExportJobs';
@@ -349,7 +351,13 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       ) : null}
       {tab === 'quality' ? <Quality surveyId={id} def={def} readOnly={readOnly} onChange={edit} /> : null}
       {tab === 'results' ? <Results surveyId={id} readOnly={readOnly} /> : null}
-      {tab === 'analysis' ? <Analysis surveyId={id} readOnly={readOnly} /> : null}
+      {tab === 'analysis' ? (
+        <div className="stack">
+          <Analysis surveyId={id} readOnly={readOnly} />
+          <ChoiceResults surveyId={id} def={def} />
+          <ResearchAssistant surveyId={id} aiConfigured={aiConfigured} />
+        </div>
+      ) : null}
     </Shell>
   );
 }

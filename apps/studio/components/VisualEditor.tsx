@@ -3,6 +3,7 @@
  * Structured survey editor. It edits the canonical survey definition directly; the JSON view and
  * this editor are two views of the same object.
  */
+import { ConjointForm, MaxDiffForm } from './ChoiceForms';
 import { useState } from 'react';
 import type { Option, Page, Question, QuestionType, SurveyDefinition } from '@zapx/survey-schema';
 import { MediaLibraryProvider, OptionImagePicker, QuestionMediaEditor, useHasMediaLibrary } from './MediaLibrary';
@@ -13,10 +14,11 @@ import {
   HotspotForm,
   LoopsEditor,
   QuotaTableBuilder,
+  RecodesEditor,
   UrlVariablesEditor,
   VariablesEditor,
 } from './FlowEditor';
-import { InsertFromBank, SaveQuestionToBank } from './QuestionBank';
+import { InsertBlockFromBank, InsertFromBank, SavePageToBank, SaveQuestionToBank } from './QuestionBank';
 
 type Selection = { kind: 'survey' } | { kind: 'page'; page: number } | { kind: 'question'; page: number; q: number };
 
@@ -34,6 +36,8 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   photo: 'Photo',
   signature: 'Signature',
   barcode: 'Barcode / QR code',
+  maxdiff: 'MaxDiff (best-worst)',
+  conjoint: 'Conjoint (choice-based)',
   info: 'Information',
 };
 
@@ -78,6 +82,49 @@ function newQuestion(def: SurveyDefinition, type: QuestionType): Question {
       return { ...base, type, text: 'Please sign to confirm' };
     case 'barcode':
       return { ...base, type, text: 'Scan the barcode on the pack', maxLength: 200 };
+    case 'maxdiff':
+      return {
+        ...base,
+        type,
+        text: 'Which of these matters MOST and which LEAST to you?',
+        options: Array.from({ length: 8 }, (_, i) => ({ code: i + 1, label: `Item ${i + 1}` })),
+        itemsPerSet: 4,
+        sets: 6,
+        versions: 10,
+        bestLabel: 'Most important',
+        worstLabel: 'Least important',
+      };
+    case 'conjoint':
+      return {
+        ...base,
+        type,
+        text: 'If these were your only options, which would you choose?',
+        attributes: [
+          {
+            id: 'price',
+            label: 'Price',
+            levels: [
+              { code: 1, label: 'Low' },
+              { code: 2, label: 'Medium' },
+              { code: 3, label: 'High' },
+            ],
+          },
+          {
+            id: 'brand',
+            label: 'Brand',
+            levels: [
+              { code: 1, label: 'Brand A' },
+              { code: 2, label: 'Brand B' },
+              { code: 3, label: 'Brand C' },
+            ],
+          },
+        ],
+        tasks: 8,
+        conceptsPerTask: 3,
+        versions: 10,
+        noneOption: true,
+        noneLabel: 'None of these',
+      };
     case 'cardsort':
       return {
         ...base,
@@ -255,6 +302,14 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
                     setSel({ kind: 'question', page: pi, q: p.questions.length });
                   }}
                 />
+                <InsertBlockFromBank
+                  def={def}
+                  after={pi}
+                  onInsert={(d) => {
+                    onChange(d);
+                    setSel({ kind: 'page', page: pi + 1 });
+                  }}
+                />
               </div>
             ) : null}
           </div>
@@ -297,6 +352,7 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
               }
             />
           ) : null}
+          {sel.kind === 'page' && selected && !readOnly ? <SavePageToBank page={selected as Page} /> : null}
           {sel.kind === 'question' && selected ? (
             <QuestionForm
               q={selected as Question}
@@ -491,6 +547,8 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
       <h2 style={{ marginTop: 12 }}>Quotas</h2>
       <p className="muted small">
         Respondents matching the condition count toward the target when they complete. Over-target respondents get the quota-full redirect.
+        Quotas with the same least-fill group are alternatives: someone who matches several (aware of three brands, say) counts toward only
+        the least filled one, and is over quota only when all of them are full.
       </p>
       <table className="data list-editor">
         <thead>
@@ -499,6 +557,7 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
             <th>Label</th>
             <th>Condition</th>
             <th>Target</th>
+            <th>Least-fill group</th>
             <th />
           </tr>
         </thead>
@@ -541,6 +600,18 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
                 />
               </td>
               <td>
+                <input
+                  className="mono"
+                  aria-label={`Least-fill group of ${q.id}`}
+                  value={q.group ?? ''}
+                  placeholder="none"
+                  style={{ width: 110 }}
+                  onChange={(e) =>
+                    onChange({ ...def, quotas: def.quotas.map((x, j) => (j === i ? { ...x, group: e.target.value || undefined } : x)) })
+                  }
+                />
+              </td>
+              <td>
                 <button className="link danger" onClick={() => onChange({ ...def, quotas: def.quotas.filter((_, j) => j !== i) })}>
                   Remove
                 </button>
@@ -561,6 +632,7 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
       <QuotaTableBuilder def={def} onChange={onChange} />
       <UrlVariablesEditor def={def} onChange={onChange} />
       <VariablesEditor def={def} onChange={onChange} />
+      <RecodesEditor def={def} onChange={onChange} />
       <LoopsEditor def={def} onChange={onChange} />
       <BlocksEditor def={def} onChange={onChange} />
     </>
@@ -775,6 +847,8 @@ function QuestionForm({
           <DynamicListEditor q={q} def={def} onChange={onChange} />
         </>
       ) : null}
+      {q.type === 'maxdiff' ? <MaxDiffForm q={q} onChange={onChange} OptionsEditor={OptionsEditor} /> : null}
+      {q.type === 'conjoint' ? <ConjointForm q={q} onChange={onChange} /> : null}
       {q.type === 'cardsort' ? <CardSortForm q={q} onChange={onChange} OptionsEditor={OptionsEditor} /> : null}
       {q.type === 'hotspot' ? <HotspotForm q={q} onChange={onChange} /> : null}
       {q.type === 'multi' ? (

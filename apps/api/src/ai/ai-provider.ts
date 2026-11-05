@@ -49,6 +49,33 @@ export interface TranslateResult {
   usage?: AiTokenUsage;
 }
 
+/** A table computed by ZAPX, given to the research assistant as text. */
+export interface InsightTable {
+  /** T1, T2... so findings can cite it. */
+  id: string;
+  title: string;
+  /** The table as plain text (bases, percentages, significance letters). */
+  text: string;
+}
+
+export interface InsightsRequest {
+  surveyTitle: string;
+  /** What the researcher asked. */
+  question: string;
+  tables: InsightTable[];
+}
+
+export interface InsightsResult {
+  /** Short answer to the question. */
+  answer: string;
+  /** Each finding cites the tables it is read from. */
+  findings: Array<{ statement: string; tables: string[] }>;
+  /** Limits: low bases, unweighted data, what the tables cannot show. */
+  caveats: string[];
+  model: string;
+  usage?: AiTokenUsage;
+}
+
 /** Errors a provider can raise; the controller maps `status` to the HTTP response. */
 export class AiError extends Error {
   constructor(
@@ -81,4 +108,8 @@ export abstract class AiProvider {
   abstract readonly model: string;
   abstract architect(req: ArchitectRequest, model?: string): Promise<ArchitectResult>;
   abstract translate(req: TranslateRequest, model?: string): Promise<TranslateResult>;
+  /** Research assistant: read computed tables and answer a question about them, citing tables. */
+  insights(_req: InsightsRequest, _model?: string): Promise<InsightsResult> {
+    return Promise.reject(new AiError('This AI provider cannot answer research questions.', 503, 'NOT_CONFIGURED'));
+  }
 }

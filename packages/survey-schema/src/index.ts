@@ -275,6 +275,47 @@ export const barcodeQuestionSchema = z.object({
   maxLength: z.number().int().min(1).max(500).default(200),
 });
 
+/**
+ * MaxDiff (best-worst scaling, blueprint phase 4): the respondent sees several sets of items and picks
+ * the best and the worst in each. The sets come from a balanced design computed from the question
+ * (every item shown about equally often, pairs spread out), in `versions` variants assigned by the
+ * respondent's seed. Stored as {v: version, b1: best code, w1: worst code, b2: ...}.
+ */
+export const maxDiffQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('maxdiff'),
+  options: z.array(optionSchema).min(4).max(40),
+  itemsPerSet: z.number().int().min(3).max(6).default(4),
+  sets: z.number().int().min(2).max(30).default(6),
+  versions: z.number().int().min(1).max(50).default(10),
+  bestLabel: z.string().min(1).max(60).default('Most important'),
+  worstLabel: z.string().min(1).max(60).default('Least important'),
+});
+
+export const conjointLevelSchema = z.object({ code: z.number().int(), label: z.string().min(1).max(200) });
+export const conjointAttributeSchema = z.object({
+  id: variableName,
+  label: z.string().min(1).max(120),
+  levels: z.array(conjointLevelSchema).min(2).max(9),
+});
+
+/**
+ * Choice-based conjoint (CBC, blueprint phase 4): in each task the respondent picks one of several
+ * product concepts (one level of each attribute), or none when offered. Concepts come from a
+ * level-balanced design with minimal overlap, in `versions` variants. Stored as {v: version, t1:
+ * chosen concept 1..n (0 = none), t2: ...}.
+ */
+export const conjointQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('conjoint'),
+  attributes: z.array(conjointAttributeSchema).min(2).max(8),
+  tasks: z.number().int().min(2).max(20).default(8),
+  conceptsPerTask: z.number().int().min(2).max(4).default(3),
+  versions: z.number().int().min(1).max(50).default(10),
+  noneOption: z.boolean().default(true),
+  noneLabel: z.string().min(1).max(80).default('None of these'),
+});
+
 /** Reference to a captured photo or recording, unique within one interview. */
 export const CAPTURE_REF = /^[A-Za-z0-9_-]{8,64}$/;
 
@@ -300,6 +341,8 @@ export const questionSchema = z.discriminatedUnion('type', [
   photoQuestionSchema,
   signatureQuestionSchema,
   barcodeQuestionSchema,
+  maxDiffQuestionSchema,
+  conjointQuestionSchema,
   infoElementSchema,
 ]);
 export type Question = z.infer<typeof questionSchema>;
@@ -317,6 +360,9 @@ export type SumQuestion = z.infer<typeof sumQuestionSchema>;
 export type PhotoQuestion = z.infer<typeof photoQuestionSchema>;
 export type SignatureQuestion = z.infer<typeof signatureQuestionSchema>;
 export type BarcodeQuestion = z.infer<typeof barcodeQuestionSchema>;
+export type MaxDiffQuestion = z.infer<typeof maxDiffQuestionSchema>;
+export type ConjointQuestion = z.infer<typeof conjointQuestionSchema>;
+export type ConjointAttribute = z.infer<typeof conjointAttributeSchema>;
 export type CardSortQuestion = z.infer<typeof cardSortQuestionSchema>;
 export type HotspotQuestion = z.infer<typeof hotspotQuestionSchema>;
 
@@ -349,6 +395,13 @@ export const pageSchema = z.object({
 });
 export type Page = z.infer<typeof pageSchema>;
 
+/**
+ * Blueprint phase 4: a reusable block in the question bank, one or more pages with their questions
+ * (a standard demographics section, say). Inserted into a survey with its names made free there.
+ */
+export const bankBlockSchema = z.object({ pages: z.array(pageSchema).min(1).max(20) });
+export type BankBlock = z.infer<typeof bankBlockSchema>;
+
 /** Final statuses a respondent can reach. Each maps to a vendor redirect. */
 /** The same eight statuses as PROJEXA. `partial` = abandoned; `technical_error` = ZAPX could not continue. */
 export const OUTCOME_STATUSES = [
@@ -379,6 +432,13 @@ export const quotaSchema = z.object({
   condition: expression,
   /** Number of completes allowed. */
   target: z.number().int().min(0),
+  /**
+   * Blueprint phase 4, least-fill quota balancing: quotas with the same group are alternatives. A
+   * respondent who matches several counts toward only one of them, the least filled (count as a
+   * share of target) that still has room, and is over quota only when every one they match is full.
+   * Typical use: brand quotas where a respondent aware of several brands is assigned one.
+   */
+  group: variableName.optional(),
 });
 export type Quota = z.infer<typeof quotaSchema>;
 
@@ -471,6 +531,49 @@ export const variableSchema = z.object({
 });
 export type CalculatedVariable = z.infer<typeof variableSchema>;
 
+/**
+ * Recode (derived variable for analysis, blueprint phase 4): groups the values of one analysis
+ * variable into new categories, e.g. AGE 18-34 / 35-54 / 55+, or top-2 box of a scale. The source
+ * is an analysis variable id: a question, a grid row (GRID_row), a ranking or sum item, a calculated
+ * variable, a system variable (vendor, mode...) or an earlier recode. Answers are never changed;
+ * the recode is worked out when tables are run and in exports, and lists its lineage.
+ */
+export const recodeGroupSchema = z
+  .object({
+    code: z.number().int(),
+    label: z.string().min(1).max(200),
+    /** Source codes (or text values) that fall in this group. */
+    values: z
+      .array(z.union([z.number(), z.string().max(100)]))
+      .max(200)
+      .optional(),
+    /** Numeric range, inclusive. */
+    min: z.number().optional(),
+    max: z.number().optional(),
+  })
+  .refine((g) => (g.values?.length ?? 0) > 0 || g.min !== undefined || g.max !== undefined, {
+    message: 'A group needs values or a range.',
+  })
+  .refine((g) => g.min === undefined || g.max === undefined || g.min <= g.max, { message: 'The range minimum is above its maximum.' });
+export const recodeSchema = z
+  .object({
+    id: variableName,
+    label: z.string().max(200).optional(),
+    source: z.string().min(1).max(100),
+    groups: z.array(recodeGroupSchema).min(1).max(50),
+    /** Group for answered values that match no group; left out (missing) when absent. */
+    otherwise: z.object({ code: z.number().int(), label: z.string().min(1).max(200) }).optional(),
+  })
+  .refine(
+    (r) =>
+      new Set([...r.groups.map((g) => g.code), ...(r.otherwise ? [r.otherwise.code] : [])]).size ===
+      r.groups.length + (r.otherwise ? 1 : 0),
+    {
+      message: 'Group codes must be unique.',
+    },
+  );
+export type Recode = z.infer<typeof recodeSchema>;
+
 // ---- Data quality (Milestone 5) -----------------------------------------------------------------
 // Quality settings are part of the versioned definition: an in-survey quality reject changes where a
 // respondent is redirected, so it is published, diffed and reviewed like any other logic.
@@ -550,6 +653,8 @@ export const capiSettingsSchema = z.object({
   gps: z.enum(['off', 'optional', 'required']).default('off'),
   /** consent: the interviewer asks the respondent before recording the interview's audio. Never recorded silently. */
   audio: z.enum(['off', 'consent']).default('off'),
+  /** Blueprint phase 4: with audio consent, record the device camera too (asked in the same consent). */
+  video: z.boolean().default(false),
   /** What the interviewer reads out to ask for consent to record. */
   consentText: z.string().max(1000).optional(),
   /**
@@ -565,6 +670,8 @@ export type CapiSettings = z.infer<typeof capiSettingsSchema>;
 
 export const DEFAULT_RECORDING_CONSENT =
   'May I record the sound of this interview? It is only used to check the quality of my work, is kept securely and is not shared.';
+export const DEFAULT_VIDEO_CONSENT =
+  'May I record this interview with sound and video from this device? It is only used to check the quality of my work, is kept securely and is not shared.';
 
 export function capiSettingsOf(def: { settings?: { capi?: unknown } }): CapiSettings {
   const parsed = capiSettingsSchema.safeParse(def.settings?.capi ?? {});
@@ -584,6 +691,7 @@ export const surveyDefinitionSchema = z.object({
   loops: z.array(loopSchema).max(50).default([]),
   blocks: z.array(blockSchema).max(50).default([]),
   variables: z.array(variableSchema).max(200).default([]),
+  recodes: z.array(recodeSchema).max(100).default([]),
   urlVariables: z.array(urlVariableSchema).max(100).default([]),
   settings: z
     .object({
@@ -617,7 +725,7 @@ export type AnswerValue =
   | number // single, numeric
   | number[] // multi; ranking (codes in rank order); hotspot (region codes)
   | string // open; photo (capture reference)
-  | Record<string, number> // grid: rowId -> column code; sum: option code -> amount; cardsort: card -> group
+  | Record<string, number> // grid: rowId -> column code; sum: option code -> amount; cardsort: card -> group; maxdiff/conjoint: v, b1/w1 or t1
   | null;
 
 export type Answers = Record<string, AnswerValue>;

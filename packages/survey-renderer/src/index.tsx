@@ -6,11 +6,16 @@
  * answers cannot inject markup or scripts.
  */
 import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { conditionHoldsFor } from '@zapx/logic-engine';
+import { conditionHoldsFor, conjointTasksFor, maxDiffSetsFor } from '@zapx/logic-engine';
 import type { AnswerValue, Answers, DeviceSettings, Option, Question, QuestionMedia, Theme } from '@zapx/survey-schema';
 import { formatNumber, textDirection } from '@zapx/survey-schema';
 
-export type DisplayQuestion = Question & { renderedText?: string; condition?: string };
+export type DisplayQuestion = Question & {
+  renderedText?: string;
+  condition?: string;
+  /** MaxDiff sets or conjoint tasks for this respondent (from renderQuestion). */
+  design?: { version: number; sets?: number[][]; tasks?: number[][][] };
+};
 
 export interface FieldErrors {
   [questionId: string]: string | undefined;
@@ -49,6 +54,9 @@ export interface RendererMessages {
   scanCode: string;
   stopScan: string;
   scanUnavailable: string;
+  choiceSet: string;
+  choiceTask: string;
+  choiceOption: string;
 }
 export const DEFAULT_RENDERER_MESSAGES: RendererMessages = {
   unsorted: 'Not sorted',
@@ -68,6 +76,9 @@ export const DEFAULT_RENDERER_MESSAGES: RendererMessages = {
   scanCode: 'Scan with the camera',
   stopScan: 'Stop scanning',
   scanUnavailable: 'This device cannot scan codes. Type the code instead.',
+  choiceSet: 'Set {n} of {total}',
+  choiceTask: 'Choice {n} of {total}',
+  choiceOption: 'Option {n}',
 };
 
 /** Where media files are loaded from: the API's public media endpoint by default. */
@@ -372,6 +383,8 @@ export function QuestionView({
       {q.type === 'photo' ? (
         <PhotoInput questionId={q.id} label={text} value={value} onChange={onChange} handler={photos} messages={messages} />
       ) : null}
+      {q.type === 'maxdiff' ? <MaxDiff question={q} design={q.design} value={value} onChange={onChange} messages={messages} /> : null}
+      {q.type === 'conjoint' ? <Conjoint question={q} design={q.design} value={value} onChange={onChange} messages={messages} /> : null}
       {q.type === 'signature' ? <SignaturePad label={text} value={value} onChange={onChange} messages={messages} /> : null}
       {q.type === 'barcode' ? (
         <BarcodeInput label={text} maxLength={q.maxLength} value={value} onChange={onChange} messages={messages} />
@@ -727,6 +740,151 @@ function PhotoInput({
   );
 }
 
+const fill = (t: string, vars: Record<string, number>) => t.replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? ''));
+const recordOf = (v: AnswerValue) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, number>) : {});
+
+function MaxDiff({
+  question: q,
+  design,
+  value,
+  onChange,
+  messages,
+}: {
+  question: Extract<Question, { type: 'maxdiff' }>;
+  design: DisplayQuestion['design'];
+  value: AnswerValue;
+  onChange: (v: AnswerValue) => void;
+  messages: RendererMessages;
+}) {
+  const d = design?.sets ? design : maxDiffSetsFor(q, '');
+  const cur = recordOf(value);
+  const label = (c: number) => q.options.find((o) => o.code === c)?.label ?? String(c);
+  const pick = (key: string, code: number, other: string) => {
+    const next: Record<string, number> = { ...cur, v: d.version, [key]: code };
+    if (next[other] === code) delete next[other];
+    onChange(next);
+  };
+  return (
+    <div className="zx-choice">
+      {d.sets!.map((set, i) => (
+        <table className="zx-maxdiff" key={i} data-set={i + 1}>
+          <caption>{fill(messages.choiceSet, { n: i + 1, total: d.sets!.length })}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{q.bestLabel}</th>
+              <th scope="col" className="zx-sr-only">
+                Item
+              </th>
+              <th scope="col">{q.worstLabel}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {set.map((c) => (
+              <tr key={c}>
+                <td>
+                  <input
+                    type="radio"
+                    name={`${q.id}-b${i + 1}`}
+                    aria-label={`${q.bestLabel}: ${label(c)}`}
+                    checked={cur[`b${i + 1}`] === c}
+                    onChange={() => pick(`b${i + 1}`, c, `w${i + 1}`)}
+                  />
+                </td>
+                <th scope="row">{label(c)}</th>
+                <td>
+                  <input
+                    type="radio"
+                    name={`${q.id}-w${i + 1}`}
+                    aria-label={`${q.worstLabel}: ${label(c)}`}
+                    checked={cur[`w${i + 1}`] === c}
+                    onChange={() => pick(`w${i + 1}`, c, `b${i + 1}`)}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ))}
+    </div>
+  );
+}
+
+function Conjoint({
+  question: q,
+  design,
+  value,
+  onChange,
+  messages,
+}: {
+  question: Extract<Question, { type: 'conjoint' }>;
+  design: DisplayQuestion['design'];
+  value: AnswerValue;
+  onChange: (v: AnswerValue) => void;
+  messages: RendererMessages;
+}) {
+  const d = design?.tasks ? design : conjointTasksFor(q, '');
+  const cur = recordOf(value);
+  const level = (ai: number, code: number) => q.attributes[ai]!.levels.find((l) => l.code === code)?.label ?? String(code);
+  return (
+    <div className="zx-choice">
+      {d.tasks!.map((task, ti) => {
+        const key = `t${ti + 1}`;
+        const choose = (n: number) => onChange({ ...cur, v: d.version, [key]: n });
+        return (
+          <table className="zx-conjoint" key={ti} data-task={ti + 1}>
+            <caption>{fill(messages.choiceTask, { n: ti + 1, total: d.tasks!.length })}</caption>
+            <thead>
+              <tr>
+                <td />
+                {task.map((_, ci) => (
+                  <th scope="col" key={ci}>
+                    {fill(messages.choiceOption, { n: ci + 1 })}
+                  </th>
+                ))}
+                {q.noneOption ? <td /> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {q.attributes.map((a, ai) => (
+                <tr key={a.id}>
+                  <th scope="row">{a.label}</th>
+                  {task.map((concept, ci) => (
+                    <td key={ci}>{level(ai, concept[ai]!)}</td>
+                  ))}
+                  {q.noneOption ? <td /> : null}
+                </tr>
+              ))}
+              <tr>
+                <td />
+                {task.map((_, ci) => (
+                  <td key={ci}>
+                    <label className="zx-conjoint-pick">
+                      <input
+                        type="radio"
+                        name={`${q.id}-${key}`}
+                        checked={cur[key] === ci + 1}
+                        onChange={() => choose(ci + 1)}
+                        aria-label={`${fill(messages.choiceTask, { n: ti + 1, total: d.tasks!.length })}: ${fill(messages.choiceOption, { n: ci + 1 })}`}
+                      />
+                    </label>
+                  </td>
+                ))}
+                {q.noneOption ? (
+                  <td>
+                    <label className="zx-conjoint-pick">
+                      <input type="radio" name={`${q.id}-${key}`} checked={cur[key] === 0} onChange={() => choose(0)} /> {q.noneLabel}
+                    </label>
+                  </td>
+                ) : null}
+              </tr>
+            </tbody>
+          </table>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Signature strokes on a 1000 x 400 grid, as stored in the answer ("x,y x,y;x,y ..."). */
 const SIG_W = 1000;
 const SIG_H = 400;
@@ -1044,7 +1202,7 @@ function CardSort({
   const cardEl = (o: Option) => (
     <li
       key={o.code}
-      className="zx-card"
+      className="zx-sort-card"
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', String(o.code));
@@ -1242,10 +1400,17 @@ export const defaultThemeCss = `
 .zx-sort-title{margin:0 0 8px;font-weight:600;}
 .zx-sort-count{color:var(--zx-muted);font-weight:400;}
 .zx-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
-.zx-card{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--zx-border);border-radius:calc(var(--zx-radius) - 4px);background:var(--zx-bg);cursor:grab;}
+.zx-sort-card{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--zx-border);border-radius:calc(var(--zx-radius) - 4px);background:var(--zx-bg);cursor:grab;}
 .zx-card-select{max-width:50%;font:inherit;padding:4px;border-radius:6px;border:1px solid var(--zx-border);background:var(--zx-card);color:var(--zx-text);}
 .zx-signature-pad{display:block;width:100%;max-width:560px;aspect-ratio:5/2;border:2px dashed var(--zx-border,#c8ccd4);border-radius:var(--zx-radius);background:var(--zx-card,#fff);touch-action:none;cursor:crosshair;color:var(--zx-text,#111);}
 .zx-signature-clear{margin-top:8px;}
+.zx-choice{display:grid;gap:18px;}
+.zx-maxdiff,.zx-conjoint{border-collapse:collapse;width:100%;max-width:640px;}
+.zx-maxdiff caption,.zx-conjoint caption{text-align:start;font-weight:600;padding:4px 0;color:var(--zx-muted);}
+.zx-maxdiff td,.zx-maxdiff th,.zx-conjoint td,.zx-conjoint th{border-bottom:1px solid var(--zx-border);padding:8px;text-align:center;}
+.zx-maxdiff tbody th,.zx-conjoint tbody th{text-align:start;font-weight:500;}
+.zx-maxdiff input,.zx-conjoint input{width:20px;height:20px;accent-color:var(--zx-accent);}
+.zx-conjoint thead th{background:var(--zx-accent-soft);border-radius:var(--zx-radius) var(--zx-radius) 0 0;}
 .zx-barcode{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
 .zx-barcode .zx-input{flex:1 1 220px;}
 .zx-barcode-video{width:100%;max-width:420px;border-radius:var(--zx-radius);background:#000;}

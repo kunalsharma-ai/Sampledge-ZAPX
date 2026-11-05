@@ -11,7 +11,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes } from 'node:crypto';
 import { Prisma, type ResponseStatus, type SurveyVersion } from '@zapx/db';
-import { checkGeofence, classifyDevice, matchingQuotas, prepareSurvey, replayInterview } from '@zapx/logic-engine';
+import { checkGeofence, classifyDevice, prepareSurvey, replayInterview } from '@zapx/logic-engine';
+import { takeQuotaPlaces } from '../quotas/quota-places';
 import { capiSettingsOf, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
 import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
@@ -330,21 +331,22 @@ export class CapiService {
       }
     }
 
-    const create = (s: ResponseStatus, why: string | null, tx: Prisma.TransactionClient) =>
-      tx.response.create({ data: { ...base, ...quality, status: s, outcomeReason: why, answers: answers as Prisma.InputJsonValue } });
+    const create = (s: ResponseStatus, why: string | null, tx: Prisma.TransactionClient, quotaCells: string[] = []) =>
+      tx.response.create({
+        data: { ...base, ...quality, status: s, outcomeReason: why, answers: answers as Prisma.InputJsonValue, quotaCells },
+      });
 
     try {
       await this.prisma.$transaction(async (tx) => {
+        let cells: string[] = [];
         if (status === 'COMPLETE') {
           // Offline interviewers cannot see live quotas. The server never overfills: a complete that
           // arrives after its quota filled is kept, marked quota_full with the quota that was full.
-          for (const q of matchingQuotas(def, answers)) {
-            const n = await tx.$executeRaw`UPDATE "QuotaCount" SET "count" = "count" + 1
-              WHERE "surveyId" = ${item.surveyId} AND "quotaId" = ${q.id} AND "count" < COALESCE("targetOverride", ${q.target})`;
-            if (n === 0) throw new QuotaFullAtSync(q.id);
-          }
+          const places = await takeQuotaPlaces(tx, item.surveyId, def, answers);
+          if (!places.ok) throw new QuotaFullAtSync(places.quotaId);
+          cells = places.cells;
         }
-        await create(status, reason, tx);
+        await create(status, reason, tx, cells);
       });
     } catch (e) {
       if (!(e instanceof QuotaFullAtSync)) throw e;

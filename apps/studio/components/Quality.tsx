@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   DEFAULT_RECORDING_CONSENT,
+  DEFAULT_VIDEO_CONSENT,
   capiSettingsOf,
   qualitySettingsOf,
   type CapiSettings,
@@ -69,6 +70,7 @@ interface Capture {
   kind: 'photo' | 'audio';
   url: string;
   size: number;
+  contentType?: string;
   transcript?: { text: string; language: string | null; at: string } | null;
 }
 interface Point {
@@ -444,7 +446,11 @@ function Evidence({ item: i }: { item: Item }) {
       {i.recording ? (
         <div className="row" style={{ gap: 8 }}>
           <span className="muted">Recording:</span>
-          <audio controls preload="none" src={i.recording.url} aria-label={`Recording of interview ${i.uid}`} />
+          {i.recording.contentType?.startsWith('video/') ? (
+            <video controls preload="none" width={320} src={i.recording.url} aria-label={`Video recording of interview ${i.uid}`} />
+          ) : (
+            <audio controls preload="none" src={i.recording.url} aria-label={`Recording of interview ${i.uid}`} />
+          )}
         </div>
       ) : null}
       {i.recording?.transcript ? (
@@ -525,12 +531,18 @@ function CaptureSettingsEditor({
           </label>
         </div>
         {c.audio === 'consent' ? (
+          <label className="check">
+            <input type="checkbox" checked={c.video} onChange={(e) => set({ video: e.target.checked })} />
+            Record video from the device camera too (asked in the same consent; sound only when there is no camera)
+          </label>
+        ) : null}
+        {c.audio === 'consent' ? (
           <label className="field">
             What the interviewer reads out to ask for consent
             <textarea
               rows={2}
               value={c.consentText ?? ''}
-              placeholder={DEFAULT_RECORDING_CONSENT}
+              placeholder={c.video ? DEFAULT_VIDEO_CONSENT : DEFAULT_RECORDING_CONSENT}
               onChange={(e) => set({ consentText: e.target.value || undefined })}
             />
           </label>

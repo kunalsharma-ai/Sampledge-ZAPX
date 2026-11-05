@@ -49,6 +49,7 @@ import { ArchitectService } from './ai/architect.service';
 import { AiProvider } from './ai/ai-provider';
 import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
 import { AiGateway } from './ai/ai-gateway';
+import { ResearchAssistantService } from './analysis/research.service';
 import { AiUsageRepository } from './ai/ai-usage.repository';
 import { AiSettingsController } from './ai/ai-settings.controller';
 import { FraudBlocksController, QualityController } from './quality/quality.controller';
@@ -125,6 +126,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     CatiService,
     TelephonyService,
     AnalysisService,
+    ResearchAssistantService,
     MediaService,
     SsoService,
     SamlService,

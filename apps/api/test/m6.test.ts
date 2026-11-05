@@ -231,7 +231,8 @@ describe('organization API keys', () => {
     ).body;
     expect(created.key).toMatch(/^zapx_[0-9a-f]{12}_[A-Za-z0-9_-]{32}$/);
     const stored = await prisma.apiKey.findUniqueOrThrow({ where: { id: created.id } });
-    expect(stored.secretHash).not.toContain(created.key.split('_')[2]);
+    // The secret is everything after "zapx_<12 hex>_" (it can itself contain "_").
+    expect(stored.secretHash).not.toContain(created.key.slice('zapx_'.length + 13));
     const listed = (await http.get('/api/api-keys').set(programmer.headers).expect(200)).body;
     expect(listed).toHaveLength(1);
     expect(listed[0].key).toBeUndefined();

@@ -21,7 +21,7 @@ import { notConfigured } from './claude.provider';
 import { AiUsageRepository } from './ai-usage.repository';
 import { CircuitBreaker } from './circuit-breaker';
 
-export const AI_TASKS = ['architect', 'translate'] as const;
+export const AI_TASKS = ['architect', 'translate', 'insights'] as const;
 export type AiTask = (typeof AI_TASKS)[number];
 
 export interface AiActor {
@@ -71,7 +71,7 @@ export class AiGateway {
   /** Model for a task: AI_MODEL_<TASK>, else AI_MODEL (the provider's default). */
   modelFor(task: AiTask): string {
     const cfg = config();
-    const perTask = { architect: cfg.AI_MODEL_ARCHITECT, translate: cfg.AI_MODEL_TRANSLATE }[task];
+    const perTask = { architect: cfg.AI_MODEL_ARCHITECT, translate: cfg.AI_MODEL_TRANSLATE, insights: cfg.AI_MODEL_INSIGHTS }[task];
     return perTask ?? this.provider.model;
   }
 

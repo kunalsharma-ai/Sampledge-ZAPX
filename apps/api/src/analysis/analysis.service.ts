@@ -5,6 +5,7 @@ import {
   crosstab,
   frequency,
   rake,
+  recodeProblems,
   variables,
   type AnalysisRecord,
   type Crosstab,
@@ -12,8 +13,16 @@ import {
   type RakeResult,
   type Variable,
 } from '@zapx/analysis-core';
-import { parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
-import { prepareSurvey } from '@zapx/logic-engine';
+import { parseSurveyDefinition, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
+import {
+  computeVariables,
+  conjointAnalysis,
+  conjointDesign,
+  maxDiffDesign,
+  maxDiffScores,
+  prepareSurvey,
+  variableLineage,
+} from '@zapx/logic-engine';
 import { z } from 'zod';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
@@ -136,6 +145,7 @@ export class AnalysisService {
       );
     }
     const records: AnalysisRecord[] = [];
+    const calculated = (def.variables ?? []).length > 0;
     let cursor: string | undefined;
     for (;;) {
       const page = await db.response.findMany({
@@ -146,8 +156,10 @@ export class AnalysisService {
         select: { id: true, answers: true, status: true, mode: true, language: true, device: true, vendor: { select: { code: true } } },
       });
       for (const r of page) {
+        const answers = (r.answers ?? {}) as Record<string, unknown>;
         records.push({
-          answers: (r.answers ?? {}) as Record<string, unknown>,
+          answers,
+          ...(calculated ? { derived: computeVariables(def, answers as Answers) } : {}),
           system: {
             status: r.status.toLowerCase(),
             vendor: r.vendor?.code ?? null,
@@ -160,11 +172,11 @@ export class AnalysisService {
       if (page.length < PAGE) break;
       cursor = page[page.length - 1]!.id;
     }
-    return { survey, def, records, vars: variables(def, records) };
+    return { survey, def, records, vars: variables(def, records, { lineage: variableLineage(def) }) };
   }
 
   /** Rake the records to the targets and attach the weights. Returns the diagnostics. */
-  private applyWeights(vars: Variable[], records: AnalysisRecord[], w: NonNullable<Weighting>): WeightingSummary {
+  applyWeights(vars: Variable[], records: AnalysisRecord[], w: NonNullable<Weighting>): WeightingSummary {
     const dims = w.dimensions.map((d) => ({ variable: this.pick(vars, d.variable), targets: d.targets }));
     let result: RakeResult;
     try {
@@ -190,8 +202,8 @@ export class AnalysisService {
   }
 
   async variables(user: AuthUser, surveyId: string) {
-    const { vars, records } = await this.load(user, surveyId, filtersSchema.parse({}));
-    return { completes: records.length, variables: vars };
+    const { def, vars, records } = await this.load(user, surveyId, filtersSchema.parse({}));
+    return { completes: records.length, variables: vars, recodeProblems: recodeProblems(def) };
   }
 
   async frequencies(user: AuthUser, surveyId: string, filters: Filters, ids?: string[], weighting?: Weighting) {
@@ -218,6 +230,37 @@ export class AnalysisService {
       tables.push(crosstab(banner, stub, records, { confidence: cfg.confidence }));
     }
     return { total: records.length, weighting: w, tables };
+  }
+
+  /** Blueprint phase 4: MaxDiff counting scores or conjoint part-worths for one question. */
+  async choice(user: AuthUser, surveyId: string, questionId: string, filters: Filters, weighting?: Weighting) {
+    const { vars, records, def } = await this.load(user, surveyId, filters);
+    const w = weighting ? this.applyWeights(vars, records, weighting) : null;
+    const q = def.pages.flatMap((p) => p.questions).find((x) => x.id === questionId);
+    if (!q || (q.type !== 'maxdiff' && q.type !== 'conjoint')) throw new BadRequestException('Choose a MaxDiff or conjoint question');
+    const answers = records.map((r) => r.answers as Answers);
+    const weights = records.map((r) => r.weight ?? 1);
+    return q.type === 'maxdiff'
+      ? { type: 'maxdiff' as const, questionId, total: records.length, weighting: w, result: maxDiffScores(q, answers, weights) }
+      : { type: 'conjoint' as const, questionId, total: records.length, weighting: w, result: conjointAnalysis(q, answers, weights) };
+  }
+
+  /** The design of a MaxDiff or conjoint question as CSV (one row per item or concept shown). */
+  async choiceDesignCsv(user: AuthUser, surveyId: string, questionId: string): Promise<string> {
+    const survey = await this.surveys.getSurvey(user, surveyId);
+    const def = await this.definition(surveyId, survey.liveVersionId);
+    const q = def.pages.flatMap((p) => p.questions).find((x) => x.id === questionId);
+    if (!q || (q.type !== 'maxdiff' && q.type !== 'conjoint')) throw new BadRequestException('Choose a MaxDiff or conjoint question');
+    if (q.type === 'maxdiff') {
+      const lines = ['version,set,position,item_code'];
+      maxDiffDesign(q).forEach((v, vi) => v.forEach((set, si) => set.forEach((c, pi) => lines.push(`${vi},${si + 1},${pi + 1},${c}`))));
+      return lines.join('\r\n') + '\r\n';
+    }
+    const lines = [['version', 'task', 'concept', ...q.attributes.map((a) => a.id)].join(',')];
+    conjointDesign(q).forEach((v, vi) =>
+      v.forEach((task, ti) => task.forEach((c, ci) => lines.push([vi, ti + 1, ci + 1, ...c].join(',')))),
+    );
+    return lines.join('\r\n') + '\r\n';
   }
 
   run(user: AuthUser, surveyId: string, cfg: ReportConfig) {

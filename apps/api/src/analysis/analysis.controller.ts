@@ -6,6 +6,7 @@ import { parseBody } from '../common/validation';
 import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 import { AnalysisService, filtersSchema, reportConfigSchema, weightingSchema } from './analysis.service';
+import { ResearchAssistantService, askSchema } from './research.service';
 
 const READERS = ['ADMIN', 'PROGRAMMER', 'VIEWER'] as const;
 const frequenciesSchema = z.object({
@@ -27,7 +28,29 @@ const reportSchema = z.object({ name: z.string().trim().min(1).max(120), config:
 @Controller()
 @Throttle({ default: { limit: 60, ttl: 60_000 } })
 export class AnalysisController {
-  constructor(private readonly analysis: AnalysisService) {}
+  constructor(
+    private readonly analysis: AnalysisService,
+    private readonly assistant: ResearchAssistantService,
+  ) {}
+
+  /** The tables the research assistant would read for these settings (no AI call). */
+  @Post('surveys/:id/analysis/assistant/tables')
+  @Roles(...READERS)
+  @HttpCode(200)
+  async assistantTables(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
+    const { question: _q, ...input } = parseBody(askSchema.extend({ question: z.string().max(2000).default('') }), body);
+    const { total, weighted, tables } = await this.assistant.tables(user, id, input);
+    return { total, weighted, tables };
+  }
+
+  /** Ask the research assistant a question about computed tables. */
+  @Post('surveys/:id/analysis/assistant')
+  @Roles(...READERS)
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  ask(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
+    return this.assistant.ask(user, id, parseBody(askSchema, body));
+  }
 
   @Get('surveys/:id/analysis/variables')
   @Roles(...READERS)
@@ -48,6 +71,28 @@ export class AnalysisController {
   @HttpCode(200)
   crosstab(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     return this.analysis.crosstabs(user, id, parseBody(crosstabSchema, body));
+  }
+
+  @Post('surveys/:id/analysis/choice/:questionId')
+  @Roles(...READERS)
+  @HttpCode(200)
+  choice(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('questionId') questionId: string, @Body() body: unknown) {
+    const input = parseBody(frequenciesSchema, body ?? {});
+    return this.analysis.choice(user, id, questionId, input.filters, input.weighting);
+  }
+
+  @Get('surveys/:id/analysis/choice/:questionId/design.csv')
+  @Roles(...READERS)
+  async design(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('questionId') questionId: string,
+    @Res() res: ExpressResponse,
+  ) {
+    const csv = await this.analysis.choiceDesignCsv(user, id, questionId);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${questionId.replace(/[^A-Za-z0-9_]/g, '')}-design.csv"`);
+    res.send(csv);
   }
 
   @Post('surveys/:id/analysis/weights')

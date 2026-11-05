@@ -28,6 +28,8 @@ import {
   photoQuestionSchema,
   signatureQuestionSchema,
   barcodeQuestionSchema,
+  maxDiffQuestionSchema,
+  conjointQuestionSchema,
   rankingQuestionSchema,
   scaleQuestionSchema,
   singleQuestionSchema,
@@ -219,6 +221,12 @@ function questionXml(q: Question, ind: string): string {
     if (!list) continue;
     for (const item of list) out += `${inner}<${name}${scalarAttrs(item, ['label'])}>${esc(String(item.label ?? ''))}</${name}>\n`;
   }
+  if (q.type === 'conjoint')
+    for (const a of q.attributes) {
+      out += `${inner}<attribute${attr('id', a.id)}${attr('label', a.label)}>\n`;
+      for (const l of a.levels) out += `${inner}  <level${attr('code', l.code)}>${esc(l.label)}</level>\n`;
+      out += `${inner}</attribute>\n`;
+    }
   if (q.type !== 'info') for (const v of q.validations) out += `${inner}<validate${attr('message', v.message)}>${esc(v.expr)}</validate>\n`;
   return `${out}${ind}</${q.type}>\n`;
 }
@@ -235,11 +243,21 @@ export function toZapxXml(def: SurveyDefinition): string {
   for (const c of st.quality.checks)
     out += `      <check${attr('id', c.id)}${attr('label', c.label)}${attr('weight', c.weight)}>${esc(c.condition)}</check>\n`;
   out += `    </quality>\n`;
-  out += `    <capi${attr('gps', st.capi.gps)}${attr('audio', st.capi.audio)}>${st.capi.consentText ? esc(st.capi.consentText) : ''}</capi>\n`;
+  out += `    <capi${attr('gps', st.capi.gps)}${attr('audio', st.capi.audio)}${attr('interruptions', st.capi.interruptions)}${attr('video', st.capi.video)}>${st.capi.consentText ? esc(st.capi.consentText) : ''}`;
+  for (const g of st.capi.geofences)
+    out += `<area${attr('label', g.label)}${attr('lat', g.lat)}${attr('lon', g.lon)}${attr('radiusM', g.radiusM)}/>`;
+  out += `</capi>\n`;
   out += `  </settings>\n`;
   for (const u of def.urlVariables ?? [])
     out += `  <urlvar${attr('id', u.id)}${attr('param', u.param)}${attr('label', u.label)}${attr('numeric', u.numeric)}/>\n`;
   for (const v of def.variables ?? []) out += `  <variable${attr('id', v.id)}${attr('label', v.label)}>${esc(v.expr)}</variable>\n`;
+  for (const r of def.recodes ?? []) {
+    out += `  <recode${attr('id', r.id)}${attr('label', r.label)}${attr('source', r.source)}>\n`;
+    for (const g of r.groups)
+      out += `    <group${attr('code', g.code)}${attr('label', g.label)}${attr('values', g.values?.map(String).join('|'))}${attr('min', g.min)}${attr('max', g.max)}/>\n`;
+    if (r.otherwise) out += `    <otherwise${attr('code', r.otherwise.code)}${attr('label', r.otherwise.label)}/>\n`;
+    out += `  </recode>\n`;
+  }
   for (const p of def.pages) {
     out += `  <page${attr('id', p.id)}${attr('title', p.title)}${attr('cond', p.condition)}>\n`;
     for (const q of p.questions) out += questionXml(q, '    ');
@@ -255,7 +273,7 @@ export function toZapxXml(def: SurveyDefinition): string {
   for (const t of def.terminations)
     out += `  <termination${attr('id', t.id)}${attr('status', t.status)}${attr('label', t.label)}>${esc(t.condition)}</termination>\n`;
   for (const q of def.quotas)
-    out += `  <quota${attr('id', q.id)}${attr('label', q.label)}${attr('target', q.target)}>${esc(q.condition)}</quota>\n`;
+    out += `  <quota${attr('id', q.id)}${attr('label', q.label)}${attr('target', q.target)}${attr('group', q.group)}>${esc(q.condition)}</quota>\n`;
   return `${out}</survey>\n`;
 }
 
@@ -294,6 +312,14 @@ const NUMBER_KEYS = new Set([
   'straightlineMinRows',
   'reviewBelow',
   'rejectBelow',
+  'lat',
+  'lon',
+  'radiusM',
+  'itemsPerSet',
+  'sets',
+  'versions',
+  'tasks',
+  'conceptsPerTask',
 ]);
 const BOOLEAN_KEYS = new Set([
   'required',
@@ -313,6 +339,9 @@ const BOOLEAN_KEYS = new Set([
   'openEnds',
   'sameNetwork',
   'fraud',
+  'interruptions',
+  'video',
+  'noneOption',
 ]);
 const LIST_KEYS = new Set(['pages', 'countries']);
 
@@ -348,6 +377,8 @@ const QUESTION_SCHEMAS = {
   photo: photoQuestionSchema,
   signature: signatureQuestionSchema,
   barcode: barcodeQuestionSchema,
+  maxdiff: maxDiffQuestionSchema,
+  conjoint: conjointQuestionSchema,
   info: infoElementSchema,
 } as const;
 const shapeKeys = (schema: { shape: Record<string, unknown> }) => new Set(Object.keys(schema.shape));
@@ -382,6 +413,7 @@ export function fromZapxXml(src: string): XmlReadResult {
   def.blocks = [];
   def.variables = [];
   def.urlVariables = [];
+  def.recodes = [];
   for (const el of elements(root)) {
     switch (el.name) {
       case 'welcome':
@@ -413,9 +445,15 @@ export function fromZapxXml(src: string): XmlReadResult {
             });
             settings.quality = quality;
           } else if (s.name === 'capi') {
-            const capi = attrsTo(s, new Set(['gps', 'audio']));
-            const t = textOf(s);
+            const capi = attrsTo(s, new Set(['gps', 'audio', 'interruptions', 'video']));
+            const t = s.children
+              .map((c) => ('text' in c ? c.text : ''))
+              .join('')
+              .trim();
             if (t) capi.consentText = t;
+            capi.geofences = elements(s).flatMap((a) =>
+              a.name === 'area' ? [attrsTo(a, new Set(['label', 'lat', 'lon', 'radiusM']))] : (unexpected(a, '<capi>'), []),
+            );
             settings.capi = capi;
           } else unexpected(s, '<settings>');
         }
@@ -425,6 +463,24 @@ export function fromZapxXml(src: string): XmlReadResult {
       case 'urlvar':
         (def.urlVariables as unknown[]).push(attrsTo(el, shapeKeys(urlVariableSchema)));
         break;
+      case 'recode': {
+        const rc = attrsTo(el, new Set(['id', 'label', 'source']));
+        rc.groups = [];
+        for (const g of elements(el)) {
+          if (g.name === 'group') {
+            const values = g.attrs.values;
+            const grp = attrsTo(
+              { ...g, attrs: Object.fromEntries(Object.entries(g.attrs).filter(([k]) => k !== 'values')) },
+              new Set(['code', 'label', 'min', 'max']),
+            );
+            if (values !== undefined) grp.values = values.split('|').map((x) => (/^-?\d+(\.\d+)?$/.test(x) ? Number(x) : x));
+            (rc.groups as unknown[]).push(grp);
+          } else if (g.name === 'otherwise') rc.otherwise = attrsTo(g, new Set(['code', 'label']));
+          else unexpected(g, '<recode>');
+        }
+        (def.recodes as unknown[]).push(rc);
+        break;
+      }
       case 'variable':
         (def.variables as unknown[]).push({ ...attrsTo(el, new Set(['id', 'label'])), expr: textOf(el) });
         break;
@@ -452,7 +508,7 @@ export function fromZapxXml(src: string): XmlReadResult {
         (def.terminations as unknown[]).push({ ...attrsTo(el, new Set(['id', 'status', 'label'])), condition: textOf(el) });
         break;
       case 'quota':
-        (def.quotas as unknown[]).push({ ...attrsTo(el, new Set(['id', 'label', 'target'])), condition: textOf(el) });
+        (def.quotas as unknown[]).push({ ...attrsTo(el, new Set(['id', 'label', 'target', 'group'])), condition: textOf(el) });
         break;
       default:
         unexpected(el, '<survey>');
@@ -491,6 +547,16 @@ function readQuestion(el: XmlElement, warn: (w: XmlWarning) => void): Record<str
       const o: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(c.attrs)) o[k] = coerce(k, v, c.line, warn);
       q[c.name] = o;
+    } else if (c.name === 'attribute' && allowed.has('attributes')) {
+      ((q.attributes ??= []) as unknown[]).push({
+        id: c.attrs.id ?? '',
+        label: c.attrs.label ?? '',
+        levels: elements(c).flatMap((l) =>
+          l.name === 'level'
+            ? [{ code: coerce('code', l.attrs.code ?? '', l.line, warn), label: textOf(l) }]
+            : (warn({ line: l.line, message: `<${l.name}> is not supported inside <attribute>; it was ignored.` }), []),
+        ),
+      });
     } else if (listName[c.name] && allowed.has(listName[c.name]!)) {
       const item: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(c.attrs)) item[k] = coerce(k, v, c.line, warn);

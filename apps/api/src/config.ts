@@ -46,6 +46,7 @@ const schema = z
     AI_MODEL: optionalString,
     AI_MODEL_ARCHITECT: optionalString,
     AI_MODEL_TRANSLATE: optionalString,
+    AI_MODEL_INSIGHTS: optionalString,
     /** Provider per task (only "anthropic" is implemented; see docs/modules/ai-gateway.md). */
     AI_PROVIDER: z.enum(['anthropic']).default('anthropic'),
     /** Price list in USD per million tokens: {"<model>": {"input": n, "output": n, "cacheRead": n, "cacheWrite": n}}. */

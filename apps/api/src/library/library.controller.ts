@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
 import { z } from 'zod';
 import type { Prisma } from '@zapx/db';
-import { SURVEY_TEMPLATES, parseSurveyDefinition, questionSchema } from '@zapx/survey-schema';
+import { SURVEY_TEMPLATES, bankBlockSchema, parseSurveyDefinition, questionSchema } from '@zapx/survey-schema';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { parseBody } from '../common/validation';
@@ -9,7 +9,7 @@ import type { AuthUser } from '../auth/auth.types';
 import { CAN_EDIT, CurrentUser, Roles } from '../auth/decorators';
 
 const itemSchema = z.object({
-  kind: z.enum(['QUESTION', 'SURVEY']),
+  kind: z.enum(['QUESTION', 'SURVEY', 'BLOCK']),
   name: z.string().trim().min(1).max(200),
   category: z.string().trim().min(1).max(60).default('General'),
   tags: z.array(z.string().trim().min(1).max(40)).max(20).default([]),
@@ -18,7 +18,12 @@ const itemSchema = z.object({
 const updateSchema = itemSchema.omit({ kind: true, content: true }).partial();
 
 /** Check that the content is a valid question or survey, and return its canonical form. */
-export function validLibraryContent(kind: 'QUESTION' | 'SURVEY', content: unknown): Prisma.InputJsonValue {
+export function validLibraryContent(kind: 'QUESTION' | 'SURVEY' | 'BLOCK', content: unknown): Prisma.InputJsonValue {
+  if (kind === 'BLOCK') {
+    const b = bankBlockSchema.safeParse(content);
+    if (!b.success) throw new BadRequestException(`Not a valid block of pages: ${b.error.issues[0]?.message ?? 'invalid'}`);
+    return b.data as unknown as Prisma.InputJsonValue;
+  }
   if (kind === 'QUESTION') {
     const q = questionSchema.safeParse(content);
     if (!q.success) throw new BadRequestException(`Not a valid question: ${q.error.issues[0]?.message ?? 'invalid'}`);
@@ -51,7 +56,7 @@ export class LibraryController {
   @Get('library')
   list(@CurrentUser() user: AuthUser, @Query('kind') kind?: string, @Query('q') q?: string) {
     const where: Prisma.LibraryItemWhereInput = { tenantId: user.tenantId };
-    if (kind === 'QUESTION' || kind === 'SURVEY') where.kind = kind;
+    if (kind === 'QUESTION' || kind === 'SURVEY' || kind === 'BLOCK') where.kind = kind;
     const text = q?.trim().slice(0, 100);
     if (text)
       where.OR = [

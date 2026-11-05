@@ -9,7 +9,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
 import { Prisma, type Response } from '@zapx/db';
-import { matchingQuotas, prepareSurvey } from '@zapx/logic-engine';
+import { prepareSurvey } from '@zapx/logic-engine';
+import { releaseQuotaPlaces, takeQuotaPlaces } from '../quotas/quota-places';
 import {
   MIN_COMPLETES_FOR_MEDIAN,
   assessQuality,
@@ -306,9 +307,7 @@ export class QualityService {
         if (n.count === 0) return false;
         if (!r.isTest) {
           const version = await tx.surveyVersion.findUniqueOrThrow({ where: { id: r.versionId } });
-          for (const q of matchingQuotas(version.definition as unknown as SurveyDefinition, (r.answers ?? {}) as Answers)) {
-            await tx.$executeRaw`UPDATE "QuotaCount" SET "count" = "count" - 1 WHERE "surveyId" = ${surveyId} AND "quotaId" = ${q.id} AND "count" > 0`;
-          }
+          await releaseQuotaPlaces(tx, surveyId, version.definition as unknown as SurveyDefinition, r);
         }
         await this.audit.record(user, 'quality.reject', 'response', id, { uid: r.uid, score: r.qualityScore, note: note ?? null }, tx);
         return true;
@@ -337,16 +336,17 @@ export class QualityService {
     const version = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: r.versionId } });
     const def = version.definition as unknown as SurveyDefinition;
     await this.prisma.$transaction(async (tx) => {
-      if (!r.isTest)
-        for (const q of matchingQuotas(def, (r.answers ?? {}) as Answers)) {
-          const n = await tx.$executeRaw`UPDATE "QuotaCount" SET "count" = "count" + 1
-            WHERE "surveyId" = ${surveyId} AND "quotaId" = ${q.id} AND "count" < COALESCE("targetOverride", ${q.target})`;
-          if (n === 0) throw new BadRequestException(`Quota ${q.id} is full, so this interview cannot be counted as a complete`);
-        }
+      let cells: string[] = [];
+      if (!r.isTest) {
+        const places = await takeQuotaPlaces(tx, surveyId, def, (r.answers ?? {}) as Answers);
+        if (!places.ok) throw new BadRequestException(`Quota ${places.quotaId} is full, so this interview cannot be counted as a complete`);
+        cells = places.cells;
+      }
       const n = await tx.response.updateMany({
         where: { id: r.id, status: 'QUALITY_FAIL' },
         data: {
           status: 'COMPLETE',
+          quotaCells: cells,
           outcomeReason: null,
           reviewState: 'ACCEPTED',
           reviewedAt: new Date(),
