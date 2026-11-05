@@ -39,6 +39,8 @@ export interface TranslateRequest {
   /** Survey title, for tone and domain. */
   surveyTitle: string;
   items: Array<{ key: string; text: string; context: string }>;
+  /** The organization's required translations for terms in these items. */
+  glossary?: Array<{ source: string; target: string; note?: string }>;
 }
 
 export interface TranslateResult {

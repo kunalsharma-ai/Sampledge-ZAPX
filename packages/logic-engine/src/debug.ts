@@ -3,10 +3,12 @@
  * dependency explorer. Pure functions over the canonical definition, used by the Programmer
  * workspace in the studio.
  */
-import type { Answers, SurveyDefinition } from '@zapx/survey-schema';
+import type { Answers, QaTestCase, SurveyDefinition } from '@zapx/survey-schema';
 import { ExpressionError, evaluate, parse, references, truthy, type Value } from './expression.js';
 import {
   PIPE_PATTERN,
+  computeVariables,
+  visibleQuestions,
   conditionHolds,
   contextFor,
   firstMatchingTermination,
@@ -136,4 +138,107 @@ export function dependencyGraph(def: SurveyDefinition): DependencyNode[] {
   for (const q of def.quotas) link(refsOf(q.condition), `quota ${q.id}`, 'quota');
   for (const c of def.settings.quality.checks) link(refsOf(c.condition), `quality check ${c.id}`, 'quality check');
   return [...nodes.values()];
+}
+
+export interface TestCaseCheck {
+  label: string;
+  passed: boolean;
+  /** What actually happened, when it differs. */
+  actual?: string;
+}
+
+export interface TestCaseResult {
+  name: string;
+  passed: boolean;
+  checks: TestCaseCheck[];
+  /** The route the answers took, for the report. */
+  pages: string[];
+  ending: string;
+}
+
+/** Outcome of a set of answers: `complete`, or the matching termination as `status:ID`. */
+function outcomeOf(def: SurveyDefinition, answers: Answers): { status: string; id?: string } {
+  const t = firstMatchingTermination(def, answers);
+  return t ? { status: t.status, id: t.id } : { status: 'complete' };
+}
+
+const show = (v: unknown) => (v === undefined ? 'nothing' : JSON.stringify(v));
+
+/**
+ * Run one saved test case against a definition (regression testing). Every expectation becomes a
+ * check; a case passes when all its checks pass. A missing page or question is a failed check, so a
+ * renamed id is caught rather than silently passing.
+ */
+export function runTestCase(source: SurveyDefinition, tc: QaTestCase): TestCaseResult {
+  const def = prepareSurvey(source);
+  const answers = tc.answers as Answers;
+  const { steps, ending } = traceRoute(source, answers, tc.seed);
+  const shownPages = new Set(steps.filter((s) => s.shown).map((s) => s.pageId));
+  const pageOf = new Map<string, number>();
+  def.pages.forEach((p, i) => p.questions.forEach((q) => pageOf.set(q.id, i)));
+  const checks: TestCaseCheck[] = [];
+
+  const isShown = (id: string): boolean | undefined => {
+    const pi = def.pages.findIndex((p) => p.id === id);
+    if (pi >= 0) return shownPages.has(id);
+    const qpi = pageOf.get(id);
+    if (qpi === undefined) return undefined;
+    const page = def.pages[qpi]!;
+    return shownPages.has(page.id) && visibleQuestions(page, def, answers).some((q) => q.id === id);
+  };
+  for (const id of tc.expect.shows) {
+    const s = isShown(id);
+    checks.push({
+      label: `${id} is shown`,
+      passed: s === true,
+      actual: s === undefined ? `${id} is not in the survey` : s ? undefined : 'skipped',
+    });
+  }
+  for (const id of tc.expect.skips) {
+    const s = isShown(id);
+    checks.push({
+      label: `${id} is skipped`,
+      passed: s === false,
+      actual: s === undefined ? `${id} is not in the survey` : s ? 'shown' : undefined,
+    });
+  }
+  if (tc.expect.outcome) {
+    const o = outcomeOf(def, answers);
+    const want = tc.expect.outcome;
+    const ok = want.includes(':') ? `${o.status}:${o.id}` === want : o.status === want;
+    checks.push({ label: `ends as ${want}`, passed: ok, actual: ok ? undefined : o.id ? `${o.status}:${o.id}` : o.status });
+  }
+  if (Object.keys(tc.expect.variables).length) {
+    const values = computeVariables(def, answers);
+    for (const [k, want] of Object.entries(tc.expect.variables)) {
+      const got = Object.hasOwn(values, k) ? values[k] : undefined;
+      const ok = got === want || (typeof got === 'number' && typeof want === 'number' && Math.abs(got - want) < 1e-9);
+      checks.push({ label: `${k} = ${show(want)}`, passed: ok, actual: ok ? undefined : show(got) });
+    }
+  }
+  if (tc.expect.quotas) {
+    const got = matchingQuotas(def, answers)
+      .map((q) => q.id)
+      .sort();
+    const want = [...tc.expect.quotas].sort();
+    const ok = got.join(',') === want.join(',');
+    checks.push({
+      label: `counts toward ${want.length ? want.join(', ') : 'no quota'}`,
+      passed: ok,
+      actual: ok ? undefined : got.join(', ') || 'no quota',
+    });
+  }
+  return {
+    name: tc.name,
+    passed: checks.every((c) => c.passed),
+    checks,
+    pages: steps.filter((s) => s.shown).map((s) => s.pageId),
+    ending,
+  };
+}
+
+/** Run a whole suite; the summary counts passed and failed cases. */
+export function runTestSuite(def: SurveyDefinition, cases: QaTestCase[]) {
+  const results = cases.map((c) => runTestCase(def, c));
+  return { passed: results.filter((r) => r.passed).length, failed: results.filter((r) => !r.passed).length, results };
 }

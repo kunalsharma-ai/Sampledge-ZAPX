@@ -15,6 +15,7 @@ import { CopyField, ErrorNote, Shell } from '@/components/Shell';
 import { VisualEditor } from '@/components/VisualEditor';
 import { Preview } from '@/components/Preview';
 import { Programmer } from '@/components/Programmer';
+import { VoiceCommandButton } from '@/components/VoiceCommand';
 import { Assist } from '@/components/Assist';
 import { QaLab } from '@/components/QaLab';
 import { DesignStudio } from '@/components/DesignStudio';
@@ -72,6 +73,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [presDirty, setPresDirty] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
   const [tab, setTab] = useState<Tab>('build');
+  // An edit spoken as a voice command, handed to the AI architect.
+  const [voiceInstruction, setVoiceInstruction] = useState<{ text: string; n: number } | null>(null);
   // Deep links from the dashboard: ?tab=assist&prompt=… or ?tab=qa.
   const [linkParams] = useState(() =>
     typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search),
@@ -227,6 +230,22 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         <div style={{ flex: 1 }} />
         {!readOnly ? (
           <>
+            <VoiceCommandButton
+              language={def.language}
+              onCommand={(c, heard) => {
+                if (c.kind === 'tab' && (TABS as readonly string[]).includes(c.tab)) {
+                  setTab(c.tab as Tab);
+                  setNotice(`Heard “${heard}”.`);
+                } else if (c.kind === 'save') {
+                  setNotice(`Heard “${heard}”.`);
+                  if (unsaved) void save();
+                } else if (c.kind === 'ai') {
+                  setVoiceInstruction({ text: c.instruction, n: Date.now() });
+                  setTab('assist');
+                  setNotice(`Heard “${heard}”. Check the instruction, then draft the proposal.`);
+                } else setNotice(`Heard “${heard}”, but that is not a command.`);
+              }}
+            />
             <button onClick={save} disabled={busy || !unsaved}>
               Save draft
             </button>
@@ -301,12 +320,13 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
       ) : null}
       {tab === 'assist' ? (
         <Assist
+          key={voiceInstruction?.n ?? 0}
           surveyId={id}
           language={def.language}
           readOnly={readOnly}
           dirty={unsaved}
           onApplied={load}
-          initialInstruction={linkParams.get('prompt') ?? ''}
+          initialInstruction={voiceInstruction?.text ?? linkParams.get('prompt') ?? ''}
           focusImport={linkParams.get('focus') === 'import'}
         />
       ) : null}

@@ -9,3 +9,5 @@ export * from './replay.js';
 export * from './flow.js';
 export * from './xml.js';
 export * from './debug.js';
+export * from './translation-tools.js';
+export * from './voice.js';

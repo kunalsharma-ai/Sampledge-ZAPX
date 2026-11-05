@@ -15,6 +15,9 @@ import {
   contextFor,
   hasNoOptions,
   withDynamicOptions,
+  exposureKey,
+  leastFillSeed,
+  pickedPages,
   parseCached,
   progressPercent,
   references,
@@ -34,6 +37,7 @@ import {
   defaultPresentation,
   parsePresentation,
   qualitySettingsOf,
+  urlVariableAnswers,
   type Answers,
   type AnswerValue,
   type DeviceType,
@@ -126,6 +130,8 @@ function wantsFraudChecks(def: SurveyDefinition) {
   return q.enabled && q.fraud;
 }
 
+/** The response's page-order seed: its id, or the seed least-fill balancing chose. */
+const seedOf = (r: Pick<Response, 'id' | 'orderSeed'>) => r.orderSeed ?? r.id;
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 const toEnum = (s: OutcomeStatus) => s.toUpperCase() as Response['status'];
 const fromEnum = (s: Response['status']) => s.toLowerCase() as OutcomeStatus;
@@ -352,11 +358,15 @@ export class InterviewService {
     const token = randomBytes(32).toString('base64url');
     // The response id also seeds this respondent's randomized block order, so it is chosen here.
     const responseId = randomUUID();
-    const firstPage = nextPageIndex(def, {}, -1, responseId);
+    const orderSeed = await this.orderSeedFor(surveyId, def, responseId, isTest);
+    const urlAnswers = urlVariableAnswers(def, entryParams);
+    const firstPage = nextPageIndex(def, urlAnswers, -1, orderSeed);
     try {
       const response = await this.prisma.response.create({
         data: {
           id: responseId,
+          orderSeed: orderSeed === responseId ? null : orderSeed,
+          answers: urlAnswers as Prisma.InputJsonValue,
           tenantId: survey.tenantId,
           surveyId,
           versionId: version.id,
@@ -394,6 +404,27 @@ export class InterviewService {
   }
 
   /**
+   * The page-order seed for a new respondent. With least-fill blocks it is chosen so the picked
+   * pages are the ones shown least so far, and the exposure counts are increased (test interviews
+   * read them but are not counted).
+   */
+  private async orderSeedFor(surveyId: string, def: SurveyDefinition, responseId: string, isTest: boolean): Promise<string> {
+    if (!def.blocks?.some((b) => b.balance === 'least_fill')) return responseId;
+    const rows = await this.prisma.blockExposure.findMany({ where: { surveyId } });
+    const exposure = Object.fromEntries(rows.map((r) => [exposureKey(r.blockId, r.pageId), r.count]));
+    const seed = leastFillSeed(def, responseId, exposure);
+    if (!isTest)
+      for (const [blockId, pages] of Object.entries(pickedPages(def, seed)))
+        for (const pageId of pages)
+          await this.prisma.blockExposure.upsert({
+            where: { surveyId_blockId_pageId: { surveyId, blockId, pageId } },
+            create: { surveyId, blockId, pageId, count: 1 },
+            update: { count: { increment: 1 } },
+          });
+    return seed;
+  }
+
+  /**
    * Start or resume a telephone (CATI) interview for a call-list case (Milestone 9). The interviewer
    * reads the questions from the same runtime respondents use; the response records mode CATI and
    * the interviewer. Resuming an unfinished interview issues a new session token.
@@ -418,10 +449,14 @@ export class InterviewService {
     const ctx = interviewContext(version, (version.definition as unknown as SurveyDefinition).language);
     const def = ctx.def;
     const responseId = randomUUID();
-    const firstPage = nextPageIndex(def, {}, -1, responseId);
+    const orderSeed = await this.orderSeedFor(survey.id, def, responseId, false);
+    const urlAnswers = urlVariableAnswers(def, input.entryParams);
+    const firstPage = nextPageIndex(def, urlAnswers, -1, orderSeed);
     const response = await this.prisma.response.create({
       data: {
         id: responseId,
+        orderSeed: orderSeed === responseId ? null : orderSeed,
+        answers: urlAnswers as Prisma.InputJsonValue,
         tenantId: survey.tenantId,
         surveyId: survey.id,
         versionId: version.id,
@@ -575,7 +610,7 @@ export class InterviewService {
     const lookup = contextFor(def, answers);
     // Calculated variables are worked out here; the browser only sees their current values.
     for (const v of contextVars) context[v] = (answers[v] ?? (lookup.lookup(v) as AnswerValue | undefined) ?? null) as AnswerValue;
-    const first = nextPageIndex(def, answers, -1, r.id);
+    const first = nextPageIndex(def, answers, -1, seedOf(r));
     return {
       state: 'in_progress',
       look: ctx.look,
@@ -589,7 +624,7 @@ export class InterviewService {
       page: { id: page.id, title: page.title, questions },
       answers: pageAnswers,
       context,
-      progress: progressPercent(def, r.currentPage, r.id),
+      progress: progressPercent(def, r.currentPage, seedOf(r)),
       isFirstPage: r.currentPage === first,
       isTest: r.isTest,
     };
@@ -672,7 +707,7 @@ export class InterviewService {
       if (full) return this.finish(r, ctx, vendor, answers, 'quota_full', full, timing);
     }
 
-    const next = nextPageIndex(def, answers, r.currentPage, r.id);
+    const next = nextPageIndex(def, answers, r.currentPage, seedOf(r));
     if (next === -1) return this.complete(r, ctx, vendor, answers, timing);
 
     const moved = await this.prisma.response.updateMany({
@@ -697,7 +732,7 @@ export class InterviewService {
     const vendor = await this.vendorOf(r);
     if (r.status !== 'IN_PROGRESS' || !def.settings.allowBack) return this.stateOf(r, ctx, vendor);
     const answers = (r.answers ?? {}) as Answers;
-    const prev = prevPageIndex(def, answers, r.currentPage, r.id);
+    const prev = prevPageIndex(def, answers, r.currentPage, seedOf(r));
     if (prev === -1) return this.stateOf(r, ctx, vendor);
     await this.prisma.response.update({
       where: { id: r.id },

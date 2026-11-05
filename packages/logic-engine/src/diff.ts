@@ -5,7 +5,17 @@
  */
 import { scaleCodes, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 
-export type DiffEntity = 'survey' | 'settings' | 'page' | 'question' | 'termination' | 'quota' | 'loop' | 'block' | 'variable';
+export type DiffEntity =
+  | 'survey'
+  | 'settings'
+  | 'page'
+  | 'question'
+  | 'termination'
+  | 'quota'
+  | 'loop'
+  | 'block'
+  | 'variable'
+  | 'urlVariable';
 
 export interface DiffItem {
   change: 'added' | 'removed' | 'changed' | 'moved';
@@ -175,13 +185,21 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
   }
 
   // Terminations, quotas, loops, blocks and calculated variables
-  const NAMES: Record<string, string> = { termination: 'Termination', quota: 'Quota', loop: 'Loop', block: 'Block', variable: 'Variable' };
+  const NAMES: Record<string, string> = {
+    termination: 'Termination',
+    quota: 'Quota',
+    loop: 'Loop',
+    block: 'Block',
+    variable: 'Variable',
+    urlVariable: 'URL variable',
+  };
   for (const [entity, b, a] of [
     ['termination', before.terminations, after.terminations],
     ['quota', before.quotas, after.quotas],
     ['loop', before.loops ?? [], after.loops ?? []],
     ['block', before.blocks ?? [], after.blocks ?? []],
     ['variable', before.variables ?? [], after.variables ?? []],
+    ['urlVariable', before.urlVariables ?? [], after.urlVariables ?? []],
   ] as const) {
     const name = NAMES[entity]!;
     const mb = keyed<{ id: string }>(b as Array<{ id: string }>);
@@ -189,7 +207,8 @@ export function diffSurveys(before: SurveyDefinition, after: SurveyDefinition): 
     for (const [id, { item }] of ma) {
       const old = mb.get(id);
       const desc = (x: unknown) => {
-        const r = x as { condition?: string; target?: number; expr?: string; pages?: string[] };
+        const r = x as { condition?: string; target?: number; expr?: string; pages?: string[]; param?: string };
+        if (r.param !== undefined) return `link parameter ${r.param}`;
         if (r.condition !== undefined) return r.target === undefined ? r.condition : `${r.condition} (target ${r.target})`;
         if (r.expr !== undefined) return r.expr;
         return `pages ${(r.pages ?? []).join(', ')}`;

@@ -25,6 +25,7 @@ import {
 import { parseSurveyDefinition, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { SaveTestCase } from './TestCases';
 import { CodeEditor, type LintMessage } from './CodeEditor';
 
 type Pane = 'xml' | 'debug' | 'deps' | 'history' | 'migrate';
@@ -168,7 +169,7 @@ export function Programmer({
         {!readOnly ? <SaveSurveyToBank def={def} /> : null}
       </div>
       {pane === 'xml' ? <XmlPane def={def} onApply={onApply} readOnly={readOnly} /> : null}
-      {pane === 'debug' ? <DebugPane def={def} /> : null}
+      {pane === 'debug' ? <DebugPane def={def} surveyId={surveyId} readOnly={readOnly} /> : null}
       {pane === 'deps' ? <DependencyPane def={def} /> : null}
       {pane === 'history' ? <HistoryPane surveyId={surveyId} current={def} onApply={onApply} readOnly={readOnly} /> : null}
       {pane === 'migrate' ? <MigratePane onApply={onApply} readOnly={readOnly} /> : null}
@@ -277,7 +278,7 @@ function XmlPane({ def, onApply, readOnly }: { def: SurveyDefinition; onApply: (
   );
 }
 
-function DebugPane({ def }: { def: SurveyDefinition }) {
+function DebugPane({ def, surveyId, readOnly }: { def: SurveyDefinition; surveyId: string; readOnly?: boolean }) {
   const sample = useMemo(() => {
     try {
       return simulateSurvey(def, { respondents: 1, seed: 'debug' }).samples[0]?.answers ?? {};
@@ -357,6 +358,7 @@ function DebugPane({ def }: { def: SurveyDefinition }) {
             <p data-testid="debug-ending">
               Ends as: <strong>{route.ending}</strong>
             </p>
+            {!readOnly && answers ? <SaveTestCase surveyId={surveyId} def={def} answers={answers} /> : null}
           </>
         ) : null}
       </section>

@@ -155,6 +155,9 @@ export class ClaudeAiProvider extends AiProvider {
               role: 'user',
               content:
                 `Survey: ${req.surveyTitle}\nTranslate from ${req.from.name} (${req.from.tag}) into ${req.to.name} (${req.to.tag}).\n` +
+                (req.glossary?.length
+                  ? `Glossary (always translate these terms exactly as given):\n<glossary>\n${JSON.stringify(req.glossary).replace(/<\/glossary/gi, '<\\/glossary')}\n</glossary>\n`
+                  : '') +
                 `Items (JSON array of {key, context, text}):\n<items>\n${payload.replace(/<\/items/gi, '<\\/items')}\n</items>`,
             },
           ],

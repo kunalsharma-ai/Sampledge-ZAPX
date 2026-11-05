@@ -2,7 +2,7 @@ import { Body, Controller, HttpException, NotFoundException, Param, Post } from 
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import type { Prisma } from '@zapx/db';
-import { textKeys } from '@zapx/logic-engine';
+import { glossaryFor, textKeys } from '@zapx/logic-engine';
 import { parsePresentation, parseSurveyDefinition, type Presentation } from '@zapx/survey-schema';
 import { parseBody } from '../common/validation';
 import { AuditService } from '../common/audit.service';
@@ -57,6 +57,11 @@ export class TranslateController {
           const e = lang.texts[k.key];
           return !e || !e.text.trim() || e.source !== k.source;
         });
+    const terms = (await this.prisma.glossaryTerm.findMany({ where: { tenantId: user.tenantId, language: lang.tag } })).map((t) => ({
+      source: t.source,
+      target: t.target,
+      ...(t.note ? { note: t.note } : {}),
+    }));
     const results: Record<string, { text: string; source: string }> = {};
     let model = this.gateway.modelFor('translate');
     const actor = { tenantId: user.tenantId, userId: user.id };
@@ -74,6 +79,10 @@ export class TranslateController {
                 to: { tag: lang.tag, name: lang.name },
                 surveyTitle: def.definition.title,
                 items: batch.map((k) => ({ key: k.key, text: k.source, context: k.context })),
+                glossary: glossaryFor(
+                  batch.map((k) => k.source),
+                  terms,
+                ),
               },
               m,
             ),

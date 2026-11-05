@@ -36,7 +36,9 @@ import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
 import { HealthController } from './health.controller';
 import { QaController } from './qa/qa.controller';
+import { TestCasesController } from './qa/test-cases.controller';
 import { TranslateController } from './surveys/translate.controller';
+import { TranslationToolsController } from './surveys/translation-tools.controller';
 import { ChangeSetsController } from './changesets/changesets.controller';
 import { ChangeSetsService } from './changesets/changesets.service';
 import { ArchitectService } from './ai/architect.service';
@@ -96,8 +98,10 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     LibraryController,
     InterviewController,
     QaController,
+    TestCasesController,
     ChangeSetsController,
     TranslateController,
+    TranslationToolsController,
     AiSettingsController,
     QualityController,
     FraudBlocksController,

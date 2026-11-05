@@ -36,7 +36,7 @@ function memberOf(v: unknown, member: string): Value {
 
 /** Build an evaluation context over a set of answers. Grid rows are Q.row; ranks and sums Q.code. */
 export function contextFor(def: SurveyDefinition, answers: Answers): EvalContext {
-  const known = new Set(def.pages.flatMap((p) => p.questions.map((q) => q.id)));
+  const known = new Set([...def.pages.flatMap((p) => p.questions.map((q) => q.id)), ...(def.urlVariables ?? []).map((u) => u.id)]);
   const variables = new Map((def.variables ?? []).map((v) => [v.id, v.expr] as const));
   const computing = new Set<string>();
   const ctx: EvalContext = {
@@ -454,6 +454,10 @@ export function answerText(def: SurveyDefinition, id: string, answers: Answers):
     const value = contextFor(def, answers).lookup(id);
     if (value === null || value === undefined || typeof value === 'object') return '';
     return typeof value === 'number' ? String(Math.round(value * 100) / 100) : String(value);
+  }
+  if ((def.urlVariables ?? []).some((x) => x.id === id)) {
+    const v = answers[id];
+    return typeof v === 'string' || typeof v === 'number' ? String(v) : '';
   }
   const q = def.pages.flatMap((p) => p.questions).find((x) => x.id === id);
   const v = answers[id];

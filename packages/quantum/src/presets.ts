@@ -1,5 +1,6 @@
 /**
- * The Quantum theme presets (Neon AI, the default, plus the original ten). Each preset is a colour family with a dark and a light scheme, so
+ * The Quantum theme presets: 16 families (Neon AI, the default, the original ten, and five from the
+ * ZAPX blueprint's Theme Studio). Each preset is a colour family with a dark and a light scheme, so
  * the person's light/dark/system choice works with every preset. Only key colours are listed here:
  * the theme engine derives the remaining tokens and corrects anything that would miss WCAG contrast.
  */
@@ -16,6 +17,11 @@ export const PRESET_IDS = [
   'oceanic-intelligence',
   'minimal-executive',
   'adaptive-dynamic',
+  'holographic-glass',
+  'forest-intelligence',
+  'sunset-fusion',
+  'obsidian-gold',
+  'crimson-carbon',
 ] as const;
 
 export type PresetId = (typeof PRESET_IDS)[number];
@@ -142,6 +148,51 @@ export const PRESETS: Record<PresetId, ThemePreset> = {
     dark: { bg: '#0a0b10', surface: '#14151d', text: '#ebecf3' },
     light: { bg: '#f6f6f9', surface: '#ffffff', text: '#14151d' },
     usesCustomAccent: true,
+  },
+  'holographic-glass': {
+    id: 'holographic-glass',
+    name: 'Holographic Glass',
+    description: 'Frosted pearl glass with iridescent pink, cyan and lilac light.',
+    native: 'light',
+    accents: ['#8b5cf6', '#ec4899', '#06b6d4'],
+    dark: { bg: '#0d0b18', surface: '#191628', text: '#f1effa', accent: '#b69cff' },
+    light: { bg: '#f4f2fb', surface: '#ffffff', text: '#1b1730', accent: '#6d28d9' },
+  },
+  'forest-intelligence': {
+    id: 'forest-intelligence',
+    name: 'Forest Intelligence',
+    description: 'Deep pine green with moss and fresh lime highlights.',
+    native: 'dark',
+    accents: ['#22c55e', '#84cc16', '#14b8a6'],
+    dark: { bg: '#06120c', surface: '#0d1f16', text: '#e6f4ea' },
+    light: { bg: '#f1f8f3', surface: '#ffffff', text: '#0e2016', accent: '#15803d' },
+  },
+  'sunset-fusion': {
+    id: 'sunset-fusion',
+    name: 'Sunset Fusion',
+    description: 'Dusky plum fading into coral, orange and rose.',
+    native: 'dark',
+    accents: ['#fb7185', '#f97316', '#c026d3'],
+    dark: { bg: '#170a14', surface: '#24111f', text: '#fbecef' },
+    light: { bg: '#fdf4f3', surface: '#ffffff', text: '#2a1220', accent: '#be123c' },
+  },
+  'obsidian-gold': {
+    id: 'obsidian-gold',
+    name: 'Obsidian Gold',
+    description: 'Black volcanic glass with polished gold.',
+    native: 'dark',
+    accents: ['#d4a72c', '#f5d061', '#8a6d1f'],
+    dark: { bg: '#080706', surface: '#14120e', text: '#f5efe2' },
+    light: { bg: '#faf7f0', surface: '#ffffff', text: '#1d1a12', accent: '#8a6410' },
+  },
+  'crimson-carbon': {
+    id: 'crimson-carbon',
+    name: 'Crimson Carbon',
+    description: 'Carbon black weave with crimson and steel.',
+    native: 'dark',
+    accents: ['#ef4444', '#f43f5e', '#94a3b8'],
+    dark: { bg: '#0b0a0b', surface: '#171415', text: '#f3eded' },
+    light: { bg: '#f8f5f5', surface: '#ffffff', text: '#1f1416', accent: '#b91c1c' },
   },
 };
 

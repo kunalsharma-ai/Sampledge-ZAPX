@@ -198,6 +198,15 @@ export function BlocksEditor({ def, onChange }: { def: Def; onChange: (d: Def) =
           <label className="check">
             <input type="checkbox" checked={b.randomize} onChange={(e) => set(i, { randomize: e.target.checked })} /> Random order
           </label>
+          {b.pick !== undefined ? (
+            <label className="field">
+              Choose pages
+              <select value={b.balance} onChange={(e) => set(i, { balance: e.target.value as 'random' | 'least_fill' })}>
+                <option value="random">At random</option>
+                <option value="least_fill">Least shown so far (balanced)</option>
+              </select>
+            </label>
+          ) : null}
           <button className="link danger" onClick={() => onChange({ ...def, blocks: blocks.filter((_, j) => j !== i) })}>
             Remove
           </button>
@@ -208,7 +217,10 @@ export function BlocksEditor({ def, onChange }: { def: Def; onChange: (d: Def) =
           onClick={() =>
             onChange({
               ...def,
-              blocks: [...blocks, { id: `B${blocks.length + 1}`, pages: def.pages.slice(-2).map((p) => p.id), randomize: true }],
+              blocks: [
+                ...blocks,
+                { id: `B${blocks.length + 1}`, pages: def.pages.slice(-2).map((p) => p.id), randomize: true, balance: 'random' },
+              ],
             })
           }
           disabled={def.pages.length < 2}
@@ -267,6 +279,79 @@ export function VariablesEditor({ def, onChange }: { def: Def; onChange: (d: Def
       </table>
       <div>
         <button onClick={() => onChange({ ...def, variables: [...vars, { id: `V${vars.length + 1}`, expr: '1' }] })}>+ Variable</button>
+      </div>
+    </section>
+  );
+}
+
+// ---- URL variables ------------------------------------------------------------------------------
+
+export function UrlVariablesEditor({ def, onChange }: { def: Def; onChange: (d: Def) => void }) {
+  const vars = def.urlVariables ?? [];
+  const set = (i: number, patch: Partial<Def['urlVariables'][number]>) =>
+    onChange({ ...def, urlVariables: vars.map((v, j) => (j === i ? { ...v, ...patch } : v)) });
+  return (
+    <section className="stack" aria-labelledby="urlvars-h">
+      <h2 id="urlvars-h" style={{ marginTop: 12 }}>
+        URL variables
+      </h2>
+      <p className="muted small">
+        Values passed on the survey link, such as <span className="mono">&amp;seg=B2B</span> from a panel or CRM. They are saved with the
+        response, exported as a column, and usable in conditions, quotas and piping like an answer. Respondents never see them as questions.
+      </p>
+      {vars.length ? (
+        <table className="data list-editor">
+          <thead>
+            <tr>
+              <th>Variable</th>
+              <th>Link parameter</th>
+              <th>Description</th>
+              <th>Number</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {vars.map((v, i) => (
+              <tr key={i}>
+                <td>
+                  <input className="mono" aria-label="URL variable" value={v.id} onChange={(e) => set(i, { id: e.target.value })} />
+                </td>
+                <td>
+                  <input className="mono" aria-label="Link parameter" value={v.param} onChange={(e) => set(i, { param: e.target.value })} />
+                </td>
+                <td>
+                  <input
+                    aria-label="URL variable description"
+                    value={v.label ?? ''}
+                    onChange={(e) => set(i, { label: e.target.value || undefined })}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`${v.id} is a number`}
+                    checked={v.numeric}
+                    onChange={(e) => set(i, { numeric: e.target.checked })}
+                  />
+                </td>
+                <td>
+                  <button className="link danger" onClick={() => onChange({ ...def, urlVariables: vars.filter((_, j) => j !== i) })}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+      <div>
+        <button
+          onClick={() =>
+            onChange({ ...def, urlVariables: [...vars, { id: `URL${vars.length + 1}`, param: `p${vars.length + 1}`, numeric: false }] })
+          }
+        >
+          + URL variable
+        </button>
       </div>
     </section>
   );

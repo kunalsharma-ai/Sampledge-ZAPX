@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { surveyDefinitionSchema, type SurveyDefinition, type SurveyDefinitionInput } from '@zapx/survey-schema';
+import {
+  qaTestCaseSchema,
+  surveyDefinitionSchema,
+  urlVariableAnswers,
+  type SurveyDefinition,
+  type SurveyDefinitionInput,
+} from '@zapx/survey-schema';
 import {
   analyzeSurvey,
   compileSurvey,
@@ -19,6 +25,14 @@ import {
   traceRoute,
   dependencyGraph,
   validatePage,
+  checkFlow,
+  exposureKey,
+  fromZapxXml,
+  leastFillSeed,
+  pickedPages,
+  toZapxXml,
+  runTestCase,
+  runTestSuite,
 } from './index.js';
 
 const make = (d: Partial<SurveyDefinitionInput>): SurveyDefinition =>
@@ -360,5 +374,142 @@ describe('programmer tools', () => {
       uses: ['KIDS', 'AGE'],
       usedBy: [{ location: 'page P2', what: 'page condition' }],
     });
+  });
+});
+
+describe('blueprint phase 2: URL variables and least-fill blocks', () => {
+  const base = {
+    schemaVersion: 1,
+    title: 'P2',
+    pages: [
+      { id: 'S', questions: [{ id: 'AGE', type: 'numeric', text: 'Age?', min: 0, max: 99 }] },
+      { id: 'C1', questions: [{ id: 'A1', type: 'open', text: 'Concept 1?' }] },
+      { id: 'C2', questions: [{ id: 'A2', type: 'open', text: 'Concept 2?' }] },
+      { id: 'C3', questions: [{ id: 'A3', type: 'open', text: 'Concept 3?' }] },
+      { id: 'E', condition: 'SEG == "B2B" and SCORE > 5', questions: [{ id: 'END', type: 'info', text: 'Thanks' }] },
+    ],
+    urlVariables: [
+      { id: 'SEG', param: 'seg' },
+      { id: 'SCORE', param: 'score', numeric: true },
+    ],
+    blocks: [{ id: 'CON', pages: ['C1', 'C2', 'C3'], pick: 1, balance: 'least_fill' }],
+  };
+  const def = surveyDefinitionSchema.parse(base);
+
+  it('reads link parameters into answers usable in logic', () => {
+    const a = urlVariableAnswers(def, { seg: 'B2B', score: '7', other: 'x' });
+    expect(a).toEqual({ SEG: 'B2B', SCORE: 7 });
+    expect(urlVariableAnswers(def, { score: 'abc' })).toEqual({});
+    expect(conditionHolds('SEG == "B2B" and SCORE > 5', def, a)).toBe(true);
+    expect(analyzeSurvey(def).issues.filter((i) => i.severity === 'error')).toEqual([]);
+  });
+
+  it('rejects reserved or repeated parameters and clashing names', () => {
+    const bad = surveyDefinitionSchema.parse({
+      ...base,
+      urlVariables: [
+        { id: 'AGE', param: 'age' },
+        { id: 'U1', param: 'uid' },
+        { id: 'U2', param: 'seg' },
+        { id: 'U3', param: 'seg' },
+      ],
+    });
+    const messages = checkFlow(bad).map((i) => i.message);
+    expect(messages).toEqual([
+      expect.stringContaining('"AGE" is used more than once'),
+      expect.stringContaining('"uid" is used by ZAPX'),
+      expect.stringContaining('"seg" is read twice'),
+    ]);
+  });
+
+  it('least fill picks the pages shown least so far', () => {
+    const exposure: Record<string, number> = {};
+    const shown: Record<string, number> = { C1: 0, C2: 0, C3: 0 };
+    for (let i = 0; i < 30; i++) {
+      const seed = leastFillSeed(def, `r${i}`, exposure);
+      for (const p of pickedPages(def, seed).CON!) {
+        exposure[exposureKey('CON', p)] = (exposure[exposureKey('CON', p)] ?? 0) + 1;
+        shown[p]!++;
+      }
+    }
+    expect(shown).toEqual({ C1: 10, C2: 10, C3: 10 });
+  });
+
+  it('round-trips through ZAPX XML', () => {
+    const back = fromZapxXml(toZapxXml(def));
+    expect(back.warnings).toEqual([]);
+    expect(surveyDefinitionSchema.parse(back.definition)).toEqual(def);
+  });
+});
+
+describe('blueprint phase 2: saved QA test cases', () => {
+  const def = surveyDefinitionSchema.parse({
+    schemaVersion: 1,
+    title: 'Cases',
+    pages: [
+      {
+        id: 'P1',
+        questions: [
+          { id: 'AGE', type: 'numeric', text: 'Age?', min: 0, max: 99 },
+          {
+            id: 'KIDS',
+            type: 'single',
+            text: 'Kids?',
+            options: [
+              { code: 1, label: 'Yes' },
+              { code: 2, label: 'No' },
+            ],
+          },
+        ],
+      },
+      { id: 'P2', condition: 'KIDS == 1', questions: [{ id: 'NKIDS', type: 'numeric', text: 'How many?', min: 1, max: 10 }] },
+      {
+        id: 'P3',
+        questions: [
+          { id: 'NOTE', type: 'open', text: 'Anything else?', condition: 'AGE > 60' },
+          { id: 'END', type: 'info', text: 'Bye' },
+        ],
+      },
+    ],
+    variables: [{ id: 'SENIOR', expr: 'AGE >= 65' }],
+    terminations: [{ id: 'T_MINOR', condition: 'AGE < 18', status: 'terminate' }],
+    quotas: [{ id: 'Q_PARENT', condition: 'KIDS == 1', target: 10 }],
+  });
+
+  it('passes when the logic does what the case expects', () => {
+    const r = runTestCase(
+      def,
+      qaTestCaseSchema.parse({
+        name: 'Senior parent',
+        answers: { AGE: 70, KIDS: 1, NKIDS: 2 },
+        expect: { outcome: 'complete', shows: ['P2', 'NOTE'], variables: { SENIOR: true }, quotas: ['Q_PARENT'] },
+      }),
+    );
+    expect(r.checks.filter((c) => !c.passed)).toEqual([]);
+    expect(r.passed).toBe(true);
+    expect(r.pages).toEqual(['P1', 'P2', 'P3']);
+  });
+
+  it('fails with what actually happened, and catches renamed ids', () => {
+    const suite = runTestSuite(def, [
+      qaTestCaseSchema.parse({
+        name: 'Minor',
+        answers: { AGE: 15, KIDS: 2 },
+        expect: { outcome: 'terminate:T_MINOR', skips: ['P2', 'NOTE'] },
+      }),
+      qaTestCaseSchema.parse({
+        name: 'Wrong',
+        answers: { AGE: 30, KIDS: 2 },
+        expect: { outcome: 'terminate', shows: ['P2', 'GONE'], variables: { SENIOR: true }, quotas: ['Q_PARENT'] },
+      }),
+    ]);
+    expect(suite).toMatchObject({ passed: 1, failed: 1 });
+    expect(suite.results[1]!.checks.filter((c) => !c.passed).map((c) => c.actual)).toEqual([
+      'skipped',
+      'GONE is not in the survey',
+      'complete',
+      'false',
+      'no quota',
+    ]);
   });
 });

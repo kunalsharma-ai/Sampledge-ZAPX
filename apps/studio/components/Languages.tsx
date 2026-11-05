@@ -5,10 +5,11 @@
  * enabled language to be complete and reviewed by a person.
  */
 import { useMemo, useState } from 'react';
-import { textKeys, translationStatus } from '@zapx/logic-engine';
-import { LANGUAGE_TAG, type Language, type Presentation, type SurveyDefinition } from '@zapx/survey-schema';
+import { textKeys, translationQa, translationStatus, type TranslationIssue } from '@zapx/logic-engine';
+import { LANGUAGE_TAG, textDirection, type Language, type Presentation, type SurveyDefinition } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { GlossaryEditor, useGlossary } from './Glossary';
 
 type RowState = 'missing' | 'outdated' | 'machine' | 'reviewed';
 
@@ -44,6 +45,15 @@ export function Languages({
   const keys = useMemo(() => textKeys(def, presentation), [def, presentation]);
   const statuses = useMemo(() => translationStatus(def, presentation), [def, presentation]);
   const lang = presentation.languages.find((l) => l.tag === selected);
+  const glossary = useGlossary(lang?.tag);
+  // Per-language QA warnings (glossary, length, unchanged); blockers are shown by the status column.
+  const warnings = useMemo(() => {
+    const by = new Map<string, TranslationIssue[]>();
+    if (!lang) return by;
+    for (const i of translationQa(def, presentation, lang.tag, glossary.terms))
+      if (i.severity === 'warning') by.set(i.key, [...(by.get(i.key) ?? []), i]);
+    return by;
+  }, [def, presentation, lang, glossary.terms]);
 
   const updateLang = (tag: string, fn: (l: Language) => Language) =>
     onChange({ ...presentation, languages: presentation.languages.map((l) => (l.tag === tag ? fn(l) : l)) });
@@ -86,6 +96,32 @@ export function Languages({
     }
   };
 
+  const fillFromMemory = async () => {
+    if (!lang) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const r = await api<{ reused: number; memorySize: number; version: { updatedAt: string; presentation: unknown } }>(
+        `/surveys/${surveyId}/translation-memory`,
+        {
+          method: 'POST',
+          body: { language: lang.tag },
+        },
+      );
+      onServerUpdate(r.version);
+      setNotice(
+        r.reused
+          ? `${r.reused} texts filled from translations your team already approved in other surveys.`
+          : `No matches in the translation memory (${r.memorySize} approved ${lang.name} texts in your other surveys).`,
+      );
+    } catch (e) {
+      setError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const rowState = (l: Language, key: string, source: string): RowState => {
     const e = l.texts[key];
     if (!e || !e.text.trim()) return 'missing';
@@ -95,7 +131,13 @@ export function Languages({
 
   const status = statuses.find((s) => s.tag === selected);
   const rows = lang
-    ? keys.filter((k) => filter === 'all' || rowState(lang, k.key, k.source) !== 'reviewed' || status?.placeholderMismatch.includes(k.key))
+    ? keys.filter(
+        (k) =>
+          filter === 'all' ||
+          rowState(lang, k.key, k.source) !== 'reviewed' ||
+          status?.placeholderMismatch.includes(k.key) ||
+          warnings.has(k.key),
+      )
     : [];
 
   return (
@@ -195,7 +237,16 @@ export function Languages({
               {status.outdated.length ? ` · ${status.outdated.length} outdated (source changed)` : ''}
               {status.unreviewed.length ? ` · ${status.unreviewed.length} AI translations to review` : ''}
               {status.placeholderMismatch.length ? ` · ${status.placeholderMismatch.length} with broken {{piping}}` : ''}
+              {warnings.size ? ` · ${warnings.size} with checks to look at` : ''}
+              {textDirection(lang.tag) === 'rtl' ? ' · written right to left' : ''}
             </p>
+            <GlossaryEditor
+              language={lang.tag}
+              name={lang.name}
+              terms={glossary.terms}
+              onChanged={() => void glossary.reload()}
+              readOnly={readOnly}
+            />
             {lang.enabled && !status.complete ? (
               <p className="error-text small">
                 This language is offered to respondents, so publishing is blocked until every text is translated and reviewed.
@@ -209,7 +260,14 @@ export function Languages({
                   disabled={busy || dirty || !aiConfigured}
                   title={aiConfigured ? '' : 'AI is not configured on this server'}
                 >
-                  {busy ? 'Translating…' : 'Translate missing with AI'}
+                  {busy ? 'Working…' : 'Translate missing with AI'}
+                </button>
+                <button
+                  onClick={() => void fillFromMemory()}
+                  disabled={busy || dirty}
+                  title="Reuse translations your team approved in other surveys"
+                >
+                  Fill from translation memory
                 </button>
                 <button
                   onClick={() =>
@@ -229,7 +287,7 @@ export function Languages({
                 </button>
                 {dirty ? (
                   <span className="small" style={{ color: 'var(--warn)' }}>
-                    Save first: AI translates the saved draft.
+                    Save first: AI and the memory work on the saved draft.
                   </span>
                 ) : null}
                 {!aiConfigured ? <span className="muted small">AI is not configured; translate by hand below.</span> : null}
@@ -277,8 +335,14 @@ export function Languages({
                               texts: { ...l.texts, [k.key]: { text: e.target.value, source: k.source, status: 'reviewed' } },
                             }))
                           }
+                          dir={textDirection(lang.tag)}
                           style={{ fontFamily: 'inherit', fontSize: 13 }}
                         />
+                        {(warnings.get(k.key) ?? []).map((w, i) => (
+                          <div key={i} className="small" style={{ color: 'var(--warn)' }}>
+                            {w.message}
+                          </div>
+                        ))}
                         {st === 'outdated' && entry ? <div className="muted small">Translated from: “{entry.source}”</div> : null}
                         {broken ? (
                           <div className="error-text small">

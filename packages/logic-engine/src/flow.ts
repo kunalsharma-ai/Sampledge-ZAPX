@@ -9,7 +9,7 @@
  * Blocks are applied per respondent at run time through `pageOrder`, seeded by the interview id, so
  * the order is stable when a respondent resumes and the server, preview, QA lab and CAPI app agree.
  */
-import type { Answers, Option, Page, Question, SurveyDefinition } from '@zapx/survey-schema';
+import { RESERVED_LINK_PARAMS, type Answers, type Option, type Page, type Question, type SurveyDefinition } from '@zapx/survey-schema';
 import { ExpressionError, rewriteVariables } from './expression.js';
 import { PIPE_PATTERN, seededOrder } from './interview.js';
 
@@ -119,6 +119,21 @@ export function checkFlow(def: SurveyDefinition): FlowIssue[] {
     if (questionIds.has(key) || varIds.has(key))
       issues.push({ message: `Variable "${v.id}" is used more than once.`, location: `variables.${v.id}` });
     varIds.add(key);
+  }
+  const params = new Set<string>();
+  for (const u of def.urlVariables ?? []) {
+    const key = u.id.toLowerCase();
+    const loc = `urlVariables.${u.id}`;
+    if (questionIds.has(key) || varIds.has(key)) issues.push({ message: `URL variable "${u.id}" is used more than once.`, location: loc });
+    varIds.add(key);
+    if (RESERVED_LINK_PARAMS.includes(u.param))
+      issues.push({
+        message: `URL variable ${u.id}: the link parameter "${u.param}" is used by ZAPX itself; choose another name.`,
+        location: loc,
+      });
+    if (params.has(u.param))
+      issues.push({ message: `URL variable ${u.id}: the link parameter "${u.param}" is read twice.`, location: loc });
+    params.add(u.param);
   }
   return issues;
 }
@@ -230,6 +245,41 @@ export function pageOrder(def: SurveyDefinition, seed = ''): number[] {
     i += idx.length;
   }
   return out;
+}
+
+/** Blocks that pick a subset by least fill. */
+const leastFillBlocks = (def: SurveyDefinition) =>
+  (def.blocks ?? []).filter((b) => b.balance === 'least_fill' && b.pick !== undefined && b.pick < b.pages.length);
+
+/** For each least-fill block, the pages a respondent with this seed is shown. */
+export function pickedPages(def: SurveyDefinition, seed: string): Record<string, string[]> {
+  const blocks = leastFillBlocks(def);
+  if (!blocks.length) return {};
+  const shown = new Set(pageOrder(def, seed).map((i) => def.pages[i]!.id));
+  return Object.fromEntries(blocks.map((b) => [b.id, b.pages.filter((p) => shown.has(p))]));
+}
+
+/** Exposure key of a block page, as counted by the server. */
+export const exposureKey = (blockId: string, pageId: string) => `${blockId}:${pageId}`;
+
+/**
+ * Least-fill balancing without changing how order is stored: try a few seeds derived from the
+ * respondent's own seed and keep the one whose picked pages have been shown least so far. The
+ * chosen seed is stored with the response, so resume and replay give the same pages. With no
+ * least-fill block the respondent's own seed is returned.
+ */
+export function leastFillSeed(def: SurveyDefinition, base: string, exposure: Record<string, number>, tries = 32): string {
+  if (!leastFillBlocks(def).length) return base;
+  let best = base;
+  let bestScore = Infinity;
+  for (let k = 0; k < tries; k++) {
+    const seed = k === 0 ? base : `${base}~${k}`;
+    let score = 0;
+    for (const [block, pages] of Object.entries(pickedPages(def, seed)))
+      for (const p of pages) score += exposure[exposureKey(block, p)] ?? 0;
+    if (score < bestScore) [best, bestScore] = [seed, score];
+  }
+  return best;
 }
 
 /**

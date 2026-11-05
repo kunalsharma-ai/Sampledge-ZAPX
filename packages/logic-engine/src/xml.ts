@@ -16,6 +16,7 @@
  */
 import {
   blockSchema,
+  urlVariableSchema,
   cardSortQuestionSchema,
   gridQuestionSchema,
   hotspotQuestionSchema,
@@ -234,6 +235,8 @@ export function toZapxXml(def: SurveyDefinition): string {
   out += `    </quality>\n`;
   out += `    <capi${attr('gps', st.capi.gps)}${attr('audio', st.capi.audio)}>${st.capi.consentText ? esc(st.capi.consentText) : ''}</capi>\n`;
   out += `  </settings>\n`;
+  for (const u of def.urlVariables ?? [])
+    out += `  <urlvar${attr('id', u.id)}${attr('param', u.param)}${attr('label', u.label)}${attr('numeric', u.numeric)}/>\n`;
   for (const v of def.variables ?? []) out += `  <variable${attr('id', v.id)}${attr('label', v.label)}>${esc(v.expr)}</variable>\n`;
   for (const p of def.pages) {
     out += `  <page${attr('id', p.id)}${attr('title', p.title)}${attr('cond', p.condition)}>\n`;
@@ -246,7 +249,7 @@ export function toZapxXml(def: SurveyDefinition): string {
     out += `  </loop>\n`;
   }
   for (const b of def.blocks ?? [])
-    out += `  <block${attr('id', b.id)}${attr('label', b.label)}${attr('pages', b.pages)}${attr('randomize', b.randomize)}${attr('pick', b.pick)}/>\n`;
+    out += `  <block${attr('id', b.id)}${attr('label', b.label)}${attr('pages', b.pages)}${attr('randomize', b.randomize)}${attr('pick', b.pick)}${attr('balance', b.balance)}/>\n`;
   for (const t of def.terminations)
     out += `  <termination${attr('id', t.id)}${attr('status', t.status)}${attr('label', t.label)}>${esc(t.condition)}</termination>\n`;
   for (const q of def.quotas)
@@ -293,6 +296,7 @@ const NUMBER_KEYS = new Set([
 const BOOLEAN_KEYS = new Set([
   'required',
   'randomize',
+  'numeric',
   'anchor',
   'exclusive',
   'multiline',
@@ -373,6 +377,7 @@ export function fromZapxXml(src: string): XmlReadResult {
   def.loops = [];
   def.blocks = [];
   def.variables = [];
+  def.urlVariables = [];
   for (const el of elements(root)) {
     switch (el.name) {
       case 'welcome':
@@ -413,6 +418,9 @@ export function fromZapxXml(src: string): XmlReadResult {
         def.settings = settings;
         break;
       }
+      case 'urlvar':
+        (def.urlVariables as unknown[]).push(attrsTo(el, shapeKeys(urlVariableSchema)));
+        break;
       case 'variable':
         (def.variables as unknown[]).push({ ...attrsTo(el, new Set(['id', 'label'])), expr: textOf(el) });
         break;

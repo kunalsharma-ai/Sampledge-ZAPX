@@ -6,7 +6,16 @@
 import { useState } from 'react';
 import type { Option, Page, Question, QuestionType, SurveyDefinition } from '@zapx/survey-schema';
 import { MediaLibraryProvider, OptionImagePicker, QuestionMediaEditor, useHasMediaLibrary } from './MediaLibrary';
-import { BlocksEditor, CardSortForm, DynamicListEditor, HotspotForm, LoopsEditor, QuotaTableBuilder, VariablesEditor } from './FlowEditor';
+import {
+  BlocksEditor,
+  CardSortForm,
+  DynamicListEditor,
+  HotspotForm,
+  LoopsEditor,
+  QuotaTableBuilder,
+  UrlVariablesEditor,
+  VariablesEditor,
+} from './FlowEditor';
 import { InsertFromBank, SaveQuestionToBank } from './QuestionBank';
 
 type Selection = { kind: 'survey' } | { kind: 'page'; page: number } | { kind: 'question'; page: number; q: number };
@@ -544,6 +553,7 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
         </button>
       </div>
       <QuotaTableBuilder def={def} onChange={onChange} />
+      <UrlVariablesEditor def={def} onChange={onChange} />
       <VariablesEditor def={def} onChange={onChange} />
       <LoopsEditor def={def} onChange={onChange} />
       <BlocksEditor def={def} onChange={onChange} />

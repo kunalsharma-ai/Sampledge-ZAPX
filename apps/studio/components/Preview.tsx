@@ -27,7 +27,14 @@ import {
   type FieldErrors,
   type PhotoHandler,
 } from '@zapx/survey-renderer';
-import { defaultPresentation, type AnswerValue, type Answers, type Presentation, type SurveyDefinition } from '@zapx/survey-schema';
+import {
+  defaultPresentation,
+  textDirection,
+  type AnswerValue,
+  type Answers,
+  type Presentation,
+  type SurveyDefinition,
+} from '@zapx/survey-schema';
 
 const WIDTHS = { desktop: undefined, tablet: 768, mobile: 375 } as const;
 type Device = keyof typeof WIDTHS;
@@ -135,7 +142,7 @@ export function Preview({
           style={{ maxWidth: WIDTHS[device], margin: device === 'desktop' ? undefined : '0 auto' }}
           data-testid="preview-frame"
         >
-          <div className="zx-root" style={{ minHeight: compact ? 260 : 400 }} lang={language}>
+          <div className="zx-root" style={{ minHeight: compact ? 260 : 400 }} lang={language} dir={textDirection(language)}>
             <style>{defaultThemeCss}</style>
             <style>{themeCss(presentation.theme, presentation.devices)}</style>
             <div className="zx-shell">
