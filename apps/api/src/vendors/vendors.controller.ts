@@ -62,18 +62,26 @@ const previewSchema = z.object({
 
 const RESERVED_PARAMS = ['vid', 'uid', 'cc', 'sig', 'exp', 'test', 'tsig', 'lang'];
 
-/** Roles that receive the vendor's shared secret. ADMIN is the highest role (there is no separate super admin). */
+/** Roles that receive the vendor's shared secret. A super admin also receives it (see seesVendorSecret). */
 export const SEES_VENDOR_SECRET: RoleName[] = ['ADMIN'];
+
+/**
+ * Administrators and the super admin see the vendor's shared secret (Kunal's decisions, 2026-11-05):
+ * a super admin sees it whatever their role in the organization. API keys never act as super admin.
+ */
+export function seesVendorSecret(user: Pick<AuthUser, 'role' | 'superAdmin' | 'apiKeyId'>): boolean {
+  return SEES_VENDOR_SECRET.includes(user.role) || (!!user.superAdmin && !user.apiKeyId);
+}
 
 /**
  * What the studio sees: never the encrypted partner secret, only whether one is set. The shared
  * secret signs entry links, redirects and callbacks and authenticates the vendor API, so only
- * administrators receive it (Kunal's decision, 2026-11-05); programmers and viewers get the rest of
- * the vendor without it.
+ * administrators and the super admin receive it; programmers and viewers get the rest of the vendor
+ * without it.
  */
-export function presentVendor(v: Vendor, role: RoleName) {
+export function presentVendor(v: Vendor, user: Pick<AuthUser, 'role' | 'superAdmin' | 'apiKeyId'>) {
   const { partnerSecretEnc, secret, ...rest } = v;
-  return { ...rest, ...(SEES_VENDOR_SECRET.includes(role) ? { secret } : {}), partnerSecretSet: !!partnerSecretEnc };
+  return { ...rest, ...(seesVendorSecret(user) ? { secret } : {}), partnerSecretSet: !!partnerSecretEnc };
 }
 
 /** Sample vendors, their redirect and callback configuration and redirect QA (preview). */
@@ -134,7 +142,7 @@ export class VendorsController {
       where: { projectId, ...this.access.vendors(user) },
       orderBy: { createdAt: 'asc' },
     });
-    return rows.map((v) => presentVendor(v, user.role));
+    return rows.map((v) => presentVendor(v, user));
   }
 
   @Post('projects/:projectId/vendors')
@@ -155,12 +163,12 @@ export class VendorsController {
       data: { ...data, tenantId: user.tenantId, projectId, secret: randomBytes(32).toString('hex') },
     });
     await this.audit.record(user, 'vendor.create', 'vendor', vendor.id, { code: vendor.code, ...VendorsController.summary(vendor) });
-    return presentVendor(vendor, user.role);
+    return presentVendor(vendor, user);
   }
 
   @Get('vendors/:id')
   async get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    return presentVendor(await this.own(user, id), user.role);
+    return presentVendor(await this.own(user, id), user);
   }
 
   @Put('vendors/:id')
@@ -177,7 +185,7 @@ export class VendorsController {
       before: VendorsController.summary(before),
       after: VendorsController.summary(vendor),
     });
-    return presentVendor(vendor, user.role);
+    return presentVendor(vendor, user);
   }
 
   /** Soft delete: links stop working, history (responses, redirects, callbacks) is kept. */
@@ -196,7 +204,7 @@ export class VendorsController {
     await this.own(user, id);
     const vendor = await this.prisma.vendor.update({ where: { id }, data: { secret: randomBytes(32).toString('hex') } });
     await this.audit.record(user, 'vendor.rotate_secret', 'vendor', id);
-    return presentVendor(vendor, user.role);
+    return presentVendor(vendor, user);
   }
 
   /** Redirect QA: show exactly where a respondent would be sent for each status. */

@@ -38,6 +38,8 @@ Also open: Dependabot PRs #20–#25 (Node 26 and nginx 1.31 base images; GitHub 
 ### Security (#36, branch `security-fixes`)
 
 - The vendor shared secret is returned only to ADMIN; programmers and viewers no longer receive it.
+- The super admin also receives the vendor shared secret, whatever their role, but never through an
+  API key (branch `vendor-secret-super-admin`).
 - Password change on My account (`POST /api/auth/change-password`), administrator one-time reset
   links (`POST /api/users/:id/password-reset`), "forgot password" by email
   (`POST /api/auth/forgot-password`) and `POST /api/auth/reset-password`.

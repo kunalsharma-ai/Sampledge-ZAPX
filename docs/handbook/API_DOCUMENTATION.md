@@ -142,8 +142,9 @@ Vendor body fields (all optional except `name` and `code`) are defined by `vendo
 `callbackStatuses`, `callbackMaxAttempts`, `partnerBaseUrl`, `partnerSecret` (write-only), `partnerS2s`,
 `presetId`. A survey can start from `template` (built-in key) or `libraryItemId` _(PR #30)_.
 
-The vendor's shared `secret` (64 hex characters) is in the answer only for ADMIN;
-for PROGRAMMER and VIEWER the field is left out _(branch `security-fixes`)_.
+The vendor's shared `secret` (64 hex characters) is in the answer only for ADMIN
+and for a signed-in super admin (whatever their role; never through an API key); for PROGRAMMER and
+VIEWER the field is left out _(branch `security-fixes`, super admin from branch `vendor-secret-super-admin`)_.
 
 ### Save a draft, publish and go live
 
