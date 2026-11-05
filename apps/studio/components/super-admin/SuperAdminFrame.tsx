@@ -7,7 +7,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Activity, Building2, CreditCard, LayoutGrid, PlugZap, Users, Workflow } from 'lucide-react';
+import { Activity, Building2, CreditCard, LayoutGrid, PlugZap, ShieldCheck, Users, Workflow } from 'lucide-react';
+import { PageHeader } from '@/components/neon/PageHeader';
 import { Shell } from '@/components/Shell';
 import { useMe } from '@/lib/useMe';
 
@@ -50,15 +51,9 @@ export function SuperAdminFrame({
     );
   return (
     <Shell crumbs={crumbs}>
-      <div className="sa-head">
-        <div>
-          <h1 className="sa-title">
-            <span className="nx-gradient-text">Super admin</span> · {title}
-          </h1>
-          {intro ? <p className="muted small sa-intro">{intro}</p> : null}
-        </div>
-        {actions ? <div className="row">{actions}</div> : null}
-      </div>
+      <PageHeader icon={ShieldCheck} eyebrow="Super admin" title={title} actions={actions}>
+        {intro}
+      </PageHeader>
       <nav className="sa-tabs" aria-label="Super admin sections">
         {SECTIONS.map((s) => {
           const active = s.href === '/super-admin' ? path === s.href : path === s.href || path.startsWith(`${s.href}/`);

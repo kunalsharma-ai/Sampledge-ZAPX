@@ -1,19 +1,4 @@
 /* Super admin console. Builds on the shared neon and Quantum styles; only console-specific layout here. */
-.sa-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.sa-title {
-  margin: 0;
-}
-.sa-intro {
-  margin: 4px 0 0;
-  max-width: 760px;
-}
 .sa-tabs {
   display: flex;
   gap: 6px;
