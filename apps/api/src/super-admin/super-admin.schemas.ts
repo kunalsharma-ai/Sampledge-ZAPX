@@ -101,3 +101,10 @@ export const activitySchema = z.object({
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 export type ActivityQuery = z.infer<typeof activitySchema>;
+
+export const featureChangeSchema = z.object({
+  feature: z.string().refine(isFeatureKey, 'Unknown feature'),
+  surface: z.enum(['web', 'mobile', 'both']).default('both'),
+  /** null: back to what the plan says. */
+  on: z.boolean().nullable(),
+});

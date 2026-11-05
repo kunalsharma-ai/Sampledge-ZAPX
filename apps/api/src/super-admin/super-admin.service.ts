@@ -331,6 +331,19 @@ export class SuperAdminService {
     return { overrides: clean };
   }
 
+  /** Changes one feature for the organization ("both" surfaces at once); null goes back to the plan. */
+  async setOrganizationFeature(actor: AuthUser, id: string, change: { feature: string; surface: Surface | 'both'; on: boolean | null }) {
+    const t = await this.tenantOr404(id);
+    const o = readOverrides(t.featureOverrides);
+    for (const s of change.surface === 'both' ? SURFACES : [change.surface]) {
+      const m = { ...(o[s] ?? {}) };
+      if (change.on === null) delete m[change.feature];
+      else m[change.feature] = change.on;
+      o[s] = m;
+    }
+    return this.setOrganizationFeatures(actor, id, o);
+  }
+
   async suspend(actor: AuthUser, id: string, reason: string) {
     const t = await this.tenantOr404(id);
     if (t.platformOperator) throw new BadRequestException('The organization that runs this installation cannot be suspended');
@@ -519,7 +532,7 @@ export class SuperAdminService {
     const k = count(keys);
     const v = count(vendors);
     return {
-      platform,
+      platform: platform.integrations,
       organizations: orgs.map((o) => {
         const ent = resolveEntitlements({
           surface: 'web',

@@ -13,6 +13,7 @@ import {
   activitySchema,
   createOrgSchema,
   createUserSchema,
+  featureChangeSchema,
   newPlanSchema,
   orgPatchSchema,
   overridesSchema,
@@ -170,6 +171,11 @@ export class SuperAdminController {
   @Put('organizations/:id/features')
   setFeatures(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     return this.svc.setOrganizationFeatures(user, id, parseBody(overridesSchema, body));
+  }
+
+  @Patch('organizations/:id/features')
+  setFeature(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
+    return this.svc.setOrganizationFeature(user, id, parseBody(featureChangeSchema, body));
   }
 
   @Post('organizations/:id/suspend')

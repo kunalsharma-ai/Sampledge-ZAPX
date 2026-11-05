@@ -13,13 +13,14 @@ import {
   PhoneCall,
   ScrollText,
   Settings,
+  ShieldCheck,
   Sparkles,
   Workflow,
   X,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { api, type Me } from '@/lib/api';
+import { api, hasFeature, type Me } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ThemeMenu } from '@/components/quantum/ThemeMenu';
 import { GlobalSearch } from '@/components/neon/GlobalSearch';
@@ -35,23 +36,25 @@ interface NavItem {
 
 function navFor(me: Me | null): NavItem[] {
   if (!me) return [];
+  // Entries whose feature the super admin switched off for this organization or member are hidden.
+  const on = (key: string) => hasFeature(me, key);
   if (me.role === 'INTERVIEWER')
     return [
-      { href: '/calls', label: 'Calls', icon: PhoneCall },
+      ...(on('cati') || on('calls') ? [{ href: '/calls', label: 'Calls', icon: PhoneCall }] : []),
       { href: '/appearance', label: 'Appearance', icon: Palette },
     ];
-  const items: NavItem[] = [
-    { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/projects', label: 'Projects', icon: FolderKanban, match: ['/projects', '/surveys'] },
-    { href: '/library', label: 'Question bank', icon: Library },
-  ];
-  if (me.role !== 'VIEWER') items.push({ href: '/calls', label: 'Fieldwork calls', icon: PhoneCall });
-  items.push({ href: '/automation', label: 'Automation', icon: Workflow });
+  const items: NavItem[] = [];
+  if (me.superAdmin) items.push({ href: '/super-admin', label: 'Super admin', icon: ShieldCheck });
+  if (on('dashboard')) items.push({ href: '/', label: 'Dashboard', icon: LayoutDashboard });
+  if (on('projects')) items.push({ href: '/projects', label: 'Projects', icon: FolderKanban, match: ['/projects', '/surveys'] });
+  if (on('library')) items.push({ href: '/library', label: 'Question bank', icon: Library });
+  if (me.role !== 'VIEWER' && (on('cati') || on('calls'))) items.push({ href: '/calls', label: 'Fieldwork calls', icon: PhoneCall });
+  if (on('automation')) items.push({ href: '/automation', label: 'Automation', icon: Workflow });
   items.push({ href: '/appearance', label: 'Themes & appearance', icon: Palette });
   if (me.role === 'ADMIN') {
-    items.push({ href: '/settings', label: 'Settings', icon: Settings });
-    items.push({ href: '/settings/audit', label: 'Audit log', icon: ScrollText });
-  } else if (me.role === 'PROGRAMMER') items.push({ href: '/settings', label: 'API keys', icon: KeyRound });
+    if (on('settings')) items.push({ href: '/settings', label: 'Settings', icon: Settings });
+    if (on('audit_log')) items.push({ href: '/settings/audit', label: 'Audit log', icon: ScrollText });
+  } else if (me.role === 'PROGRAMMER' && on('api_keys')) items.push({ href: '/settings', label: 'API keys', icon: KeyRound });
   return items;
 }
 
