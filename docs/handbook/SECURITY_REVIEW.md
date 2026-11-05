@@ -39,21 +39,21 @@ For the project's own security notes, which this review does not replace, see
 
 ## 2. Potential issues found
 
-| #   | Severity | Finding                                                                                              | Status                                            |
-| --- | -------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| S1  | Medium   | Vendor shared secret is readable by every role, including VIEWER                                     | **Fixed** on branch `security-fixes` (ADMIN only) |
-| S2  | Medium   | Terraform secret list and the documented secret JSON disagree                                        | **Fixed** on branch `security-fixes`              |
-| S3  | Medium   | No way to reset or change a password                                                                 | **Fixed** on branch `security-fixes`              |
-| S4  | Low–Med  | Rate limits are per API process                                                                      | open                                              |
-| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                                                           | open                                              |
-| S6  | Low      | Studio content security policy does not restrict scripts                                             | open                                              |
-| S7  | Low      | Login answers with the session token in the body too                                                 | open                                              |
-| S8  | Low      | Automated security scanning never runs on GitHub                                                     | open                                              |
-| S9  | Info     | Row-level security covers two tables only                                                            | open                                              |
-| S10 | Low–Med  | Feature gating is a list of route patterns; unlisted routes are open _(PR #41)_                      | open                                              |
-| S11 | Low      | The oldest organization becomes the platform operator automatically _(PR #38)_                       | open                                              |
-| S12 | Info     | Super admins see the vendor secret only if they are also ADMIN of that organization _(PR #36 + #41)_ | open, owner to decide                             |
-| S13 | Info     | Runtime CSP now allows `'wasm-unsafe-eval'` for eye tracking _(PR #37)_                              | accepted by design                                |
+| #   | Severity | Finding                                                                                               | Status                                            |
+| --- | -------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| S1  | Medium   | Vendor shared secret is readable by every role, including VIEWER                                      | **Fixed** on branch `security-fixes` (ADMIN only) |
+| S2  | Medium   | Terraform secret list and the documented secret JSON disagree                                         | **Fixed** on branch `security-fixes`              |
+| S3  | Medium   | No way to reset or change a password                                                                  | **Fixed** on branch `security-fixes`              |
+| S4  | Low–Med  | Rate limits are per API process                                                                       | open                                              |
+| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                                                            | open                                              |
+| S6  | Low      | Studio content security policy does not restrict scripts                                              | open                                              |
+| S7  | Low      | Login answers with the session token in the body too                                                  | open                                              |
+| S8  | Low      | Automated security scanning never runs on GitHub                                                      | open                                              |
+| S9  | Info     | Row-level security covers two tables only                                                             | open                                              |
+| S10 | Low–Med  | Feature gating is a list of route patterns; unlisted routes are open _(PR #41)_                       | open                                              |
+| S11 | Low      | The oldest organization becomes the platform operator automatically _(PR #38)_                        | open                                              |
+| S12 | Info     | Super admins saw the vendor secret only if they were also ADMIN of that organization _(PR #36 + #41)_ | **Fixed** on branch `vendor-secret-super-admin`   |
+| S13 | Info     | Runtime CSP now allows `'wasm-unsafe-eval'` for eye tracking _(PR #37)_                               | accepted by design                                |
 
 The review below describes the code as it was found on `blueprint-p5-enterprise`; each fixed
 finding ends with what the fix changed.
@@ -204,8 +204,10 @@ finding ends with what the fix changed.
   check, and the super admin console does not show other organizations' vendors.
 - **Why it matters:** the owner asked that "the super admin and admin both" can see it. Today a super
   admin sees it only in their own organization, and only when their role there is ADMIN.
-- **Owner to decide:** whether super admins should see vendor secrets of every organization. That
-  would be a code change (not made here, since this PR changes documentation only).
+- **Fixed (branch `vendor-secret-super-admin`, owner's decision 2026-11-05):** `seesVendorSecret(user)`
+  returns true for role ADMIN or for a super admin signed in with a session (never an API key), so a
+  super admin sees the secret whatever their role. The super admin console still does not list other
+  organizations' vendors. Test: `apps/api/test/security-fixes.test.ts`.
 
 ### S13. `'wasm-unsafe-eval'` in the runtime CSP (Info) _(PR #37)_
 

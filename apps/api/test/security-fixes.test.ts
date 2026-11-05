@@ -118,6 +118,37 @@ describe('vendor shared secret', () => {
   });
 });
 
+describe('vendor shared secret for the super admin', () => {
+  it('is returned to a super admin whatever their role, but not through their API key', async () => {
+    const projectId = (await http.post('/api/projects').set(admin).send({ name: 'Super secrets' }).expect(201)).body.id as string;
+    const vendor = (await http.post(`/api/projects/${projectId}/vendors`).set(admin).send({ name: 'Panel', code: 'SY' }).expect(201)).body;
+    const viewer = await member('VIEWER');
+    await http
+      .get(`/api/vendors/${vendor.id}`)
+      .set(viewer.headers)
+      .expect(200)
+      .expect((r) => expect(r.body).not.toHaveProperty('secret'));
+
+    await prisma.user.update({ where: { id: viewer.id }, data: { superAdmin: true } });
+    const one = (await http.get(`/api/vendors/${vendor.id}`).set(viewer.headers).expect(200)).body;
+    const list = (await http.get(`/api/projects/${projectId}/vendors`).set(viewer.headers).expect(200)).body;
+    expect(one.secret).toBe(vendor.secret);
+    expect(list.find((v: { id: string }) => v.id === vendor.id).secret).toBe(vendor.secret);
+
+    // An API key acts as its creator but never as super admin.
+    const programmer = await member('PROGRAMMER');
+    await prisma.user.update({ where: { id: programmer.id }, data: { superAdmin: true } });
+    const key = (await http.post('/api/api-keys').set(programmer.headers).send({ name: 'script', role: 'PROGRAMMER' }).expect(201)).body;
+    const viaKey = (
+      await http
+        .get(`/api/vendors/${vendor.id}`)
+        .set({ Authorization: `Bearer ${key.key}` })
+        .expect(200)
+    ).body;
+    expect(viaKey).not.toHaveProperty('secret');
+  });
+});
+
 describe('change my password', () => {
   it('needs the current password, signs out other sessions and keeps this one', async () => {
     const m = await member('PROGRAMMER');

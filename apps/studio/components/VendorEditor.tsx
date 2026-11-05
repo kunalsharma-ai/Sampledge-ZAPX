@@ -29,7 +29,7 @@ export interface Vendor {
   partnerBaseUrl: string | null;
   partnerSecretSet: boolean;
   partnerS2s: boolean;
-  /** Only for administrators. */
+  /** Only for administrators and the super admin. */
   secret?: string;
 }
 
