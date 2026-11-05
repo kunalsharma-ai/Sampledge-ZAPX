@@ -1,8 +1,11 @@
 # Going live: what needs a person with the accounts
 
-Everything in ZAPX that could be built and tested without real accounts is done (milestones 1 to
-20 merged into `main`, the open pull requests #27 to #38 and #28, including integrations in the CRM). The steps
-below need credentials, accounts or decisions that only the owner has. Do them on a **staging** stack first, in this order; each links to the guide with the details.
+Everything in ZAPX that could be built and tested without real accounts is done: milestones 1 to
+20 are merged into `main`, and the rest is in the open pull requests listed in
+[merge-order.md](merge-order.md) (the design system, the blueprint phases, the handbook, the security
+fixes, webcam eye tracking and integrations in the CRM). The steps below need credentials, accounts or
+decisions that only the owner has. Do them on a **staging** stack first, in this order; each links to
+the guide with the details.
 
 | #   | Step                                                                                                     | Needs                                  | Guide                                                        |
 | --- | -------------------------------------------------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------ |
@@ -99,5 +102,8 @@ Not built because each needs a third-party service or a product decision:
 
 - Voice-over per language (a text-to-speech provider) and transcription of typed open answers.
 - Predictive dialing, answering-machine detection and an in-browser softphone for CATI.
-- Nets, banner books and PowerPoint in analysis; MaxDiff and conjoint question types.
+- Nets, banner books and PowerPoint in analysis; hierarchical Bayes estimation for MaxDiff and conjoint
+  (both are built with whole-sample estimation).
+- Webcam eye tracking is built as an experimental, opt-in task, but it has not been validated on real
+  webcams; test it with a few real respondents before selling it (ADR 0034).
 - Seat-based or usage-based billing; SAML single logout and encrypted assertions.
