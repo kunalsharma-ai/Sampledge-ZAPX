@@ -1334,3 +1334,129 @@ table.data th {
   background: var(--q-accent-text);
   box-shadow: none;
 }
+
+/* Blueprint phase 5: notifications */
+.nx-badge-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: var(--q-accent, #7c5cff);
+  color: var(--q-on-accent, #fff);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+.nx-notes {
+  width: min(360px, calc(100vw - 32px));
+  max-height: 70vh;
+  overflow: auto;
+}
+.nx-note-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nx-note-list li {
+  padding: 8px;
+  border-radius: 10px;
+  border: 1px solid var(--q-border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nx-note-list li.read {
+  opacity: 0.7;
+}
+
+/* Blueprint phase 5: automation rules */
+.nx-rule-list {
+  display: grid;
+  gap: 10px;
+}
+.nx-rule {
+  padding: 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--q-border);
+  background: var(--q-glass-2);
+}
+.nx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+/* Blueprint phase 5: analysis dashboards and segments */
+.nx-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.nx-dash-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.nx-kpi-big {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 0;
+}
+.nx-kpi-big b {
+  font-size: 2.2rem;
+  line-height: 1.1;
+}
+.nx-columns {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 160px;
+}
+.nx-column {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+}
+.nx-column i {
+  width: 70%;
+  border-radius: 6px 6px 0 0;
+  background: var(--viz-1);
+}
+.nx-column .ellipsis {
+  max-width: 100%;
+}
+.nx-segment {
+  padding: 6px 8px;
+  border: 1px solid var(--q-border);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.nx-segment-codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+}
+.nx-segment-builder {
+  min-width: 0;
+}
+.nx-segment-builder select,
+.nx-segment-builder input {
+  max-width: 100%;
+  min-width: 0;
+}
+.nx-segment-builder .row > select {
+  flex: 1 1 0;
+}

@@ -443,6 +443,125 @@ export function RecodesEditor({ def, onChange }: { def: Def; onChange: (d: Def) 
   );
 }
 
+// ---- Cleaning rules (blueprint phase 5) ------------------------------------------------------------
+
+type CleaningDef = Def['cleaning'][number];
+
+export function CleaningEditor({ def, onChange }: { def: Def; onChange: (d: Def) => void }) {
+  const rules = def.cleaning ?? [];
+  const set = (i: number, patch: Partial<CleaningDef>) =>
+    onChange({ ...def, cleaning: rules.map((r, j) => (j === i ? ({ ...r, ...patch } as CleaningDef) : r)) });
+  const targets = def.pages.flatMap((p) =>
+    p.questions.filter((q) => q.type === 'single' || q.type === 'numeric' || q.type === 'scale' || q.type === 'open'),
+  );
+  return (
+    <section className="stack" aria-labelledby="cleaning-h">
+      <h2 id="cleaning-h" style={{ marginTop: 12 }}>
+        Cleaning rules
+      </h2>
+      <p className="muted small">
+        Edit or fill answers when data is analysed or exported, in order. Stored answers are never changed; Analysis marks cleaned questions
+        and exports list the rules applied to each row. <em>Set</em> and <em>clear</em> apply when the condition holds (every record when
+        empty); <em>impute</em> fills blanks with the mean, median or most common answer.
+      </p>
+      {rules.map((r, i) => (
+        <fieldset key={i} className="row" style={{ gap: 8, flexWrap: 'wrap', alignItems: 'end' }} data-testid={`cleaning-${i}`}>
+          <label>
+            Rule
+            <input
+              className="mono"
+              aria-label="Cleaning rule id"
+              value={r.id}
+              onChange={(e) => set(i, { id: e.target.value })}
+              style={{ width: 90 }}
+            />
+          </label>
+          <label>
+            Question
+            <select aria-label="Cleaning target" value={r.target} onChange={(e) => set(i, { target: e.target.value })}>
+              {targets.map((q) => (
+                <option key={q.id} value={q.id}>
+                  {q.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Action
+            <select
+              aria-label="Cleaning action"
+              value={r.action}
+              onChange={(e) => {
+                const action = e.target.value as CleaningDef['action'];
+                set(i, {
+                  action,
+                  value: action === 'set' ? (r.value ?? 0) : undefined,
+                  method: action === 'impute' ? (r.method ?? 'mode') : undefined,
+                });
+              }}
+            >
+              <option value="clear">Clear</option>
+              <option value="set">Set to</option>
+              <option value="impute">Impute blanks</option>
+            </select>
+          </label>
+          {r.action === 'set' ? (
+            <label>
+              Value
+              <input
+                aria-label="Cleaning value"
+                value={r.value === undefined ? '' : String(r.value)}
+                onChange={(e) => set(i, { value: /^-?\d+(\.\d+)?$/.test(e.target.value) ? Number(e.target.value) : e.target.value })}
+                style={{ width: 90 }}
+              />
+            </label>
+          ) : null}
+          {r.action === 'impute' ? (
+            <label>
+              With
+              <select
+                aria-label="Impute method"
+                value={r.method}
+                onChange={(e) => set(i, { method: e.target.value as CleaningDef['method'] })}
+              >
+                <option value="mode">most common answer</option>
+                <option value="median">median</option>
+                <option value="mean">mean</option>
+              </select>
+            </label>
+          ) : null}
+          <label style={{ flex: 1, minWidth: 200 }}>
+            When (optional)
+            <input
+              className="mono"
+              aria-label="Cleaning condition"
+              placeholder="e.g. AGE > 99"
+              value={r.when ?? ''}
+              onChange={(e) => set(i, { when: e.target.value || undefined })}
+            />
+          </label>
+          <button className="link danger" onClick={() => onChange({ ...def, cleaning: rules.filter((_, j) => j !== i) })}>
+            Remove
+          </button>
+        </fieldset>
+      ))}
+      <div>
+        <button
+          disabled={!targets.length}
+          onClick={() =>
+            onChange({
+              ...def,
+              cleaning: [...rules, { id: `C${rules.length + 1}`, target: targets[0]!.id, action: 'clear' } as CleaningDef],
+            })
+          }
+        >
+          + Cleaning rule
+        </button>
+      </div>
+    </section>
+  );
+}
+
 // ---- URL variables ------------------------------------------------------------------------------
 
 export function UrlVariablesEditor({ def, onChange }: { def: Def; onChange: (d: Def) => void }) {

@@ -5,6 +5,7 @@ import { Shell, ErrorNote } from '@/components/Shell';
 import { CreateSurveyDialog } from '@/components/neon/CreateSurvey';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
+import { useThemeModule } from '@/lib/theme/ThemeProvider';
 
 export interface LibraryItem {
   id: string;
@@ -33,6 +34,7 @@ type Pane = 'QUESTION' | 'SURVEY' | 'templates';
  */
 export default function QuestionBankPage() {
   const me = useMe();
+  useThemeModule('library');
   const canEdit = me?.role === 'ADMIN' || me?.role === 'PROGRAMMER';
   const [pane, setPane] = useState<Pane>('QUESTION');
   const [q, setQ] = useState('');

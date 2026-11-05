@@ -10,6 +10,7 @@ import { MediaLibraryProvider, OptionImagePicker, QuestionMediaEditor, useHasMed
 import {
   BlocksEditor,
   CardSortForm,
+  CleaningEditor,
   DynamicListEditor,
   HotspotForm,
   LoopsEditor,
@@ -633,6 +634,7 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
       <UrlVariablesEditor def={def} onChange={onChange} />
       <VariablesEditor def={def} onChange={onChange} />
       <RecodesEditor def={def} onChange={onChange} />
+      <CleaningEditor def={def} onChange={onChange} />
       <LoopsEditor def={def} onChange={onChange} />
       <BlocksEditor def={def} onChange={onChange} />
     </>

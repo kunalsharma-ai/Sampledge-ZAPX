@@ -30,6 +30,7 @@ import {
 import { PRESET_LIST, PRESETS } from '@zapx/quantum';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
+import { useThemeModule } from '@/lib/theme/ThemeProvider';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { ErrorNote, Shell } from '@/components/Shell';
 import { ProjectsSection } from '@/components/neon/ProjectsSection';
@@ -120,6 +121,7 @@ const ORBIT: Array<[string, LucideIcon]> = [
 
 export default function DashboardPage() {
   const me = useMe();
+  useThemeModule('dashboard');
   const { appearance, resolved, update } = useTheme();
   const [data, setData] = useState<Summary | null>(null);
   const [ai, setAi] = useState<{ configured: boolean; model?: string } | null>(null);
