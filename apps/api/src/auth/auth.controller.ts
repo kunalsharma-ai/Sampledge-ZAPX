@@ -27,6 +27,7 @@ import { verifySession } from './auth.guard';
 import { isCommonPassword } from './password-policy';
 import { SsoService } from './sso.service';
 import { PasswordResetService, newPasswordSchema } from './password-reset.service';
+import { IntegrationSettingsService } from '../platform/integration-settings.service';
 import { ALL_ROLES, CurrentUser, Public, Roles } from './decorators';
 
 const loginSchema = z.object({ email: z.string().email().toLowerCase(), password: z.string().min(1).max(200) });
@@ -56,6 +57,7 @@ export class AuthController {
     private readonly audit: AuditService,
     private readonly sso: SsoService,
     private readonly resets: PasswordResetService,
+    private readonly integrations: IntegrationSettingsService,
   ) {}
 
   private issue(res: Response, user: { id: string; tenantId: string; role: AuthUser['role']; email: string }) {
@@ -244,9 +246,25 @@ export class AuthController {
   async me(@CurrentUser() user: AuthUser) {
     const u = await this.prisma.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { id: true, email: true, name: true, role: true, projectScope: true, tenant: { select: { id: true, name: true } } },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        projectScope: true,
+        tenant: { select: { id: true, name: true, platformOperator: true } },
+      },
     });
+    const { platformOperator, ...tenant } = u.tenant;
     // With an API key the effective role can be lower than the member's own.
-    return { ...u, role: user.role, viaApiKey: user.apiKeyId ?? null };
+    return {
+      ...u,
+      tenant,
+      role: user.role,
+      viaApiKey: user.apiKeyId ?? null,
+      // Administrators of the organization that runs the installation manage Settings > Integrations.
+      canManageIntegrations:
+        user.role === 'ADMIN' && !user.apiKeyId && (platformOperator || (await this.integrations.isOperator(tenant.id))),
+    };
   }
 }

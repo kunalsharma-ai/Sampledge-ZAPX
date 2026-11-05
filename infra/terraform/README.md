@@ -71,7 +71,13 @@ aws secretsmanager put-secret-value --secret-id "$(terraform output -raw app_sec
 }'
 ```
 
-Keep `SECRETS_KEY` safe: it decrypts stored vendor secrets, SSO client secrets and phone numbers.
+The provider keys (Claude, Stripe, IPinfo, Deepgram, Twilio) are not needed here: an administrator
+enters them in the CRM under **Settings → Integrations** after the first sign-in, where they are
+encrypted with `SECRETS_KEY`. To keep one in Secrets Manager instead, add its name (e.g.
+`ANTHROPIC_API_KEY`) to `app_secret_keys` and to this JSON; a value saved in the CRM wins over it.
+
+Keep `SECRETS_KEY` safe: it decrypts stored vendor secrets, SSO client secrets, phone numbers and
+the integration keys saved in the CRM. Changing it means entering those keys again.
 Every key named in `app_secret_keys` must exist in the JSON (empty is fine), or the tasks fail
 to start.
 
@@ -90,8 +96,9 @@ health checks), then publishes the runtime and CAPI app to S3 and refreshes Clou
 
 ## Settings worth knowing
 
-- Non-secret ZAPX settings go in `app_environment` (see `.env.example`), e.g. `AI_MODEL`,
-  `BILLING = "stripe"`, `STRIPE_PRICES`, `DEFAULT_PLAN`. The stack already sets the addresses, the
+- Non-secret ZAPX settings go in `app_environment` (see `.env.example`), e.g. `DEFAULT_PLAN`.
+  Provider settings (`AI_MODEL`, `BILLING`, `STRIPE_PRICES` and the rest) are easier to set in the
+  CRM under Settings → Integrations. The stack already sets the addresses, the
   database parts, `FILE_STORE=s3`, the CloudFront headers and production flags.
 - Sign-up is off (`ALLOW_SIGNUP=false`); create the first organization with a temporary
   `ALLOW_SIGNUP = "true"` in `app_environment`, then remove it.

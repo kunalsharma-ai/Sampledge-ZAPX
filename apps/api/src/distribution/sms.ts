@@ -8,6 +8,7 @@
  * Tested against a local stand-in of the Twilio API only, not the live service.
  */
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 
 export interface OutgoingSms {
   to: string;
@@ -58,7 +59,9 @@ export class TwilioSmsProvider implements SmsProvider {
 export function smsProvider(): SmsProvider | null {
   const c = config();
   if (c.SMS_PROVIDER !== 'twilio') return null;
-  return new TwilioSmsProvider(c.TWILIO_ACCOUNT_SID, c.TWILIO_AUTH_TOKEN, c.TWILIO_API_BASE, c.SMS_FROM);
+  // The Twilio account comes from Settings > Integrations (or the TWILIO_* variables until it is set).
+  const t = integration('twilio').values;
+  return new TwilioSmsProvider(t.accountSid, t.authToken, c.TWILIO_API_BASE, c.SMS_FROM);
 }
 
 /** Phone numbers are stored in E.164. Accepts spaces, dashes, dots and brackets; needs the leading +. */

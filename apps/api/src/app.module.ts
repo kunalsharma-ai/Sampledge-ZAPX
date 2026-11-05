@@ -40,6 +40,10 @@ import { DistributionService } from './distribution/distribution.service';
 import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
 import { HealthController } from './health.controller';
+import { PlatformIntegrationsController } from './platform/integrations.controller';
+import { IntegrationSettingsService } from './platform/integration-settings.service';
+import { DynamicAiProvider } from './ai/dynamic-ai.provider';
+import { SwitchingFileStore } from './jobs/file-store';
 import { QaController } from './qa/qa.controller';
 import { TestCasesController } from './qa/test-cases.controller';
 import { TranslateController } from './surveys/translate.controller';
@@ -48,7 +52,6 @@ import { ChangeSetsController } from './changesets/changesets.controller';
 import { ChangeSetsService } from './changesets/changesets.service';
 import { ArchitectService } from './ai/architect.service';
 import { AiProvider } from './ai/ai-provider';
-import { ClaudeAiProvider, UnconfiguredAiProvider } from './ai/claude.provider';
 import { AiGateway } from './ai/ai-gateway';
 import { ResearchAssistantService } from './analysis/research.service';
 import { AiUsageRepository } from './ai/ai-usage.repository';
@@ -71,7 +74,7 @@ import { JobsController } from './jobs/jobs.controller';
 import { JobsService } from './jobs/jobs.service';
 import { JobWorker } from './jobs/job.worker';
 import { FilesService } from './jobs/files.service';
-import { FileStore, fileStoreFromConfig } from './jobs/file-store';
+import { FileStore } from './jobs/file-store';
 import { AutomationController, NotificationsController } from './automation/automation.controller';
 import { AutomationService } from './automation/automation.service';
 import { GovernanceController } from './governance/governance.controller';
@@ -91,6 +94,7 @@ import { GovernanceService } from './governance/governance.service';
   controllers: [
     HealthController,
     DashboardController,
+    PlatformIntegrationsController,
     TelephonyController,
     AuthController,
     UsersController,
@@ -131,6 +135,7 @@ import { GovernanceService } from './governance/governance.service';
     GovernanceController,
   ],
   providers: [
+    IntegrationSettingsService,
     CatiService,
     TelephonyService,
     AnalysisService,
@@ -163,24 +168,11 @@ import { GovernanceService } from './governance/governance.service';
     FilesService,
     AutomationService,
     GovernanceService,
-    { provide: FileStore, useFactory: fileStoreFromConfig },
-    {
-      // Provider registry: AI_PROVIDER picks the implementation. Adding OpenAI or Gemini means
-      // one more AiProvider subclass and one more case here (docs/modules/ai-gateway.md).
-      provide: AiProvider,
-      useFactory: (): AiProvider => {
-        const cfg = config();
-        switch (cfg.AI_PROVIDER) {
-          case 'anthropic':
-            if (!cfg.ANTHROPIC_API_KEY) return new UnconfiguredAiProvider('An administrator needs to set ANTHROPIC_API_KEY.');
-            if (!cfg.AI_MODEL) return new UnconfiguredAiProvider('An administrator needs to set AI_MODEL.');
-            return new ClaudeAiProvider(cfg.ANTHROPIC_API_KEY, cfg.AI_MODEL, {
-              maxRetries: cfg.AI_MAX_RETRIES,
-              timeoutMs: cfg.AI_TIMEOUT_MS,
-            });
-        }
-      },
-    },
+    // Both follow Settings > Integrations in the CRM (with the environment as the fallback), so a
+    // change there takes effect without a restart. Adding OpenAI or Gemini means one more AiProvider
+    // subclass and one more case in DynamicAiProvider (docs/modules/ai-gateway.md).
+    { provide: FileStore, useClass: SwitchingFileStore },
+    { provide: AiProvider, useClass: DynamicAiProvider },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
   ],

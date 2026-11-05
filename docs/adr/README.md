@@ -33,5 +33,12 @@ they are accepted; a later record supersedes an earlier one.
 | [0026](0026-security-hardening.md)               | Security hardening: SSRF guard, lockout, sign-out, headers, secret scan | Accepted                                               |
 | [0027](0027-quantum-design-system.md)            | Quantum Design System and theme engine                                  | Accepted                                               |
 | [0028](0028-neon-dashboard.md)                   | Neon AI theme, sidebar shell and data dashboard                         | Accepted                                               |
+| [0029](0029-blueprint-core-engineering.md)       | Blueprint phase 1: core survey engineering                              | Accepted                                               |
+| [0030](0030-blueprint-multilingual-and-qa.md)    | Blueprint phase 2: multilingual tools, test cases, voice                | Accepted                                               |
+| [0031](0031-blueprint-fieldwork-and-security.md) | Blueprint phase 3: fieldwork evidence, supervision, email               | Accepted                                               |
+| [0032](0032-blueprint-research-intelligence.md)  | Blueprint phase 4: research intelligence                                | Accepted                                               |
+| [0033](0033-blueprint-enterprise-scale.md)       | Blueprint phase 5: enterprise scale                                     | Accepted                                               |
+| [0034](0034-webcam-eye-tracking.md)              | Webcam eye tracking (experimental)                                      | Accepted                                               |
+| [0035](0035-integrations-in-the-crm.md)          | Integrations set up in the CRM: sealed keys, env fallback, no restart   | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

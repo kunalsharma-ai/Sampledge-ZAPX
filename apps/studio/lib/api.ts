@@ -37,6 +37,8 @@ export interface Me {
   role: 'ADMIN' | 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
   projectScope: 'ALL' | 'ASSIGNED';
   tenant: { id: string; name: string };
+  /** Administrator of the organization that runs this installation: may open Settings > Integrations. */
+  canManageIntegrations?: boolean;
 }
 
 /** Multipart upload (files) with the same session and CSRF handling as `api`. */

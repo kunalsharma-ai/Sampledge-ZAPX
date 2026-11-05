@@ -12,6 +12,7 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client, type ServerSideEncryption } from '@aws-sdk/client-s3';
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 
 export abstract class FileStore {
   abstract put(key: string, data: Buffer, contentType?: string): Promise<void>;
@@ -55,27 +56,53 @@ export class FileNotFoundError extends Error {
   code = 'ENOENT';
 }
 
+export interface S3Settings {
+  bucket: string;
+  region: string;
+  prefix?: string;
+  kmsKeyId?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+}
+
+/** The S3 settings in use: Settings > Integrations first, then the S3_* variables. */
+export function s3Settings(): S3Settings {
+  const v = integration('s3').values;
+  return {
+    bucket: v.bucket ?? '',
+    region: v.region || config().S3_REGION,
+    prefix: v.prefix || undefined,
+    kmsKeyId: v.kmsKeyId || undefined,
+    accessKeyId: v.accessKeyId || undefined,
+    secretAccessKey: v.secretAccessKey || undefined,
+  };
+}
+
 @Injectable()
 export class S3FileStore extends FileStore {
   private readonly log = new Logger('S3FileStore');
   private readonly bucket: string;
   private readonly prefix: string;
   private readonly kmsKeyId: string | undefined;
-  constructor(private readonly client: S3Client = S3FileStore.client()) {
+  constructor(client?: S3Client, settings: S3Settings = s3Settings()) {
     super();
-    const c = config();
-    if (!c.S3_BUCKET) throw new Error('FILE_STORE=s3 needs S3_BUCKET');
-    this.bucket = c.S3_BUCKET;
-    this.prefix = c.S3_PREFIX ? `${c.S3_PREFIX.replace(/\/+$/, '')}/` : '';
-    this.kmsKeyId = c.S3_KMS_KEY_ID;
+    if (!settings.bucket) throw new Error('S3 storage needs a bucket (Settings > Integrations, or S3_BUCKET)');
+    this.client = client ?? S3FileStore.client(settings);
+    this.bucket = settings.bucket;
+    this.prefix = settings.prefix ? `${settings.prefix.replace(/\/+$/, '')}/` : '';
+    this.kmsKeyId = settings.kmsKeyId;
     this.log.log(`Files are stored in s3://${this.bucket}/${this.prefix} (${this.kmsKeyId ? 'SSE-KMS' : 'SSE-S3'})`);
   }
+  private readonly client: S3Client;
 
-  static client() {
+  static client(settings: S3Settings = s3Settings()) {
     const c = config();
     return new S3Client({
-      region: c.S3_REGION,
+      region: settings.region,
       ...(c.S3_ENDPOINT ? { endpoint: c.S3_ENDPOINT, forcePathStyle: true } : {}),
+      ...(settings.accessKeyId && settings.secretAccessKey
+        ? { credentials: { accessKeyId: settings.accessKeyId, secretAccessKey: settings.secretAccessKey } }
+        : {}),
       maxAttempts: 3,
     });
   }
@@ -111,7 +138,32 @@ export class S3FileStore extends FileStore {
   }
 }
 
-/** The store FILE_STORE selects; used by the API, the worker and the CLI alike. */
+/** The store in use right now: S3 when it is on in Settings > Integrations (or FILE_STORE=s3), else local. */
 export function fileStoreFromConfig(): FileStore {
-  return config().FILE_STORE === 's3' ? new S3FileStore() : new LocalFileStore();
+  return integration('s3').enabled ? new S3FileStore() : new LocalFileStore();
+}
+
+/**
+ * The FileStore the API and the worker use: follows Settings > Integrations, rebuilding the S3 client
+ * when the bucket, keys or switch change. Files are not moved when storage is switched.
+ */
+@Injectable()
+export class SwitchingFileStore extends FileStore {
+  private built?: { fingerprint: string; store: FileStore };
+
+  current(): FileStore {
+    const s = integration('s3');
+    const fingerprint = `${s.fingerprint}|${config().FILES_DIR}`;
+    if (this.built?.fingerprint !== fingerprint) this.built = { fingerprint, store: fileStoreFromConfig() };
+    return this.built.store;
+  }
+  put(key: string, data: Buffer, contentType?: string) {
+    return this.current().put(key, data, contentType);
+  }
+  get(key: string) {
+    return this.current().get(key);
+  }
+  delete(key: string) {
+    return this.current().delete(key);
+  }
 }

@@ -30,7 +30,7 @@ import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap';
 import { config, resetConfig } from '../src/config';
 import { PrismaService } from '../src/common/prisma.service';
-import { FileNotFoundError, FileStore, S3FileStore } from '../src/jobs/file-store';
+import { FileNotFoundError, FileStore, S3FileStore, SwitchingFileStore } from '../src/jobs/file-store';
 import { verifyStripeSignature } from '../src/plans/billing.service';
 import { databaseUrlFromParts } from '../src/database-url';
 import { addressOnly } from '../src/bootstrap';
@@ -145,8 +145,8 @@ afterAll(async () => {
 });
 
 describe('files in S3', () => {
-  it('the app uses the S3 store when FILE_STORE=s3', () => {
-    expect(app.get(FileStore)).toBeInstanceOf(S3FileStore);
+  it('the app uses the S3 store when FILE_STORE=s3 (and nothing is saved in the CRM)', () => {
+    expect((app.get(FileStore) as SwitchingFileStore).current()).toBeInstanceOf(S3FileStore);
   });
 
   it('stores uploads as encrypted objects and serves them back', async () => {

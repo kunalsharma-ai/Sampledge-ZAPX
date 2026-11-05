@@ -127,6 +127,11 @@ export default function SettingsPage() {
       <div className="row">
         <h1 style={{ margin: 0 }}>Organization settings</h1>
         <div style={{ flex: 1 }} />
+        {me?.canManageIntegrations ? (
+          <Link href="/settings/integrations" className="btn primary" data-testid="integrations-link">
+            Integrations
+          </Link>
+        ) : null}
         <Link href="/settings/audit" className="btn">
           Audit log
         </Link>
@@ -136,10 +141,10 @@ export default function SettingsPage() {
         <section className="panel stack" data-testid="ai-settings">
           <h2>AI</h2>
           {ai ? (
-            <p className="small muted" style={{ margin: 0 }}>
+            <p className="small muted" style={{ margin: 0 }} data-testid="ai-status">
               {ai.status.configured
                 ? `Provider: ${ai.status.provider}. Models: ${ai.tasks.map((t) => `${t} → ${ai.status.tasks[t].model}`).join(', ')}.`
-                : 'AI is not configured on this server (ANTHROPIC_API_KEY and AI_MODEL). These settings apply once it is.'}
+                : 'Claude is not connected yet. These settings apply once it is.'}
             </p>
           ) : null}
           {policy ? (
@@ -247,9 +252,7 @@ export default function SettingsPage() {
               ) : (
                 <p className="muted small">No AI calls yet.</p>
               )}
-              <p className="muted small">
-                Costs use the price list the server is configured with (AI_PRICING) and are estimates, not an invoice.
-              </p>
+              <p className="muted small">Costs use the price list in Settings › Integrations › Claude and are estimates, not an invoice.</p>
             </>
           ) : null}
         </section>
