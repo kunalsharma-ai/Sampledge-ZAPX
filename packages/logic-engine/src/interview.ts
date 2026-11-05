@@ -10,6 +10,7 @@ import {
   CAPTURE_REF,
   SIGNATURE_MAX_LENGTH,
   SIGNATURE_PATTERN,
+  parseEyeTrack,
   scaleCodes,
   type AnswerValue,
   type Answers,
@@ -276,6 +277,24 @@ export const SYSTEM_MESSAGES = {
   signHere: 'Sign in the box with your finger, a pen or the mouse.',
   clearSignature: 'Clear',
   signatureMissing: 'Please sign in the box.',
+  eyeTrackPending: 'Finish or skip the eye-tracking task to continue.',
+  eyeIntro: 'Eye tracking',
+  eyeAgree: 'I agree, turn on the camera',
+  eyeSkip: 'Skip this task',
+  eyeStarting: 'Starting the camera…',
+  eyePosition: 'Sit about an arm’s length from the screen with your face in good light. Keep your head still.',
+  eyeStartCalibration: 'Start',
+  eyeCalibrate: 'Look at each dot and click it. Keep your head still.',
+  eyeDot: 'Dot {n} of {total}',
+  eyeRetry: 'That was not accurate enough. Let’s try once more.',
+  eyeLook: 'Look at the picture as you normally would.',
+  eyeStop: 'Stop',
+  eyeDone: 'Thank you, this task is done.',
+  eyeSkipped: 'You skipped this task.',
+  eyeUnavailable: 'Eye tracking is not available on this device or browser. You can continue.',
+  eyeNoFace: 'We could not see a face in the camera. You can continue.',
+  eyeCalibrationFailed: 'The calibration was not accurate enough. You can continue.',
+  eyeExperimental: 'Experimental: the camera estimate of where you look is approximate.',
   scanCode: 'Scan with the camera',
   stopScan: 'Stop scanning',
   scanUnavailable: 'This device cannot scan codes. Type the code instead.',
@@ -510,6 +529,13 @@ export function normalizeAnswer(
       }
       return { value: out };
     }
+    case 'eyetrack': {
+      // Always answered (a skip or a failure is stored too), so the counts are honest.
+      const a = parseEyeTrack(raw);
+      if (!a) return { error: msg.eyeTrackPending };
+      if (a.status === 'recorded' && (a.durationMs ?? 0) > q.durationSec * 1000 + 2000) return { error: msg.eyeTrackPending };
+      return { value: raw as string };
+    }
     case 'barcode': {
       if (typeof raw !== 'string') return { error: msg.enterCode };
       const code = raw.trim();
@@ -591,6 +617,7 @@ export function answerText(def: SurveyDefinition, id: string, answers: Answers):
   if (q.type === 'ranking' && Array.isArray(v)) return v.map((c) => q.options.find((o) => o.code === c)?.label ?? String(c)).join(', ');
   if (q.type === 'hotspot' && Array.isArray(v)) return v.map((c) => q.regions.find((r) => r.code === c)?.label ?? String(c)).join(', ');
   if (q.type === 'signature') return v ? 'signed' : '';
+  if (q.type === 'eyetrack') return parseEyeTrack(v)?.status ?? '';
   if (q.type === 'maxdiff' || q.type === 'conjoint') return '';
   if (typeof v === 'object') return '';
   return String(v);

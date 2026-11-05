@@ -20,6 +20,7 @@ import {
   cardSortQuestionSchema,
   gridQuestionSchema,
   hotspotQuestionSchema,
+  eyeTrackQuestionSchema,
   infoElementSchema,
   loopSchema,
   multiQuestionSchema,
@@ -201,7 +202,14 @@ const scalarAttrs = (o: Record<string, unknown>, skip: string[]) =>
 const textEl = (name: string, v: string | undefined, ind: string) => (v ? `${ind}<${name}>${esc(v)}</${name}>\n` : '');
 
 /** Child elements of a question for its list fields, keyed by field name. */
-const LIST_ELEMENTS: Record<string, string> = { options: 'option', columns: 'col', rows: 'row', groups: 'group', regions: 'region' };
+const LIST_ELEMENTS: Record<string, string> = {
+  options: 'option',
+  columns: 'col',
+  rows: 'row',
+  groups: 'group',
+  regions: 'region',
+  aois: 'aoi',
+};
 const OBJECT_ELEMENTS = ['media', 'optionsFrom', 'dontKnow'];
 
 function questionXml(q: Question, ind: string): string {
@@ -294,6 +302,8 @@ export interface XmlReadResult {
 const NUMBER_KEYS = new Set([
   'schemaVersion',
   'code',
+  'durationSec',
+  'maxErrorPct',
   'min',
   'max',
   'step',
@@ -381,6 +391,7 @@ const QUESTION_SCHEMAS = {
   barcode: barcodeQuestionSchema,
   maxdiff: maxDiffQuestionSchema,
   conjoint: conjointQuestionSchema,
+  eyetrack: eyeTrackQuestionSchema,
   info: infoElementSchema,
 } as const;
 const shapeKeys = (schema: { shape: Record<string, unknown> }) => new Set(Object.keys(schema.shape));

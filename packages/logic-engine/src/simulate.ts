@@ -224,6 +224,14 @@ function generateAnswer(q: Question, g: GenContext): AnswerValue | undefined {
     }
     case 'signature':
       return `100,200 ${200 + (++g.serial % 700)},150 900,250`;
+    case 'eyetrack': {
+      // Synthetic respondents skip some tasks and otherwise look around the picture.
+      if (g.rng.chance(0.2)) return 'declined';
+      const pts: string[] = [];
+      for (let t = 0; t <= q.durationSec * 1000; t += 100)
+        pts.push(g.rng.chance(0.1) ? `${t},-` : `${t},${g.rng.int(0, 1000)},${g.rng.int(0, 1000)}`);
+      return `recorded|${g.rng.int(30, 120)}|${q.durationSec * 1000}|${pts.join(' ')}`;
+    }
     case 'barcode': {
       // Common code shapes (EAN-13, EAN-8, UPC-A, alphanumeric, a URL in a QR code); the first that fits the pattern.
       const n = String(++g.serial);

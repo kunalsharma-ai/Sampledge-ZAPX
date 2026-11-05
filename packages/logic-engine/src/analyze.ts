@@ -35,7 +35,8 @@ export interface LogicIssue {
     | 'FLOW'
     | 'BLOCK_ORDER'
     | 'DYNAMIC_LIST'
-    | 'CLEANING';
+    | 'CLEANING'
+    | 'EXPERIMENTAL';
   message: string;
   /** Where the problem is, e.g. "pages.P2.questions.Q5.condition". */
   location: string;
@@ -98,7 +99,8 @@ export function analyzeSurvey(source: SurveyDefinition): AnalysisReport {
         q.type === 'ranking' ||
         q.type === 'sum' ||
         q.type === 'cardsort' ||
-        q.type === 'hotspot'
+        q.type === 'hotspot' ||
+        q.type === 'eyetrack'
       ) {
         const lists =
           q.type === 'grid'
@@ -107,7 +109,9 @@ export function analyzeSurvey(source: SurveyDefinition): AnalysisReport {
               ? [q.options, q.groups]
               : q.type === 'hotspot'
                 ? [q.regions]
-                : [q.options];
+                : q.type === 'eyetrack'
+                  ? [q.aois]
+                  : [q.options];
         for (const opts of lists) {
           const codes = new Set<number>();
           for (const o of opts) {
@@ -127,6 +131,20 @@ export function analyzeSurvey(source: SurveyDefinition): AnalysisReport {
           add('error', 'INVALID_RANGE', `${q.id}: minimum selections exceed maximum.`, loc);
         if (q.minSelected !== undefined && q.minSelected > q.regions.length)
           add('error', 'INVALID_RANGE', `${q.id}: requires ${q.minSelected} areas but has ${q.regions.length}.`, loc);
+      }
+      if (q.type === 'eyetrack') {
+        if (!q.image) add('error', 'MEDIA', `${q.id}: choose the picture respondents look at.`, loc);
+        if (!q.imageAlt.trim())
+          add('warning', 'MEDIA', `${q.id}: describe the picture in its text alternative, for people using screen readers.`, loc);
+        for (const r of q.aois)
+          if (r.x + r.w > 100.001 || r.y + r.h > 100.001)
+            add('warning', 'INVALID_RANGE', `${q.id}: area of interest "${r.label}" reaches past the edge of the picture.`, loc);
+        add(
+          'warning',
+          'EXPERIMENTAL',
+          `${q.id}: webcam eye tracking is experimental. Gaze is estimated in the browser and has not been validated on real webcams; treat heatmaps as approximate.`,
+          loc,
+        );
       }
       if (q.type === 'grid') {
         const rows = new Set<string>();
