@@ -574,6 +574,31 @@ export const recodeSchema = z
   );
 export type Recode = z.infer<typeof recodeSchema>;
 
+/**
+ * Cleaning rule (blueprint phase 5): an edit or impute rule applied when data is analysed or
+ * exported. Stored answers are never changed; the cleaned value is worked out each time, and the
+ * rules each record went through are listed. Rules run in order, so a later rule sees earlier edits.
+ * - set: give the target this value when `when` holds (e.g. recode an impossible age to blank).
+ * - clear: blank the target when `when` holds (e.g. a speeder's open answer).
+ * - impute: fill a blank target with the mean, median or most common answer of the records that
+ *   answered it (computed over the data being analysed).
+ */
+export const cleaningRuleSchema = z
+  .object({
+    id: variableName,
+    label: z.string().max(200).optional(),
+    /** Records the rule applies to (an expression over answers and variables); every record when empty. */
+    when: expression.optional(),
+    /** A question id whose answer is a single value (single choice, number, scale, text). */
+    target: z.string().min(1).max(100),
+    action: z.enum(['set', 'clear', 'impute']),
+    value: z.union([z.number(), z.string().max(500)]).optional(),
+    method: z.enum(['mean', 'median', 'mode']).optional(),
+  })
+  .refine((r) => r.action !== 'set' || r.value !== undefined, { message: 'A set rule needs a value.' })
+  .refine((r) => r.action !== 'impute' || r.method !== undefined, { message: 'An impute rule needs a method (mean, median or mode).' });
+export type CleaningRule = z.infer<typeof cleaningRuleSchema>;
+
 // ---- Data quality (Milestone 5) -----------------------------------------------------------------
 // Quality settings are part of the versioned definition: an in-survey quality reject changes where a
 // respondent is redirected, so it is published, diffed and reviewed like any other logic.
@@ -692,6 +717,7 @@ export const surveyDefinitionSchema = z.object({
   blocks: z.array(blockSchema).max(50).default([]),
   variables: z.array(variableSchema).max(200).default([]),
   recodes: z.array(recodeSchema).max(100).default([]),
+  cleaning: z.array(cleaningRuleSchema).max(100).default([]),
   urlVariables: z.array(urlVariableSchema).max(100).default([]),
   settings: z
     .object({

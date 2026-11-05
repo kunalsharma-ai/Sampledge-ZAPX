@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseSurveyDefinition, type SurveyDefinition } from '@zapx/survey-schema';
-import { crosstab, frequency, recodeProblems, variables, type AnalysisRecord } from './index';
+import { crosstab, describeSegment, frequency, recodeProblems, segment, variables, type AnalysisRecord } from './index';
 
 const parsed = parseSurveyDefinition({
   schemaVersion: 1,
@@ -91,5 +91,61 @@ describe('derived variables', () => {
     };
     expect(recodeProblems(bad as SurveyDefinition).map((p) => p.id)).toEqual(['X', 'AGE']);
     expect(recodeProblems(def)).toEqual([]);
+  });
+});
+
+describe('segments and cleaning lineage (blueprint phase 5)', () => {
+  const p = parseSurveyDefinition({
+    schemaVersion: 1,
+    title: 'Segments',
+    pages: [
+      {
+        id: 'P1',
+        questions: [
+          { id: 'AGE', type: 'numeric', text: 'Age?' },
+          {
+            id: 'G',
+            type: 'single',
+            text: 'Gender',
+            options: [
+              { code: 1, label: 'Woman' },
+              { code: 2, label: 'Man' },
+            ],
+          },
+          { id: 'B', type: 'multi', text: 'Brands', options: [1, 2, 3].map((code) => ({ code, label: `B${code}` })) },
+        ],
+      },
+    ],
+    cleaning: [{ id: 'C1', target: 'AGE', action: 'clear', when: 'AGE > 99' }],
+  });
+  if (!p.ok) throw new Error(JSON.stringify(p.issues));
+  const def = p.definition;
+  const rec = (answers: Record<string, unknown>): AnalysisRecord => ({ answers, system: {} });
+  const records = [rec({ AGE: 20, G: 1, B: [1] }), rec({ AGE: 40, G: 2, B: [2, 3] }), rec({ AGE: 33, G: 1, B: [3] }), rec({ G: 2 })];
+  const vars = variables(def, records);
+
+  it('keeps records matching every filter', () => {
+    expect(segment(vars, records, [{ variable: 'G', values: [1] }])).toHaveLength(2);
+    expect(segment(vars, records, [{ variable: 'B', values: [3] }])).toHaveLength(2);
+    expect(segment(vars, records, [{ variable: 'AGE', min: 25, max: 45 }])).toEqual([records[1], records[2]]);
+    expect(
+      segment(vars, records, [
+        { variable: 'G', values: [1] },
+        { variable: 'AGE', min: 25 },
+      ]),
+    ).toEqual([records[2]]);
+    expect(segment(vars, records, [{ variable: 'G', values: [1], exclude: true }])).toEqual([records[1], records[3]]);
+    expect(() => segment(vars, records, [{ variable: 'NOPE', values: [1] }])).toThrow(/Unknown variable/);
+    expect(
+      describeSegment(vars, [
+        { variable: 'G', values: [1] },
+        { variable: 'AGE', min: 18, max: 34 },
+      ]),
+    ).toBe('G is Woman; AGE is 18 to 34');
+  });
+
+  it('marks questions edited by cleaning rules', () => {
+    expect(vars.find((v) => v.id === 'AGE')!.cleanedBy).toEqual(['C1']);
+    expect(vars.find((v) => v.id === 'G')!.cleanedBy).toBeUndefined();
   });
 });
