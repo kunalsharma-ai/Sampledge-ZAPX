@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
+import { AuthBrand, AuthFrame } from '@/components/neon/AuthFrame';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -33,32 +34,32 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <form className="panel stack center-card" onSubmit={submit}>
-      <div className="brand" style={{ fontSize: 18 }}>
-        SAMPLEDGE <span>ZAPX</span>
-      </div>
-      <h1>Reset your password</h1>
-      {emailOn === false ? (
-        <p className="muted">
-          This ZAPX does not send email. Ask an administrator of your organization for a password reset link (Settings → Team).
-        </p>
-      ) : sent ? (
-        <p role="status">If an account with that email exists, we sent it a link to set a new password. Check your inbox.</p>
-      ) : (
-        <>
-          <label className="field">
-            Email
-            <input type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
-          </label>
-          <ErrorNote error={error} />
-          <button className="primary" disabled={busy || emailOn === null}>
-            {busy ? 'Please wait…' : 'Email me a link'}
-          </button>
-        </>
-      )}
-      <Link href="/login" className="link">
-        Back to sign in
-      </Link>
-    </form>
+    <AuthFrame>
+      <form className="panel stack nx-auth-card" onSubmit={submit}>
+        <AuthBrand />
+        <h1>Reset your password</h1>
+        {emailOn === false ? (
+          <p className="muted">
+            This ZAPX does not send email. Ask an administrator of your organization for a password reset link (Settings → Team).
+          </p>
+        ) : sent ? (
+          <p role="status">If an account with that email exists, we sent it a link to set a new password. Check your inbox.</p>
+        ) : (
+          <>
+            <label className="field">
+              Email
+              <input type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </label>
+            <ErrorNote error={error} />
+            <button className="primary" disabled={busy || emailOn === null}>
+              {busy ? 'Please wait…' : 'Email me a link'}
+            </button>
+          </>
+        )}
+        <Link href="/login" className="link">
+          Back to sign in
+        </Link>
+      </form>
+    </AuthFrame>
   );
 }

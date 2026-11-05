@@ -1,14 +1,15 @@
 'use client';
 import { Shell } from '@/components/Shell';
 import { ProjectsSection } from '@/components/neon/ProjectsSection';
+import { PageHeader } from '@/components/neon/PageHeader';
+import { FolderKanban } from 'lucide-react';
 
 export default function ProjectsPage() {
   return (
     <Shell>
-      <div className="nx-page-head">
-        <h1>Projects</h1>
-        <p className="muted">Each project holds its surveys and the sample vendors sending traffic to them.</p>
-      </div>
+      <PageHeader icon={FolderKanban} eyebrow="Workspace" title="Projects">
+        Each project holds its surveys and the sample vendors sending traffic to them.
+      </PageHeader>
       <ProjectsSection />
     </Shell>
   );

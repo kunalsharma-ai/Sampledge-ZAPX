@@ -15,6 +15,8 @@ import { ApiKeys } from '@/components/ApiKeys';
 import { Webhooks } from '@/components/Webhooks';
 import { DataGovernance } from '@/components/DataGovernance';
 import { Billing, PlanUsage, ScimSettings, SsoSettings } from '@/components/Identity';
+import { PageHeader } from '@/components/neon/PageHeader';
+import { KeyRound, Settings } from 'lucide-react';
 
 type Task = 'architect' | 'translate' | 'insights';
 const TASK_NAMES: Record<Task, string> = {
@@ -94,7 +96,7 @@ export default function SettingsPage() {
   if (me && me.role === 'PROGRAMMER') {
     return (
       <Shell crumbs={<Link href="/">Dashboard</Link>}>
-        <h1>API keys</h1>
+        <PageHeader icon={KeyRound} title="API keys" />
         <ApiKeys isAdmin={false} />
       </Shell>
     );
@@ -124,18 +126,26 @@ export default function SettingsPage() {
 
   return (
     <Shell crumbs={<Link href="/">Dashboard</Link>}>
-      <div className="row">
-        <h1 style={{ margin: 0 }}>Organization settings</h1>
-        <div style={{ flex: 1 }} />
-        {me?.canManageIntegrations ? (
-          <Link href="/settings/integrations" className="btn primary" data-testid="integrations-link">
-            Integrations
-          </Link>
-        ) : null}
-        <Link href="/settings/audit" className="btn">
-          Audit log
-        </Link>
-      </div>
+      <PageHeader
+        icon={Settings}
+        tone={0}
+        eyebrow="Administration"
+        title="Organization settings"
+        actions={
+          <>
+            {me?.canManageIntegrations ? (
+              <Link href="/settings/integrations" className="btn primary" data-testid="integrations-link">
+                Integrations
+              </Link>
+            ) : null}
+            <Link href="/settings/audit" className="btn">
+              Audit log
+            </Link>
+          </>
+        }
+      >
+        AI limits, redirects, data residency, single sign-on, team, API keys and webhooks for your organization.
+      </PageHeader>
       <ErrorNote error={error} />
       <div className="grid2" style={{ marginTop: 16 }}>
         <section className="panel stack" data-testid="ai-settings">

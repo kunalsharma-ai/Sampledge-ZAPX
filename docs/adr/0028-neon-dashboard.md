@@ -32,3 +32,18 @@ recording, notifications). The studio home was a plain projects list.
 - People who never chose a theme see Neon AI dark; saved personal and organization appearances are unchanged.
 - `GET /api/dashboard/search?q=` searches projects (name, client) and surveys by name.
 - The dashboard summary is computed on each load; for very large organizations it may need caching later.
+
+## Addendum (2026-11-05): neon on every page
+
+The dashboard look now carries to the rest of the CRM, visual changes only:
+
+- `components/neon/PageHeader.tsx`: every signed-in page opens with the same glowing header (icon tile, eyebrow,
+  title, description, actions). Each page still has exactly one `h1` with the same text as before.
+- `components/neon/AuthFrame.tsx`: sign in, forgot password and reset password get the neon brand panel
+  (robot, headline, capability chips) next to the form card.
+- `app/neon-pages.css` (loaded after `neon.css`): pill tabs (with icons on the survey editor), neon table
+  headers, KPI-style stat tiles, lit panel edges, focus glows, and a fix so editor layouts stack on phones
+  (their inline desktop columns used to override the narrow-screen rule).
+- The interviewer app (`apps/capi`) uses the same indigo/violet/cyan palette, gradient buttons and glowing cards.
+
+Everything is built on Quantum tokens, so other theme presets, light mode and high contrast keep working.

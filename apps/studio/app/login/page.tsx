@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
+import { AuthBrand, AuthFrame } from '@/components/neon/AuthFrame';
 
 function LoginForm() {
   const params = useSearchParams();
@@ -48,10 +49,8 @@ function LoginForm() {
   };
 
   return (
-    <form className="panel stack center-card" onSubmit={submit}>
-      <div className="brand" style={{ fontSize: 18 }}>
-        SAMPLEDGE <span>ZAPX</span>
-      </div>
+    <form className="panel stack nx-auth-card" onSubmit={submit}>
+      <AuthBrand />
       <h1>{mode === 'login' ? 'Sign in' : 'Create an organization'}</h1>
       {mode === 'register' ? (
         <>
@@ -102,8 +101,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
-      <LoginForm />
-    </Suspense>
+    <AuthFrame>
+      <Suspense>
+        <LoginForm />
+      </Suspense>
+    </AuthFrame>
   );
 }

@@ -177,7 +177,12 @@ export function App() {
   return (
     <div className="capi">
       <header className="capi-top">
-        <strong>ZAPX Interviewer</strong>
+        <strong className="capi-brand">
+          <span className="capi-brand-mark" aria-hidden="true">
+            Z
+          </span>
+          ZAPX Interviewer
+        </strong>
         <span className={`capi-pill ${online ? 'ok' : 'off'}`} data-testid="connection">
           {online ? 'Online' : 'Offline'}
         </span>
@@ -380,7 +385,12 @@ function SignIn({ online, again, onSignedIn }: { online: boolean; again: Intervi
   const [busy, setBusy] = useState(false);
   return (
     <main className="capi-main capi-narrow">
-      <h1>ZAPX Interviewer</h1>
+      <h1 className="capi-brand">
+        <span className="capi-brand-mark" aria-hidden="true">
+          Z
+        </span>
+        ZAPX Interviewer
+      </h1>
       {again ? <p>Your session has ended. Sign in again to sync; your interviews are safe on this device.</p> : null}
       {!online ? <p className="capi-problem">You are offline. Signing in needs a connection the first time.</p> : null}
       <form

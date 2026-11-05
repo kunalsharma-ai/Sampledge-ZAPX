@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote, Shell } from '@/components/Shell';
+import { PageHeader } from '@/components/neon/PageHeader';
+import { ScrollText } from 'lucide-react';
 
 interface Event {
   id: string;
@@ -73,8 +75,9 @@ export default function AuditPage() {
 
   return (
     <Shell crumbs={crumbs}>
-      <h1>Audit log</h1>
-      <p className="muted">Every change in the organization, newest first. Audit events cannot be edited or deleted.</p>
+      <PageHeader icon={ScrollText} tone={5} eyebrow="Administration" title="Audit log">
+        Every change in the organization, newest first. Audit events cannot be edited or deleted.
+      </PageHeader>
       <form
         className="panel audit-filters"
         data-testid="audit-filters"

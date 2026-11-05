@@ -36,6 +36,7 @@ import { useTheme } from '@/lib/theme/ThemeProvider';
 import { useMe } from '@/lib/useMe';
 import { api } from '@/lib/api';
 import { ComponentPreview } from './ComponentPreview';
+import { PageHeader } from '@/components/neon/PageHeader';
 
 /** Miniature of a preset in the active scheme: page, light, a panel, a primary action and text. */
 function Swatch({ appearance }: { appearance: Appearance }) {
@@ -128,16 +129,9 @@ export default function AppearancePage() {
 
   return (
     <Shell crumbs={<Link href="/">Dashboard</Link>} forInterviewers>
-      <div className="q-page-head">
-        <div>
-          <div className="q-eyebrow">Quantum Design System</div>
-          <h1>Appearance</h1>
-          <p className="muted" style={{ margin: 0 }}>
-            Changes apply at once and follow you to every device you sign in on.
-          </p>
-        </div>
-        <SaveState />
-      </div>
+      <PageHeader icon={Palette} tone={4} eyebrow="Quantum Design System" title="Appearance" actions={<SaveState />}>
+        Changes apply at once and follow you to every device you sign in on.
+      </PageHeader>
 
       <div className="q-appearance">
         <div className="stack" style={{ gap: 16 }}>
