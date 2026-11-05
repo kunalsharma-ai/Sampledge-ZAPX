@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response as ExpressResponse } from 'express';
 import { z } from 'zod';
@@ -64,6 +64,16 @@ export class AnalysisController {
   frequencies(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
     const input = parseBody(frequenciesSchema, body ?? {});
     return this.analysis.frequencies(user, id, input.filters, input.variables, input.weighting);
+  }
+
+  /** Blueprint phase 5: run a dashboard of chart tiles without saving it. */
+  @Post('surveys/:id/analysis/dashboard')
+  @Roles(...READERS)
+  @HttpCode(200)
+  dashboard(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {
+    const cfg = parseBody(reportConfigSchema, { ...((body ?? {}) as object), type: 'dashboard' });
+    if (cfg.type !== 'dashboard') throw new BadRequestException('Not a dashboard');
+    return this.analysis.dashboard(user, id, cfg);
   }
 
   @Post('surveys/:id/analysis/crosstab')

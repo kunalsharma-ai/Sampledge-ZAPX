@@ -13,6 +13,7 @@ import { RedirectRepository } from './redirect.repository';
 import { VendorApiController } from './vendor-api.controller';
 import { WebhookService } from './webhook.service';
 import { WebhooksController } from './webhooks.controller';
+import { AutomationQueue } from '../automation/automation.queue';
 
 @Module({
   controllers: [IntegrationsController, VendorApiController, WebhooksController],
@@ -21,9 +22,10 @@ import { WebhooksController } from './webhooks.controller';
     HttpDelivery,
     CallbackWorker,
     WebhookService,
+    AutomationQueue,
     { provide: SecretBox, useClass: LocalSecretBox },
     { provide: RedirectService, useClass: LocalRedirectService },
   ],
-  exports: [RedirectService, SecretBox, CallbackWorker, WebhookService],
+  exports: [RedirectService, SecretBox, CallbackWorker, WebhookService, AutomationQueue],
 })
 export class IntegrationsModule {}

@@ -24,6 +24,8 @@ import { QaService, type QaRunInput } from '../qa/qa.service';
 import { FilesService } from './files.service';
 import { JOB_TYPES } from './jobs.service';
 import { DistributionService } from '../distribution/distribution.service';
+import { AutomationService } from '../automation/automation.service';
+import { GovernanceService } from '../governance/governance.service';
 
 const LEASE_MS = 5 * 60_000;
 const RETRY_DELAY_MS = 30_000;
@@ -64,6 +66,8 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly transcription: TranscriptionService,
     private readonly telephony: TelephonyService,
     private readonly distribution: DistributionService,
+    private readonly automation: AutomationService,
+    private readonly governance: GovernanceService,
   ) {}
 
   onApplicationBootstrap() {
@@ -104,6 +108,8 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
     }
     // Blueprint phase 3: scheduled invitation emails and reminders.
     await this.distribution.pass().catch((e) => this.log.error(`Email pass failed: ${(e as Error).message}`));
+    // Blueprint phase 5: scheduled rules and queued automation runs.
+    await this.automation.pass().catch((e) => this.log.error(`Automation pass failed: ${(e as Error).message}`));
     if (Date.now() - this.lastHousekeeping > HOUSEKEEPING_MS) {
       this.lastHousekeeping = Date.now();
       await this.housekeeping().catch((e) => this.log.error(`Housekeeping failed: ${(e as Error).message}`));
@@ -315,12 +321,26 @@ export class JobWorker implements OnApplicationBootstrap, OnModuleDestroy {
       where: { state: { in: ['DELIVERED', 'FAILED', 'DEAD'] }, createdAt: { lt: hookCutoff } },
     });
     const captures = await this.captures.purgeExpired();
+    // Blueprint phase 5: each organization's retention policy, then finished automation runs and read notifications, like jobs.
+    await this.prisma.automationRun.deleteMany({
+      where: { state: { in: ['DONE', 'SKIPPED', 'REJECTED', 'FAILED'] }, createdAt: { lt: jobCutoff } },
+    });
+    await this.prisma.notification.deleteMany({ where: { readAt: { lt: jobCutoff } } });
+    const retention = await this.governance.applyRetention();
     // Unfinished SAML sign-ins (Milestone 13) and applied billing events older than 90 days.
     const ssoRequests = await this.prisma.ssoRequest.deleteMany({ where: { expiresAt: { lt: new Date() } } });
     await this.prisma.billingEvent.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 90 * 86_400_000) } } });
     // Dialer call recordings (Milestone 19) that could not be copied from the provider yet.
     const callRecordings = await this.telephony.retryRecordings();
-    const out = { files, jobs: jobs.count, webhookDeliveries: deliveries.count, captures, ssoRequests: ssoRequests.count, callRecordings };
+    const out = {
+      files,
+      jobs: jobs.count,
+      webhookDeliveries: deliveries.count,
+      captures,
+      ssoRequests: ssoRequests.count,
+      callRecordings,
+      retention,
+    };
     if (files || jobs.count || deliveries.count || captures || ssoRequests.count || callRecordings)
       this.log.log(`Housekeeping removed ${JSON.stringify(out)}`);
     return out;

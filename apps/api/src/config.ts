@@ -147,6 +147,18 @@ const schema = z
     SENDGRID_API_BASE: z.string().url().default('https://api.sendgrid.com'),
     EMAIL_FROM: z.string().default(''),
     EMAIL_FROM_NAME: z.string().max(100).default('ZAPX surveys'),
+    /**
+     * Blueprint phase 5: SMS invitations. "twilio" sends through Twilio's Messages API with the
+     * TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN above, from SMS_FROM (an E.164 number, or a Messaging
+     * Service SID starting MG). "off" sends nothing.
+     */
+    SMS_PROVIDER: z.enum(['off', 'twilio']).default('off'),
+    SMS_FROM: z.string().default(''),
+    /**
+     * Blueprint phase 5, data residency: the region this deployment keeps data in (e.g. "eu", "us",
+     * "in"). An organization that sets its own region sees a warning when the two differ. Empty: not declared.
+     */
+    DATA_REGION: z.string().max(20).default(''),
     /** Largest interview recording (CAPI audio), in megabytes. Photos are capped at 15. */
     CAPTURE_MAX_MB: z.coerce.number().min(1).max(500).default(100),
     /** Delete photos and recordings this many days after they were uploaded. 0 keeps them until erased. */
@@ -259,6 +271,16 @@ const schema = z
         ctx.addIssue({ code: 'custom', path: ['TWILIO_CALLER_ID'], message: 'TWILIO_CALLER_ID must be E.164, e.g. +442071234567' });
       if (c.TELEPHONY_WEBHOOK_BASE && !/^https?:\/\/[^/]+(\/.*)?$/.test(c.TELEPHONY_WEBHOOK_BASE))
         ctx.addIssue({ code: 'custom', path: ['TELEPHONY_WEBHOOK_BASE'], message: 'TELEPHONY_WEBHOOK_BASE must be a URL' });
+    }
+    if (c.SMS_PROVIDER === 'twilio') {
+      for (const k of ['TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'SMS_FROM'] as const)
+        if (!c[k]) ctx.addIssue({ code: 'custom', path: [k], message: `SMS_PROVIDER=twilio needs ${k}` });
+      if (c.SMS_FROM && !/^(\+[1-9][0-9]{6,14}|MG[0-9a-fA-F]{32})$/.test(c.SMS_FROM))
+        ctx.addIssue({
+          code: 'custom',
+          path: ['SMS_FROM'],
+          message: 'SMS_FROM must be an E.164 number or a Messaging Service SID (MG...)',
+        });
     }
     if (c.NETWORK_REPUTATION === 'ipinfo' && !c.IPINFO_TOKEN)
       ctx.addIssue({ code: 'custom', path: ['IPINFO_TOKEN'], message: 'IPINFO_TOKEN is required when NETWORK_REPUTATION=ipinfo' });

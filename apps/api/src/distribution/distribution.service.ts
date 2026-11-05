@@ -18,6 +18,7 @@ import { AccessService } from '../common/access.service';
 import type { AuthUser } from '../auth/auth.types';
 import { parseCsv } from '../imports/template-import';
 import { emailProvider, type EmailProvider } from './mailer';
+import { MAX_SMS_BODY, normalizePhone, smsProvider, type SmsProvider } from './sms';
 
 export const MAX_CONTACTS = 100_000;
 /** Code of the project source that invitation links enter through. */
@@ -31,6 +32,8 @@ const SEND_BATCH = 50;
 
 export interface WaveInput {
   name: string;
+  /** Blueprint phase 5: EMAIL (default) or SMS. An SMS has no subject. */
+  channel?: 'EMAIL' | 'SMS';
   subject: string;
   body: string;
   sendAt: Date;
@@ -71,9 +74,11 @@ export class DistributionService {
       total,
       unsubscribed,
       emailEnabled: !!emailProvider(),
+      smsEnabled: !!smsProvider(),
       items: rows.map((c) => ({
         id: c.id,
         email: c.email,
+        phone: c.phone,
         name: c.name,
         language: c.language,
         fields: c.fields,
@@ -83,8 +88,9 @@ export class DistributionService {
   }
 
   /**
-   * Add or update contacts from CSV text with a header row: email (required), name, language, and any
-   * other columns (kept as link parameters). Rows with a bad email are reported, not imported.
+   * Add or update contacts from CSV text with a header row: email and/or phone (at least one per
+   * row), name, language, and any other columns (kept as link parameters). Rows with a bad email or
+   * phone number are reported, not imported. A row matches an existing contact by email, else by phone.
    */
   async importContacts(user: AuthUser, surveyId: string, csv: string) {
     await this.survey(user, surveyId);
@@ -94,27 +100,38 @@ export class DistributionService {
     const header = rows[0]!.map((h) => h.trim());
     const col = (name: string) => header.findIndex((h) => h.toLowerCase() === name);
     const iEmail = col('email');
-    if (iEmail < 0) throw new BadRequestException('The header row needs an "email" column');
+    const iPhone = col('phone');
+    if (iEmail < 0 && iPhone < 0) throw new BadRequestException('The header row needs an "email" or a "phone" column');
     const iName = col('name');
     const iLang = col('language');
+    const known = new Set([iEmail, iPhone, iName, iLang]);
     const extra = header
       .map((h, i) => ({ h, i }))
-      .filter(({ i }) => i !== iEmail && i !== iName && i !== iLang)
+      .filter(({ i }) => !known.has(i))
       .filter(({ h }) => FIELD_KEY.test(h) && !RESERVED_LINK_PARAMS.includes(h.toLowerCase()));
-    const ignored = header.filter((h, i) => i !== iEmail && i !== iName && i !== iLang && !extra.some((e) => e.i === i));
+    const ignored = header.filter((h, i) => !known.has(i) && !extra.some((e) => e.i === i));
     const errors: Array<{ row: number; message: string }> = [];
     const seen = new Set<string>();
-    const good: Array<{ email: string; name: string | null; language: string | null; fields: Record<string, string> }> = [];
+    type Row = { email: string | null; phone: string | null; name: string | null; language: string | null; fields: Record<string, string> };
+    const good: Row[] = [];
     rows.slice(1).forEach((r, k) => {
-      const email = (r[iEmail] ?? '').trim().toLowerCase();
-      if (!EMAIL.test(email) || email.length > 254)
-        return void errors.push({ row: k + 2, message: `"${email.slice(0, 80)}" is not an email address` });
-      if (seen.has(email)) return void errors.push({ row: k + 2, message: `${email} appears twice` });
-      seen.add(email);
+      const rawEmail = iEmail >= 0 ? (r[iEmail] ?? '').trim().toLowerCase() : '';
+      const rawPhone = iPhone >= 0 ? (r[iPhone] ?? '').trim() : '';
+      if (!rawEmail && !rawPhone) return void errors.push({ row: k + 2, message: 'No email or phone number' });
+      if (rawEmail && (!EMAIL.test(rawEmail) || rawEmail.length > 254))
+        return void errors.push({ row: k + 2, message: `"${rawEmail.slice(0, 80)}" is not an email address` });
+      const phone = rawPhone ? normalizePhone(rawPhone) : null;
+      if (rawPhone && !phone)
+        return void errors.push({ row: k + 2, message: `"${rawPhone.slice(0, 40)}" is not a phone number with a country code (+44...)` });
+      const key = rawEmail || phone!;
+      if (seen.has(key) || (rawEmail && phone && seen.has(phone))) return void errors.push({ row: k + 2, message: `${key} appears twice` });
+      seen.add(key);
+      if (phone) seen.add(phone);
       const fields = Object.fromEntries(extra.map(({ h, i }) => [h, (r[i] ?? '').trim().slice(0, 200)]).filter(([, v]) => v));
       const lang = iLang >= 0 ? (r[iLang] ?? '').trim() : '';
       good.push({
-        email,
+        email: rawEmail || null,
+        phone,
         name: iName >= 0 ? (r[iName] ?? '').trim().slice(0, 200) || null : null,
         language: /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(lang) ? lang : null,
         fields,
@@ -126,24 +143,37 @@ export class DistributionService {
     let updated = 0;
     for (let i = 0; i < good.length; i += 500) {
       const chunk = good.slice(i, i + 500);
-      const known = await this.prisma.contact.findMany({
-        where: { surveyId, email: { in: chunk.map((c) => c.email) } },
-        select: { email: true },
+      const emails = chunk.flatMap((c) => (c.email ? [c.email] : []));
+      const phones = chunk.flatMap((c) => (c.phone ? [c.phone] : []));
+      const matches = await this.prisma.contact.findMany({
+        where: { surveyId, OR: [{ email: { in: emails } }, { phone: { in: phones } }] },
+        select: { id: true, email: true, phone: true },
       });
-      const knownSet = new Set(known.map((k) => k.email));
-      const fresh = chunk.filter((c) => !knownSet.has(c.email));
+      const find = (c: Row) =>
+        (c.email ? matches.find((m) => m.email === c.email) : undefined) ??
+        (c.phone ? matches.find((m) => m.phone === c.phone) : undefined);
+      const fresh = chunk.filter((c) => !find(c));
       if (fresh.length) {
-        await this.prisma.contact.createMany({
+        const n = await this.prisma.contact.createMany({
           data: fresh.map((c) => ({ ...c, fields: c.fields as Prisma.InputJsonValue, tenantId: user.tenantId, surveyId })),
           skipDuplicates: true,
         });
-        added += fresh.length;
+        added += n.count;
       }
-      // Re-importing updates names and columns, but never resubscribes someone who opted out.
-      for (const c of chunk.filter((x) => knownSet.has(x.email))) {
+      // Re-importing updates names, numbers and columns, but never resubscribes someone who opted out.
+      for (const c of chunk) {
+        const m = find(c);
+        if (!m) continue;
+        const clash = c.phone && c.phone !== m.phone ? await this.prisma.contact.findFirst({ where: { surveyId, phone: c.phone } }) : null;
         await this.prisma.contact.update({
-          where: { surveyId_email: { surveyId, email: c.email } },
-          data: { name: c.name, language: c.language, fields: c.fields as Prisma.InputJsonValue },
+          where: { id: m.id },
+          data: {
+            name: c.name,
+            language: c.language,
+            fields: c.fields as Prisma.InputJsonValue,
+            ...(c.email && !m.email ? { email: c.email } : {}),
+            ...(c.phone && !clash ? { phone: c.phone } : {}),
+          },
         });
         updated++;
       }
@@ -188,11 +218,13 @@ export class DistributionService {
     const responded = await this.respondedByWave(rows.map((r) => r.id));
     return {
       emailEnabled: !!emailProvider(),
+      smsEnabled: !!smsProvider(),
       items: rows.map((d) => {
         const n = (s: string) => stats.find((x) => x.distributionId === d.id && x.state === s)?._count ?? 0;
         return {
           id: d.id,
           name: d.name,
+          channel: d.channel.toLowerCase(),
           subject: d.subject,
           body: d.body,
           sendAt: d.sendAt,
@@ -228,6 +260,8 @@ export class DistributionService {
   async createWave(user: AuthUser, surveyId: string, input: WaveInput) {
     const s = await this.survey(user, surveyId);
     if (!input.body.includes('[link]')) throw new BadRequestException('Put [link] in the message where the personal survey link goes');
+    if (input.channel === 'SMS' && input.body.length > MAX_SMS_BODY)
+      throw new BadRequestException(`Keep a text message under ${MAX_SMS_BODY} characters (the link is added to that)`);
     if (input.maxReminders > 0 && input.reminderDays < 1) throw new BadRequestException('Reminders need a number of days between emails');
     if (s.status === 'CLOSED' || s.deletedAt) throw new BadRequestException('This survey is closed');
     // Invitation links enter through a built-in source of the project, like any panel source.
@@ -237,7 +271,7 @@ export class DistributionService {
         tenantId: user.tenantId,
         projectId: s.projectId,
         code: EMAIL_SOURCE,
-        name: 'Email invitations',
+        name: 'Invitations',
         secret: randomBytes(32).toString('hex'),
       },
       update: { deletedAt: null },
@@ -272,10 +306,15 @@ export class DistributionService {
     const contacts = await this.prisma.contact.findMany({ where: { id: { in: inv.map((i) => i.contactId) } } });
     const esc = (v: string) =>
       /[",\n\r]/.test(v) || /^[=+\-@]/.test(v) ? `"${(/^[=+\-@]/.test(v) ? `'${v}` : v).replace(/"/g, '""')}"` : v;
-    const lines = ['email,name,link,unsubscribed'];
+    const lines = ['email,phone,name,link,unsubscribed'];
     for (const i of inv) {
       const c = contacts.find((x) => x.id === i.contactId);
-      if (c) lines.push([c.email, c.name ?? '', personalLink(surveyId, i.uid, c), c.unsubscribedAt ? 'yes' : 'no'].map(esc).join(','));
+      if (c)
+        lines.push(
+          [c.email ?? '', c.phone ?? '', c.name ?? '', personalLink(surveyId, i.uid, c), c.unsubscribedAt ? 'yes' : 'no']
+            .map(esc)
+            .join(','),
+        );
     }
     await this.audit.record(user, 'distribution.links', 'survey', surveyId, { distributionId: id, rows: inv.length });
     return lines.join('\r\n') + '\r\n';
@@ -293,10 +332,10 @@ export class DistributionService {
 
   // ---- Sending (worker) ---------------------------------------------------------------------------
 
-  /** Create the invitations of a wave (idempotent): one per contact who has not opted out. */
+  /** Create the invitations of a wave (idempotent): one per reachable contact who has not opted out. */
   private async invite(d: Distribution) {
     const contacts = await this.prisma.contact.findMany({
-      where: { surveyId: d.surveyId, unsubscribedAt: null },
+      where: { surveyId: d.surveyId, unsubscribedAt: null, ...(d.channel === 'SMS' ? { phone: { not: null } } : { email: { not: null } }) },
       select: { id: true },
     });
     for (let i = 0; i < contacts.length; i += 1000)
@@ -315,19 +354,23 @@ export class DistributionService {
   async pass(
     provider: EmailProvider | null = emailProvider(),
     now = new Date(),
+    sms: SmsProvider | null = smsProvider(),
   ): Promise<{ sent: number; failed: number; reminded: number }> {
     const out = { sent: 0, failed: 0, reminded: 0 };
-    // Sending is off: invitations wait (a wave can still be used for its personal links).
-    if (!provider) return out;
-    for (const d of await this.prisma.distribution.findMany({ where: { state: 'SCHEDULED', sendAt: { lte: now } }, take: 20 })) {
+    // A channel whose sending is off waits (a wave can still be used for its personal links).
+    const channels = [...(provider ? (['EMAIL'] as const) : []), ...(sms ? (['SMS'] as const) : [])];
+    if (!channels.length) return out;
+    const senders = { email: provider, sms };
+    const channel = { in: channels };
+    for (const d of await this.prisma.distribution.findMany({ where: { state: 'SCHEDULED', sendAt: { lte: now }, channel }, take: 20 })) {
       const claimed = await this.prisma.distribution.updateMany({ where: { id: d.id, state: 'SCHEDULED' }, data: { state: 'SENDING' } });
       if (claimed.count) await this.invite(d);
     }
-    const sending = await this.prisma.distribution.findMany({ where: { state: 'SENDING' }, take: 20 });
+    const sending = await this.prisma.distribution.findMany({ where: { state: 'SENDING', channel }, take: 20 });
     for (const d of sending) {
       const batch = await this.prisma.invitation.findMany({ where: { distributionId: d.id, state: 'QUEUED' }, take: SEND_BATCH });
       for (const inv of batch) {
-        const r = await this.deliver(provider, d, inv, false, now);
+        const r = await this.deliver(senders, d, inv, false, now);
         if (r === 'sent') out.sent++;
         else if (r === 'failed') out.failed++;
       }
@@ -335,7 +378,7 @@ export class DistributionService {
         await this.prisma.distribution.updateMany({ where: { id: d.id, state: 'SENDING' }, data: { state: 'SENT', sentAt: now } });
     }
     const due = await this.prisma.invitation.findMany({
-      where: { nextReminderAt: { lte: now }, state: 'SENT', distribution: { state: { in: ['SENDING', 'SENT'] } } },
+      where: { nextReminderAt: { lte: now }, state: 'SENT', distribution: { state: { in: ['SENDING', 'SENT'] }, channel } },
       include: { distribution: true },
       take: SEND_BATCH,
     });
@@ -348,13 +391,13 @@ export class DistributionService {
         await this.prisma.invitation.update({ where: { id: inv.id }, data: { nextReminderAt: null } });
         continue;
       }
-      if ((await this.deliver(provider, inv.distribution, inv, true, now)) === 'sent') out.reminded++;
+      if ((await this.deliver(senders, inv.distribution, inv, true, now)) === 'sent') out.reminded++;
     }
     return out;
   }
 
   private async deliver(
-    provider: EmailProvider,
+    senders: { email: EmailProvider | null; sms: SmsProvider | null },
     d: Distribution,
     inv: Invitation,
     reminder: boolean,
@@ -369,13 +412,14 @@ export class DistributionService {
       : await this.prisma.invitation.updateMany({ where: { id: inv.id, state: 'QUEUED' }, data: { state: 'SENT' } });
     if (!claim.count) return 'skipped';
     const contact = await this.prisma.contact.findUnique({ where: { id: inv.contactId } });
-    if (!contact || contact.unsubscribedAt) {
+    if (!contact || contact.unsubscribedAt || (d.channel === 'SMS' ? !contact.phone : !contact.email)) {
       await this.prisma.invitation.update({ where: { id: inv.id }, data: { state: reminder ? 'SENT' : 'SKIPPED', nextReminderAt: null } });
       return 'skipped';
     }
     const sends = inv.sends + 1;
     try {
-      await provider.send(composeEmail(d, inv, contact, reminder), AbortSignal.timeout(20_000));
+      if (d.channel === 'SMS') await senders.sms!.send(composeSms(d, inv, contact, reminder), AbortSignal.timeout(20_000));
+      else await senders.email!.send(composeEmail(d, inv, contact, reminder), AbortSignal.timeout(20_000));
       const more = d.maxReminders > 0 && sends - 1 < d.maxReminders && d.reminderDays > 0;
       await this.prisma.invitation.update({
         where: { id: inv.id },
@@ -383,7 +427,7 @@ export class DistributionService {
       });
       return 'sent';
     } catch (e) {
-      this.log.warn(`Email to invitation ${inv.id} failed: ${(e as Error).message}`);
+      this.log.warn(`${d.channel === 'SMS' ? 'SMS' : 'Email'} to invitation ${inv.id} failed: ${(e as Error).message}`);
       await this.prisma.invitation.update({
         where: { id: inv.id },
         data: reminder ? { error: (e as Error).message.slice(0, 300) } : { state: 'FAILED', error: (e as Error).message.slice(0, 300) },
@@ -419,5 +463,16 @@ export function composeEmail(
     .replaceAll('[unsubscribe]', unsubscribeUrl);
   if (!d.body.includes('[unsubscribe]')) text += `\n\n--\nTo stop receiving these emails: ${unsubscribeUrl}`;
   const subject = reminder ? d.reminderSubject?.trim() || `Reminder: ${d.subject}` : d.subject;
-  return { to: { email: c.email, name: c.name }, subject: subject.replaceAll('[name]', c.name ?? '').trim(), text, unsubscribeUrl };
+  return { to: { email: c.email ?? '', name: c.name }, subject: subject.replaceAll('[name]', c.name ?? '').trim(), text, unsubscribeUrl };
+}
+
+/** Blueprint phase 5: the text message of an SMS wave. The opt-out link is added unless the body has [unsubscribe]. */
+export function composeSms(d: Pick<Distribution, 'body' | 'surveyId'>, inv: Pick<Invitation, 'uid'>, c: Contact, reminder: boolean) {
+  const unsubscribeUrl = unsubscribeLink(inv.uid);
+  let text = d.body
+    .replaceAll('[link]', personalLink(d.surveyId, inv.uid, c))
+    .replaceAll('[name]', c.name ?? '')
+    .replaceAll('[unsubscribe]', unsubscribeUrl);
+  if (!d.body.includes('[unsubscribe]')) text += `\nStop: ${unsubscribeUrl}`;
+  return { to: c.phone ?? '', text: reminder ? `Reminder: ${text}` : text };
 }

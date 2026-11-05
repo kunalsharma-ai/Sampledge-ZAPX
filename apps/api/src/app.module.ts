@@ -71,6 +71,10 @@ import { JobsService } from './jobs/jobs.service';
 import { JobWorker } from './jobs/job.worker';
 import { FilesService } from './jobs/files.service';
 import { FileStore, fileStoreFromConfig } from './jobs/file-store';
+import { AutomationController, NotificationsController } from './automation/automation.controller';
+import { AutomationService } from './automation/automation.service';
+import { GovernanceController } from './governance/governance.controller';
+import { GovernanceService } from './governance/governance.service';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -121,6 +125,9 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     ApiKeysController,
     AuditLogController,
     JobsController,
+    AutomationController,
+    NotificationsController,
+    GovernanceController,
   ],
   providers: [
     CatiService,
@@ -152,6 +159,8 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     JobsService,
     JobWorker,
     FilesService,
+    AutomationService,
+    GovernanceService,
     { provide: FileStore, useFactory: fileStoreFromConfig },
     {
       // Provider registry: AI_PROVIDER picks the implementation. Adding OpenAI or Gemini means

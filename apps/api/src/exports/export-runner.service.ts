@@ -4,6 +4,9 @@ import { AuditService } from '../common/audit.service';
 import { config } from '../config';
 import type { AuthUser } from '../auth/auth.types';
 import { SurveysService } from '../surveys/surveys.service';
+import type { Prisma } from '@zapx/db';
+import { applyCleaning, prepareSurvey } from '@zapx/logic-engine';
+import type { Answers, SurveyDefinition } from '@zapx/survey-schema';
 import { ExportService, type ExportRow } from './export.service';
 
 export interface ExportOptions {
@@ -11,6 +14,8 @@ export interface ExportOptions {
   includeTest: boolean;
   /** Upper-case response statuses, e.g. ["COMPLETE"]. */
   statuses?: string[];
+  /** Blueprint phase 5: apply the survey's cleaning rules (default true); stored answers never change. */
+  cleaned?: boolean;
 }
 
 export interface BuiltExport {
@@ -43,6 +48,8 @@ export class ExportRunner {
   private where(surveyId: string, opts: ExportOptions) {
     return {
       surveyId,
+      // Blueprint phase 5: interviews erased by the retention policy have no answers left to export.
+      erasedAt: null,
       ...(opts.includeTest ? {} : { isTest: false }),
       ...(opts.statuses?.length ? { status: { in: opts.statuses as never[] } } : {}),
     };
@@ -82,7 +89,28 @@ export class ExportRunner {
       if (page.length < PAGE) break;
       cursor = page[page.length - 1]!.id;
     }
+    // Blueprint phase 5: cleaning rules of the latest published version, applied to copies of the answers.
+    const latest = versions[versions.length - 1];
+    const latestDef = latest ? prepareSurvey(latest.definition as unknown as SurveyDefinition) : null;
+    let applied: Map<string, string[]> | null = null;
+    if (opts.cleaned !== false && latestDef?.cleaning?.length) {
+      const res = applyCleaning(
+        latestDef,
+        rows.map((r) => (r.answers ?? {}) as Answers),
+      );
+      applied = new Map();
+      rows.forEach((r, i) => {
+        r.answers = res.answers[i] as Prisma.JsonValue;
+        applied!.set(r.id, res.applied[i]!);
+      });
+    }
     const columns = this.exporter.columns(versions);
+    if (applied)
+      columns.push({
+        key: 'cleaning_rules',
+        label: 'Cleaning rules applied to this row (the answers stored in ZAPX are unchanged)',
+        get: (r) => applied!.get(r.id)?.join(' ') || null,
+      });
     const name = survey.name.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60) || 'survey';
     await this.audit.record(user, 'survey.export', 'survey', surveyId, {
       format: opts.format,

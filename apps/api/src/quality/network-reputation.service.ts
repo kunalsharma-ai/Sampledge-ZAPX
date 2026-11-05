@@ -69,6 +69,7 @@ export function isPrivateAddress(ip: string): boolean {
   return true;
 }
 
+const SETTLED_KEEP_MS = 10 * 60_000;
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const CACHE_MAX = 10_000;
 
@@ -101,20 +102,34 @@ export class NetworkReputationService {
 
   /** Look the address up and store the answer on the interview. Never throws. */
   check(responseId: string, ip: string | undefined): Promise<NetworkKind[] | null> {
-    const p = this.lookupAndStore(responseId, ip).finally(() => this.pending.delete(responseId));
+    // The result is kept for a while after the lookup lands, so a finish that reads the interview
+    // before the flags were stored still gets them from settle().
+    const p = this.lookupAndStore(responseId, ip).finally(() => {
+      setTimeout(() => this.pending.get(responseId) === p && this.pending.delete(responseId), SETTLED_KEEP_MS).unref();
+    });
     this.pending.set(responseId, p);
     return p;
   }
 
-  /** The result of a lookup still running for this interview (null when none is running). */
+  /** The result of this interview's lookup, waiting if it is still running (null when there was none). */
   async settle(responseId: string): Promise<NetworkKind[] | null> {
     const p = this.pending.get(responseId);
-    return p ? p : null;
+    if (!p) return null;
+    this.pending.delete(responseId);
+    return p;
   }
 
   private async lookupAndStore(responseId: string, ip: string | undefined): Promise<NetworkKind[] | null> {
     const provider = this.current();
     if (!provider || !ip || isPrivateAddress(ip)) return null;
+    // Blueprint phase 5: an organization that keeps data inside the deployment gets no outside lookups.
+    const r = await this.prisma.response.findUnique({ where: { id: responseId }, select: { tenantId: true } }).catch(() => null);
+    if (
+      r &&
+      (await this.prisma.tenant.findUnique({ where: { id: r.tenantId }, select: { blockExternalProcessors: true } }))
+        ?.blockExternalProcessors
+    )
+      return null;
     const key = createHash('sha256').update(ip).digest('base64url');
     const now = Date.now();
     let kinds = this.cache.get(key);

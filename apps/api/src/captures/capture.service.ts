@@ -213,6 +213,21 @@ export class CaptureService {
     for (const c of unused) await this.drop(c);
   }
 
+  /** Blueprint phase 5 (retention): delete captures of these interviews, or of the tenant older than a date. */
+  async dropWhere(where: { tenantId: string; responseIds?: string[]; before?: Date }): Promise<number> {
+    const rows = await this.prisma.capture.findMany({
+      where: {
+        tenantId: where.tenantId,
+        deletedAt: null,
+        ...(where.responseIds ? { responseId: { in: where.responseIds } } : {}),
+        ...(where.before ? { createdAt: { lt: where.before } } : {}),
+      },
+      take: 1000,
+    });
+    for (const c of rows) await this.drop(c);
+    return rows.length;
+  }
+
   private async drop(c: { id: string; storageKey: string }) {
     await this.store.delete(c.storageKey);
     await this.prisma.capture.update({

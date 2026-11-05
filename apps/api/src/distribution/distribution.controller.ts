@@ -8,15 +8,18 @@ import { parseBody } from '../common/validation';
 import { DistributionService } from './distribution.service';
 
 const importSchema = z.object({ csv: z.string().min(1).max(5_000_000) });
-const waveSchema = z.object({
-  name: z.string().trim().min(1).max(120),
-  subject: z.string().trim().min(1).max(200),
-  body: z.string().min(1).max(20_000),
-  sendAt: z.iso.datetime({ offset: true }).transform((v) => new Date(v)),
-  reminderDays: z.number().int().min(0).max(60).default(0),
-  maxReminders: z.number().int().min(0).max(5).default(0),
-  reminderSubject: z.string().trim().max(200).optional(),
-});
+const waveSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    channel: z.enum(['EMAIL', 'SMS']).default('EMAIL'),
+    subject: z.string().trim().max(200).default(''),
+    body: z.string().min(1).max(20_000),
+    sendAt: z.iso.datetime({ offset: true }).transform((v) => new Date(v)),
+    reminderDays: z.number().int().min(0).max(60).default(0),
+    maxReminders: z.number().int().min(0).max(5).default(0),
+    reminderSubject: z.string().trim().max(200).optional(),
+  })
+  .refine((w) => w.channel === 'SMS' || w.subject.length > 0, { path: ['subject'], message: 'An email needs a subject' });
 
 /** Contacts and email invitation waves of a survey. */
 @Controller('surveys/:id')
@@ -85,7 +88,7 @@ export class UnsubscribeController {
   form() {
     return page(
       'Unsubscribe',
-      '<h1>Stop survey emails?</h1><p>You will not get more invitations or reminders for this survey.</p><form method="post"><button type="submit">Unsubscribe</button></form>',
+      '<h1>Stop survey invitations?</h1><p>You will not get more invitations or reminders for this survey.</p><form method="post"><button type="submit">Unsubscribe</button></form>',
     );
   }
 
@@ -98,7 +101,7 @@ export class UnsubscribeController {
   async unsubscribe(@Param('uid') uid: string) {
     const ok = uid.length <= 64 && (await this.distribution.unsubscribe(uid));
     return ok
-      ? page('Unsubscribed', '<h1>You are unsubscribed</h1><p>You will not get more emails about this survey.</p>')
+      ? page('Unsubscribed', '<h1>You are unsubscribed</h1><p>You will not get more invitations about this survey.</p>')
       : page('Link not found', '<h1>This link is not valid</h1><p>It may have been mistyped.</p>');
   }
 }
