@@ -11,8 +11,8 @@ migrations. ZAPX does not use MongoDB.
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Database name           | `zapx` locally and in Docker (`.env.example`, `docker-compose.yml`); on AWS `DB_NAME` (default `zapx`, `apps/api/src/database-url.ts`)                                                                                                                 |
 | Connection setting      | `DATABASE_URL=postgresql://user:password@host:5432/zapx?connection_limit=10&pool_timeout=20`, or `DB_HOST` + `DB_USER` + `DB_PASSWORD` (+ `DB_PORT`, `DB_NAME`, `DB_SSLMODE`, `DB_CONNECTION_LIMIT`)                                                   |
-| Schema file             | `packages/db/prisma/schema.prisma` (50 models, 22 enums)                                                                                                                                                                                               |
-| Migrations              | `packages/db/prisma/migrations/` — 27 folders, one per milestone/phase, applied in name order                                                                                                                                                          |
+| Schema file             | `packages/db/prisma/schema.prisma` (51 models with `PasswordReset` from branch `security-fixes`, 22 enums)                                                                                                                                             |
+| Migrations              | `packages/db/prisma/migrations/` — 28 folders (the last, `20261117000000_password_reset`, from branch `security-fixes`), one per milestone/phase, applied in name order                                                                                |
 | Client used by the code | `PrismaService` (`apps/api/src/common/prisma.service.ts`), which extends the generated `PrismaClient` from `@zapx/db`                                                                                                                                  |
 | Seed                    | `packages/db/src/seed.ts`: one organization "Demo tenant" and an admin account whose email and password are set by `SEED_EMAIL` and `SEED_PASSWORD` (the development defaults are in `seed.ts`; never use them outside your laptop). Development only. |
 | Ids                     | `cuid()` strings, except `Response.id` (UUID set by the code), `MediaAsset.id` and `Capture.id` (22-character random ids, because they appear in URLs), `CatiDial.id` (random)                                                                         |
@@ -74,19 +74,19 @@ erDiagram
 
 ## 3. Tables by area
 
-| Area                      | Tables                                                                                                                                 |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Organizations and people  | `Tenant`, `User`, `ProjectMember`, `TenantSso`, `SsoRequest`, `TenantScim`, `ApiKey`, `RevokedSession`, `BillingEvent`                 |
-| Surveys                   | `Project`, `Survey`, `SurveyVersion`, `ChangeSet`, `QaRun`, `QaTestCase`, `LibraryItem`, `GlossaryTerm`, `MediaAsset`, `BlockExposure` |
-| Fieldwork and responses   | `Vendor`, `Response`, `QuotaCount`, `OpenEndFingerprint`, `FraudBlock`, `Capture`, `CapiAssignment`, `BackCheck`, `QualityAppeal`      |
-| Phone (CATI)              | `CatiCase`, `CatiCall`, `CatiSettings`, `DoNotCall`, `CatiDialer`, `CatiDial`                                                          |
-| Distribution              | `Contact`, `Distribution`, `Invitation`                                                                                                |
-| Integrations and outboxes | `RedirectEvent`, `OutboundCallback`, `Webhook`, `WebhookDelivery`                                                                      |
-| AI                        | `TenantAiPolicy`, `AiUsage`                                                                                                            |
-| Jobs and files            | `Job`, `StoredFile`                                                                                                                    |
-| Analysis                  | `Report`                                                                                                                               |
-| Automation _(PR #34)_     | `AutomationRule`, `AutomationRun`, `Notification`                                                                                      |
-| Audit                     | `AuditEvent`                                                                                                                           |
+| Area                      | Tables                                                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Organizations and people  | `Tenant`, `User`, `ProjectMember`, `TenantSso`, `SsoRequest`, `TenantScim`, `ApiKey`, `RevokedSession`, `PasswordReset` _(branch `security-fixes`)_, `BillingEvent` |
+| Surveys                   | `Project`, `Survey`, `SurveyVersion`, `ChangeSet`, `QaRun`, `QaTestCase`, `LibraryItem`, `GlossaryTerm`, `MediaAsset`, `BlockExposure`                              |
+| Fieldwork and responses   | `Vendor`, `Response`, `QuotaCount`, `OpenEndFingerprint`, `FraudBlock`, `Capture`, `CapiAssignment`, `BackCheck`, `QualityAppeal`                                   |
+| Phone (CATI)              | `CatiCase`, `CatiCall`, `CatiSettings`, `DoNotCall`, `CatiDialer`, `CatiDial`                                                                                       |
+| Distribution              | `Contact`, `Distribution`, `Invitation`                                                                                                                             |
+| Integrations and outboxes | `RedirectEvent`, `OutboundCallback`, `Webhook`, `WebhookDelivery`                                                                                                   |
+| AI                        | `TenantAiPolicy`, `AiUsage`                                                                                                                                         |
+| Jobs and files            | `Job`, `StoredFile`                                                                                                                                                 |
+| Analysis                  | `Report`                                                                                                                                                            |
+| Automation _(PR #34)_     | `AutomationRule`, `AutomationRun`, `Notification`                                                                                                                   |
+| Audit                     | `AuditEvent`                                                                                                                                                        |
 
 Tables that exist only on the open PR branches (not on `main`): `LibraryItem` (#30), `GlossaryTerm`,
 `BlockExposure`, `QaTestCase` (#31), `BackCheck`, `QualityAppeal`, `Contact`, `Distribution`,
@@ -245,6 +245,25 @@ A SAML sign-in in progress (Milestone 13): the AuthnRequest ID, used once to che
 | `createdAt` | `DateTime` | yes      | default `now()` |         |
 
 Indexes and constraints: `@@index([expiresAt])`.
+
+#### PasswordReset
+
+_Branch `security-fixes`._ One-time password reset link, created by an administrator
+(`createdById` set) or by "forgot password" (`createdById` null). Only a SHA-256 hash of the token is
+stored. Logical links (no foreign key): `userId` → `User.id`, `tenantId` → `Tenant.id`.
+
+| Field         | Type        | Required | Key / default    | Meaning                                                           |
+| ------------- | ----------- | -------- | ---------------- | ----------------------------------------------------------------- |
+| `id`          | `String`    | yes      | **PK**, `cuid()` |                                                                   |
+| `tenantId`    | `String`    | yes      |                  |                                                                   |
+| `userId`      | `String`    | yes      |                  | the member whose password the link sets                           |
+| `tokenHash`   | `String`    | yes      | unique           | SHA-256 (hex) of the token in the link                            |
+| `expiresAt`   | `DateTime`  | yes      |                  | now + `PASSWORD_RESET_HOURS`                                      |
+| `usedAt`      | `DateTime?` | no       |                  | set when used, or when a newer link or a password change voids it |
+| `createdById` | `String?`   | no       |                  | the administrator; null for "forgot password"                     |
+| `createdAt`   | `DateTime`  | yes      | default `now()`  |                                                                   |
+
+Indexes and constraints: `@@unique([tokenHash])`, `@@index([userId, createdAt])`.
 
 #### BillingEvent
 
@@ -1287,4 +1306,4 @@ Indexes and constraints: `@@index([userId, readAt, createdAt])`.
 | `InvitationState`     | `QUEUED`, `SENT`, `FAILED`, `SKIPPED`                                                                                              |
 | `AutomationRunState`  | `PENDING`, `AWAITING_APPROVAL`, `RUNNING`, `DONE`, `SKIPPED`, `REJECTED`, `FAILED`                                                 |
 
-<!-- 50 models, 22 enums -->
+<!-- 51 models, 22 enums -->

@@ -34,17 +34,20 @@ For the project's own security notes, which this review does not replace, see
 
 ## 2. Potential issues found
 
-| #   | Severity | Finding                                                          |
-| --- | -------- | ---------------------------------------------------------------- |
-| S1  | Medium   | Vendor shared secret is readable by every role, including VIEWER |
-| S2  | Medium   | Terraform secret list and the documented secret JSON disagree    |
-| S3  | Medium   | No way to reset or change a password                             |
-| S4  | Low–Med  | Rate limits are per API process                                  |
-| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                       |
-| S6  | Low      | Studio content security policy does not restrict scripts         |
-| S7  | Low      | Login answers with the session token in the body too             |
-| S8  | Low      | Automated security scanning never runs on GitHub                 |
-| S9  | Info     | Row-level security covers two tables only                        |
+| #   | Severity | Finding                                                          | Status                               |
+| --- | -------- | ---------------------------------------------------------------- | ------------------------------------ |
+| S1  | Medium   | Vendor shared secret is readable by every role, including VIEWER | **Fixed** on branch `security-fixes` |
+| S2  | Medium   | Terraform secret list and the documented secret JSON disagree    | **Fixed** on branch `security-fixes` |
+| S3  | Medium   | No way to reset or change a password                             | **Fixed** on branch `security-fixes` |
+| S4  | Low–Med  | Rate limits are per API process                                  | open                                 |
+| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                       | open                                 |
+| S6  | Low      | Studio content security policy does not restrict scripts         | open                                 |
+| S7  | Low      | Login answers with the session token in the body too             | open                                 |
+| S8  | Low      | Automated security scanning never runs on GitHub                 | open                                 |
+| S9  | Info     | Row-level security covers two tables only                        | open                                 |
+
+The review below describes the code as it was found on `blueprint-p5-enterprise`; each fixed
+finding ends with what the fix changed.
 
 ### S1. Vendor shared secret readable by every role (Medium)
 
@@ -61,6 +64,12 @@ For the project's own security notes, which this review does not replace, see
   is audited; seal it with `SecretBox` like the partner secret. Existing secrets can then be rotated
   with `POST /api/vendors/:id/rotate-secret`.
 
+- **Fixed (branch `security-fixes`):** `presentVendor(v, role)` returns `secret` only to ADMIN
+  (`SEES_VENDOR_SECRET`; ZAPX has no separate super admin role). Programmers and viewers get the
+  rest of the vendor without it; programmers can still edit vendors and rotate the secret, but an
+  admin hands the new secret to the vendor. Test: `apps/api/test/security-fixes.test.ts`. Sealing the column
+  with `SecretBox` is still open (it needs a data migration of every vendor).
+
 ### S2. Terraform secret keys and the documented secret JSON disagree (Medium, deployment)
 
 - **Seen:** `app_secret_keys` in `infra/terraform/variables.tf` includes `TWILIO_AUTH_TOKEN`; the
@@ -73,6 +82,10 @@ For the project's own security notes, which this review does not replace, see
 - **Consider:** add both keys to the example JSON and `SENDGRID_API_KEY` to `app_secret_keys`.
   Re-check after PR #28 (integrations in the CRM) merges, since it moves provider keys.
 
+- **Fixed (branch `security-fixes`):** `SENDGRID_API_KEY` added to `app_secret_keys`, and the
+  README's example JSON now lists every key including `TWILIO_AUTH_TOKEN`. A test in
+  `apps/api/test/security-fixes.test.ts` fails if the two drift apart again.
+
 ### S3. No password reset or change (Medium)
 
 - **Seen:** `apps/api/src/auth/auth.controller.ts` has `login`, `register`, `logout`, `logout-all`
@@ -83,6 +96,12 @@ For the project's own security notes, which this review does not replace, see
   which is error-prone and bypasses the audit log. SSO tenants are less affected.
 - **Consider:** "change my password" (needs the current one, sets `sessionsRevokedAt`) and an
   administrator reset that issues a one-time link; both audited.
+
+- **Fixed (branch `security-fixes`):** `POST /api/auth/change-password` (current password needed,
+  other sessions signed out, this one kept), `POST /api/users/:id/password-reset` (admin one-time
+  link, also emailed when email is set up), `POST /api/auth/forgot-password` (emails a link; always 204) and `POST /api/auth/reset-password`. Tokens are stored as SHA-256 hashes in `PasswordReset`,
+  work once, expire after `PASSWORD_RESET_HOURS` and are voided by a newer link; every change is
+  audited. Studio: My account, Forgot your password?, Settings → Team → Reset password.
 
 ### S4. Rate limits are per API process (Low–Medium)
 
@@ -160,15 +179,15 @@ For the project's own security notes, which this review does not replace, see
 
 ## Documentation drift
 
-Existing documents that no longer match the code. They were **not** edited (docs-only, no
-overwriting); fix them when convenient.
+Existing documents that did not match the code when the handbook was written. The first three and
+the Terraform README were brought up to date on branch `security-fixes`.
 
 | Document                                     | What is out of date                                                                                                                                |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `README.md` (root)                           | The product summary stops at Milestone 13; M14–M20 and the open PRs (#27–#34) are not described.                                                   |
-| `docs/architecture.md`                       | Title and content cover Milestones 1 to 13 only.                                                                                                   |
-| `docs/operations/go-live.md`                 | Step 1 says to merge PRs #1 to #19; those (and #26, Milestone 20) were merged on 2026-11-02. The open stack is #27–#34 plus #28.                   |
-| `docs/api/openapi.yaml`, `capi-openapi.yaml` | They describe only the vendor API (2 paths) and the CAPI sync (2 paths). The API has 241 routes; see [API_DOCUMENTATION.md](API_DOCUMENTATION.md). |
+| `README.md` (root)                           | **Updated.** The product summary stopped at Milestone 13; it now covers M14–M20 and the open PRs.                                                  |
+| `docs/architecture.md`                       | **Updated.** Title and content covered Milestones 1 to 13 only; now M1–M20, the open PRs and stale known limits.                                   |
+| `docs/operations/go-live.md`                 | **Updated.** Step 1 said to merge PRs #1 to #19, which were merged on 2026-11-02; it now names the open stack.                                     |
+| `docs/api/openapi.yaml`, `capi-openapi.yaml` | They describe only the vendor API (2 paths) and the CAPI sync (2 paths). The API has 246 routes; see [API_DOCUMENTATION.md](API_DOCUMENTATION.md). |
 | `.env.example`                               | Missing several variables that have defaults; listed in [CONFIGURATION.md](CONFIGURATION.md#gaps-found).                                           |
-| `infra/terraform/README.md`                  | Example secret JSON misses `TWILIO_AUTH_TOKEN` (S2).                                                                                               |
+| `infra/terraform/README.md`                  | **Updated.** Example secret JSON missed `TWILIO_AUTH_TOKEN` (S2).                                                                                  |
 | `e2e/playwright.config.ts` comment           | Mentions `E2E_REUSE`, but the config always reuses running servers (**Needs Verification**).                                                       |

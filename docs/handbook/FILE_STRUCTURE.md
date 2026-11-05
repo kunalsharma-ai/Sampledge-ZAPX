@@ -100,6 +100,7 @@ before the apps see the change, because apps import the built `dist/` output.
 | `auth/auth.guard.ts`                                                          | guard              | global authentication + role check (see ARCHITECTURE §7)                                        |
 | `auth/decorators.ts`                                                          | utility            | `@Public()`, `@Roles()`, `CAN_EDIT`, `ALL_ROLES`, `@CurrentUser()`                              |
 | `auth/auth.types.ts`                                                          | types              | `AuthUser`, role names, cookie and CSRF header names, API key prefix                            |
+| `auth/password-reset.service.ts`                                              | service            | password reset links (hash only, one use, expiry), reset emails _(branch `security-fixes`)_     |
 | `auth/session.ts`                                                             | utility            | issues the 12-hour HS256 session and cookie                                                     |
 | `auth/auth.controller.ts`                                                     | controller         | login (lockout), register, logout, logout-all, me                                               |
 | `auth/password-policy.ts`                                                     | utility            | refuses common and patterned passwords                                                          |
@@ -147,27 +148,28 @@ Supertest. `test/support/` has mock OIDC, SAML and S3 servers.
 
 ## 3. `apps/studio` — the research team's web app
 
-| Path                                                  | Kind      | Responsibility                                                                                              |
-| ----------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------- |
-| `next.config.mjs`                                     | config    | proxies `/api/*` to `ZAPX_API_URL` (default `http://localhost:4000`); security headers                      |
-| `app/layout.tsx`                                      | page      | HTML shell, default theme CSS, theme boot script, `ThemeProvider`                                           |
-| `app/globals.css`, `app/quantum.css`, `app/neon.css`  | style     | all studio CSS (custom properties; `neon.css` is PR #29)                                                    |
-| `app/page.tsx`                                        | page      | dashboard (PR #29)                                                                                          |
-| `app/login/page.tsx`                                  | page      | sign-in / sign-up / SSO                                                                                     |
-| `app/projects/page.tsx`, `app/projects/[id]/page.tsx` | page      | project list, one project (surveys, vendors, access)                                                        |
-| `app/surveys/[id]/page.tsx`                           | page      | **survey workspace**: loads survey + draft, holds unsaved state, saves, publishes, renders the tabs         |
-| `app/library/page.tsx`                                | page      | question bank (PR #30)                                                                                      |
-| `app/calls/page.tsx`                                  | page      | CATI calling screen                                                                                         |
-| `app/automation/page.tsx`                             | page      | automation (PR #34)                                                                                         |
-| `app/appearance/page.tsx`, `ComponentPreview.tsx`     | page      | themes (PR #27)                                                                                             |
-| `app/settings/page.tsx`                               | page      | settings hub (AI, redirect defaults) and embeds `Team`, `ApiKeys`, `Webhooks`, `Identity`, `DataGovernance` |
-| `app/settings/audit/page.tsx`                         | page      | audit log                                                                                                   |
-| `lib/api.ts`                                          | utility   | `api()` and `upload()` fetch wrappers, `ApiError`, shared response types                                    |
-| `lib/useMe.ts`                                        | utility   | loads the signed-in member (`GET /api/auth/me`)                                                             |
-| `lib/theme/ThemeProvider.tsx`                         | utility   | applies appearance, area themes (PR #27/#34)                                                                |
-| `components/Shell.tsx`                                | component | sidebar, top bar, plan card, sign-out; `ErrorNote`                                                          |
-| `components/quantum/*`                                | component | design-system primitives (Button, Switch, ThemeMenu …) (PR #27)                                             |
-| `components/neon/*`                                   | component | dashboard widgets, charts, global search, create-survey form (PR #29)                                       |
+| Path                                                                                  | Kind      | Responsibility                                                                                              |
+| ------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------- |
+| `next.config.mjs`                                                                     | config    | proxies `/api/*` to `ZAPX_API_URL` (default `http://localhost:4000`); security headers                      |
+| `app/layout.tsx`                                                                      | page      | HTML shell, default theme CSS, theme boot script, `ThemeProvider`                                           |
+| `app/globals.css`, `app/quantum.css`, `app/neon.css`                                  | style     | all studio CSS (custom properties; `neon.css` is PR #29)                                                    |
+| `app/page.tsx`                                                                        | page      | dashboard (PR #29)                                                                                          |
+| `app/login/page.tsx`                                                                  | page      | sign-in / sign-up / SSO                                                                                     |
+| `app/forgot-password/page.tsx`, `app/reset-password/page.tsx`, `app/account/page.tsx` | page      | password reset and change _(branch `security-fixes`)_                                                       |
+| `app/projects/page.tsx`, `app/projects/[id]/page.tsx`                                 | page      | project list, one project (surveys, vendors, access)                                                        |
+| `app/surveys/[id]/page.tsx`                                                           | page      | **survey workspace**: loads survey + draft, holds unsaved state, saves, publishes, renders the tabs         |
+| `app/library/page.tsx`                                                                | page      | question bank (PR #30)                                                                                      |
+| `app/calls/page.tsx`                                                                  | page      | CATI calling screen                                                                                         |
+| `app/automation/page.tsx`                                                             | page      | automation (PR #34)                                                                                         |
+| `app/appearance/page.tsx`, `ComponentPreview.tsx`                                     | page      | themes (PR #27)                                                                                             |
+| `app/settings/page.tsx`                                                               | page      | settings hub (AI, redirect defaults) and embeds `Team`, `ApiKeys`, `Webhooks`, `Identity`, `DataGovernance` |
+| `app/settings/audit/page.tsx`                                                         | page      | audit log                                                                                                   |
+| `lib/api.ts`                                                                          | utility   | `api()` and `upload()` fetch wrappers, `ApiError`, shared response types                                    |
+| `lib/useMe.ts`                                                                        | utility   | loads the signed-in member (`GET /api/auth/me`)                                                             |
+| `lib/theme/ThemeProvider.tsx`                                                         | utility   | applies appearance, area themes (PR #27/#34)                                                                |
+| `components/Shell.tsx`                                                                | component | sidebar, top bar, plan card, sign-out; `ErrorNote`                                                          |
+| `components/quantum/*`                                                                | component | design-system primitives (Button, Switch, ThemeMenu …) (PR #27)                                             |
+| `components/neon/*`                                                                   | component | dashboard widgets, charts, global search, create-survey form (PR #29)                                       |
 
 Survey workspace components (one per tab or panel):
 

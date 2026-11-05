@@ -62,6 +62,45 @@ and signed webhooks that keep the plan in step), the AWS deployment as Terraform
 script, trusted viewer address and country behind CloudFront, and a PROJEXA connection check that
 has passed end to end against PROJEXA's own code.
 
+**Milestone 14 (edge protection, scaling, backups)** adds AWS WAF in front of the studio, the
+respondent runtime and the CAPI app (count mode first, a per-address rate rule always on),
+autoscaling of the API and studio, AWS Backup for the database and files, and the go-live checklist
+in [docs/operations/go-live.md](docs/operations/go-live.md).
+
+**Milestone 15 (weighting)** adds rim weighting (raking) to analysis, with the unweighted base and
+the effective base shown next to every weighted table.
+
+**Milestone 16 (VPN and data-centre check)** adds an optional network reputation lookup (IPinfo,
+`NETWORK_REPUTATION=ipinfo`) that flags anonymous and data-centre networks in the quality score.
+
+**Milestone 17 (transcripts)** adds on-request transcription of interview recordings (Deepgram,
+`TRANSCRIPTION=deepgram`) as a background job; transcripts appear in the review queue.
+
+**Milestone 18 (calling rules)** adds calling hours in each case's time zone and an
+organization-wide do-not-call list to CATI.
+
+**Milestone 19 (phone dialer)** adds click-to-call through Twilio (`TELEPHONY=twilio`): the
+interviewer's phone rings first, the respondent's number stays hidden, and calls can be recorded.
+
+**Milestone 20 (security hardening)** adds one network guard for every outbound call a customer
+configures, account lockout, server-side sign-out and "sign out everywhere", a common-password
+check, security headers on every response, and a production settings check that refuses unsafe
+configurations.
+
+Every provider in milestones 16 to 19 (and Stripe, S3 and SSO from milestone 13) is off until its
+keys are added, and has been tested against local stand-ins only, not the real service.
+
+**Not yet on `main` (open pull requests, merged in order).** The Quantum Design System (#27), the
+Neon AI dashboard and sidebar shell (#29), and the five blueprint phases: loops, blocks, variables and
+the question bank (#30); multilingual tools, URL variables, least-fill and test cases (#31);
+fieldwork evidence, supervision, appeals and email distribution (#32); MaxDiff, conjoint, recodes and
+the AI research assistant (#33); automation, data residency and retention, cleaning, dashboards and
+SMS (#34). Then the maintainer handbook (#35) and the security fixes from its review: the vendor
+shared secret only for admins, password change, administrator reset links and
+"forgot password", and the AWS secret list (branch `security-fixes`). Setting up integrations in the
+CRM (#28) is a separate pull request on `main`. The handbook's
+[changelog](docs/handbook/CHANGELOG.md) lists them all.
+
 ## What works today
 
 | Area                     | What you can do                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -116,8 +155,16 @@ has passed end to end against PROJEXA's own code.
 | Fraud and capture        | Fraud signals in the quality score; block a rejected complete's device and network for the organization; photo questions (shrunk, metadata removed, private); CAPI location at start and end, recording after the respondent agrees, overlapping-interview check; optional VPN, proxy, Tor and data-centre check through IPinfo (`NETWORK_REPUTATION=ipinfo`), and transcripts of recordings through Deepgram (`TRANSCRIPTION=deepgram`), both tested against stand-ins only; evidence in the review queue ([guide](docs/modules/data-quality.md), [CAPI](docs/modules/capi.md)) |
 | Row-level security       | PostgreSQL policy on respondent data: the studio's reads of responses, exports, review queue and fieldwork run scoped to the organization in the database too. Applies when the API's database role is not a superuser ([details](docs/adr/0012-row-level-security.md))                                                                                                                                                                                                                                                                                                          |
 | Deletion                 | Projects, surveys and vendors are soft-deleted: they disappear and their links stop working, history is kept                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Edge protection          | AWS WAF (count mode first), autoscaling, AWS Backup and a go-live checklist (Milestone 14)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Weighting                | Rim weighting in analysis with unweighted and effective bases (Milestone 15)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| VPN check (optional)     | IPinfo lookup flags anonymous and data-centre networks in the quality score (Milestone 16)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Transcripts (optional)   | Deepgram transcripts of interview recordings, started on request (Milestone 17)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Calling rules            | CATI calling hours per time zone and a do-not-call list (Milestone 18)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Phone dialer (optional)  | Twilio click-to-call with hidden numbers and call recording (Milestone 19)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Account security         | Account lockout, sign out everywhere, common-password check, security headers (Milestone 20)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Passwords                | Change your own password on My account; administrators create one-time reset links; "forgot password" emails a link when email is set up (branch `security-fixes`)                                                                                                                                                                                                                                                                                                                                                                                                               |
 
-Not yet built: recorded voice-over, MaxDiff and conjoint, AI open-end review, charts in analysis, SAML single logout and encrypted assertions. See
+Not yet built on `main`: recorded voice-over, AI open-end review, charts in analysis, SAML single logout and encrypted assertions (MaxDiff and conjoint are on open PR #33, chart dashboards on #34). See
 [docs/architecture.md](docs/architecture.md).
 
 ## Repository layout

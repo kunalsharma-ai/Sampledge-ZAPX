@@ -2,7 +2,7 @@
 
 The ZAPX backend is a REST API under `/api`, served by `apps/api` on port 4000. This file explains the
 common rules, walks through the main flows with **real requests and responses** (captured from a
-local run on 2026-11-05; ids shortened), and then lists **all 241 endpoints** with who may call them
+local run on 2026-11-05; ids shortened), and then lists **all 246 endpoints** with who may call them
 and the exact handler.
 
 Other contracts that already exist and stay authoritative for partners:
@@ -93,6 +93,29 @@ curl -s http://localhost:4000/api/auth/me -H "Authorization: Bearer $TOKEN"
 
 Files: `apps/api/src/auth/auth.controller.ts` (`login`, `me`), `apps/studio/app/login/page.tsx`, `apps/studio/lib/useMe.ts`.
 
+### Change or reset a password _(branch `security-fixes`)_
+
+```bash
+# Change my own password (keeps this session, signs out the others; 400 if the current one is wrong)
+curl -s -b cookie.txt -c cookie.txt -H 'x-zapx-csrf: 1' -H 'content-type: application/json' \
+  -d '{"currentPassword":"<current>","newPassword":"<new, 10+ characters>"}' localhost:4000/api/auth/change-password
+# → {"ok":true}  (and a new zapx_token cookie)
+
+# Administrator: one-time reset link for a member (also emailed when EMAIL_PROVIDER is set)
+curl -s -b cookie.txt -H 'x-zapx-csrf: 1' -X POST localhost:4000/api/users/<memberId>/password-reset
+# → {"url":"http://localhost:3000/reset-password?token=<token>","expiresAt":"…","emailed":false}
+
+# Anyone: ask for a link by email (always 204, whether or not the account exists)
+curl -s -H 'content-type: application/json' -d '{"email":"<email>"}' localhost:4000/api/auth/forgot-password
+
+# Set the new password with the token from the link (204; 400 if used, expired or replaced)
+curl -s -H 'content-type: application/json' -d '{"token":"<token>","password":"<new>"}' localhost:4000/api/auth/reset-password
+```
+
+A reset signs out every session of that member and clears an account lockout. Code:
+`apps/api/src/auth/password-reset.service.ts`; studio pages `app/account`, `app/forgot-password`,
+`app/reset-password`; the admin button is in `components/Team.tsx`.
+
 ### Create a project, a vendor and a survey
 
 ```bash
@@ -118,6 +141,9 @@ Vendor body fields (all optional except `name` and `code`) are defined by `vendo
 `dynamicAllowedHosts`, `dynamicParam`, `requireSignedEntry`, `signRedirects`, `callbackUrl`,
 `callbackStatuses`, `callbackMaxAttempts`, `partnerBaseUrl`, `partnerSecret` (write-only), `partnerS2s`,
 `presetId`. A survey can start from `template` (built-in key) or `libraryItemId` _(PR #30)_.
+
+The vendor's shared `secret` (64 hex characters) is in the answer only for ADMIN;
+for PROGRAMMER and VIEWER the field is left out _(branch `security-fixes`)_.
 
 ### Save a draft, publish and go live
 
@@ -291,19 +317,23 @@ Backend: `apps/api/src/health.controller.ts` · Frontend: —
 
 Backend: `apps/api/src/auth` · Frontend: `apps/studio/app/login/page.tsx`, `apps/studio/lib/useMe.ts`, `apps/studio/components/Shell.tsx`, `apps/studio/components/Identity.tsx` (SSO settings), `apps/capi/src/api.ts` (interviewer sign-in)
 
-| Method | Endpoint                      | Who can call it                                               | Handler (file:line)                                                           |
-| ------ | ----------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| POST   | `/api/auth/login`             | Public · rate limit () => config().LOGIN_RATE_PER_MINUTE/min  | [`AuthController.login`](../../apps/api/src/auth/auth.controller.ts#L62)      |
-| POST   | `/api/auth/register`          | Public · rate limit () => config().SIGNUP_RATE_PER_MINUTE/min | [`AuthController.register`](../../apps/api/src/auth/auth.controller.ts#L99)   |
-| POST   | `/api/auth/logout`            | Public                                                        | [`AuthController.logout`](../../apps/api/src/auth/auth.controller.ts#L140)    |
-| POST   | `/api/auth/logout-all`        | Any role incl. INTERVIEWER                                    | [`AuthController.logoutAll`](../../apps/api/src/auth/auth.controller.ts#L159) |
-| GET    | `/api/auth/me`                | Any role incl. INTERVIEWER                                    | [`AuthController.me`](../../apps/api/src/auth/auth.controller.ts#L168)        |
-| POST   | `/api/auth/sso/start`         | Public · rate limit 20/min                                    | [`SsoController.start`](../../apps/api/src/auth/sso.controller.ts#L49)        |
-| GET    | `/api/auth/sso/saml/metadata` | Public                                                        | [`SsoController.metadata`](../../apps/api/src/auth/sso.controller.ts#L67)     |
-| POST   | `/api/auth/sso/saml/acs`      | Public · rate limit 30/min                                    | [`SsoController.acs`](../../apps/api/src/auth/sso.controller.ts#L75)          |
-| GET    | `/api/auth/sso/callback`      | Public · rate limit 30/min                                    | [`SsoController.callback`](../../apps/api/src/auth/sso.controller.ts#L92)     |
-| GET    | `/api/sso`                    | ADMIN                                                         | [`SsoController.get`](../../apps/api/src/auth/sso.controller.ts#L108)         |
-| PUT    | `/api/sso`                    | ADMIN                                                         | [`SsoController.save`](../../apps/api/src/auth/sso.controller.ts#L114)        |
+| Method | Endpoint                      | Who can call it                                                       | Handler (file:line)                                                                 |
+| ------ | ----------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| POST   | `/api/auth/login`             | Public · rate limit () => config().LOGIN_RATE_PER_MINUTE/min          | [`AuthController.login`](../../apps/api/src/auth/auth.controller.ts#L69)            |
+| POST   | `/api/auth/register`          | Public · rate limit () => config().SIGNUP_RATE_PER_MINUTE/min         | [`AuthController.register`](../../apps/api/src/auth/auth.controller.ts#L106)        |
+| POST   | `/api/auth/logout`            | Public                                                                | [`AuthController.logout`](../../apps/api/src/auth/auth.controller.ts#L147)          |
+| POST   | `/api/auth/logout-all`        | Any role incl. INTERVIEWER                                            | [`AuthController.logoutAll`](../../apps/api/src/auth/auth.controller.ts#L166)       |
+| POST   | `/api/auth/change-password`   | Any role incl. INTERVIEWER (session, not API key) · rate limit 10/min | [`AuthController.changePassword`](../../apps/api/src/auth/auth.controller.ts#L181)  |
+| POST   | `/api/auth/forgot-password`   | Public · rate limit 5/min                                             | [`AuthController.forgot`](../../apps/api/src/auth/auth.controller.ts#L213)          |
+| GET    | `/api/auth/password-options`  | Public                                                                | [`AuthController.passwordOptions`](../../apps/api/src/auth/auth.controller.ts#L227) |
+| POST   | `/api/auth/reset-password`    | Public · rate limit 10/min                                            | [`AuthController.reset`](../../apps/api/src/auth/auth.controller.ts#L236)           |
+| GET    | `/api/auth/me`                | Any role incl. INTERVIEWER                                            | [`AuthController.me`](../../apps/api/src/auth/auth.controller.ts#L244)              |
+| POST   | `/api/auth/sso/start`         | Public · rate limit 20/min                                            | [`SsoController.start`](../../apps/api/src/auth/sso.controller.ts#L49)              |
+| GET    | `/api/auth/sso/saml/metadata` | Public                                                                | [`SsoController.metadata`](../../apps/api/src/auth/sso.controller.ts#L67)           |
+| POST   | `/api/auth/sso/saml/acs`      | Public · rate limit 30/min                                            | [`SsoController.acs`](../../apps/api/src/auth/sso.controller.ts#L75)                |
+| GET    | `/api/auth/sso/callback`      | Public · rate limit 30/min                                            | [`SsoController.callback`](../../apps/api/src/auth/sso.controller.ts#L92)           |
+| GET    | `/api/sso`                    | ADMIN                                                                 | [`SsoController.get`](../../apps/api/src/auth/sso.controller.ts#L108)               |
+| PUT    | `/api/sso`                    | ADMIN                                                                 | [`SsoController.save`](../../apps/api/src/auth/sso.controller.ts#L114)              |
 
 ### Team members and personal preferences
 
@@ -319,9 +349,10 @@ Backend: `apps/api/src/users` · Frontend: `apps/studio/components/Team.tsx`, `a
 | GET    | `/api/tenant/appearance-presets`      | Any role incl. INTERVIEWER | [`PreferencesController.list`](../../apps/api/src/users/preferences.controller.ts#L117)         |
 | POST   | `/api/tenant/appearance-presets`      | ADMIN                      | [`PreferencesController.addPreset`](../../apps/api/src/users/preferences.controller.ts#L123)    |
 | DELETE | `/api/tenant/appearance-presets/{id}` | ADMIN                      | [`PreferencesController.deletePreset`](../../apps/api/src/users/preferences.controller.ts#L142) |
-| GET    | `/api/users`                          | ADMIN                      | [`UsersController.list`](../../apps/api/src/users/users.controller.ts#L60)                      |
-| POST   | `/api/users`                          | ADMIN                      | [`UsersController.create`](../../apps/api/src/users/users.controller.ts#L69)                    |
-| PATCH  | `/api/users/{id}`                     | ADMIN                      | [`UsersController.update`](../../apps/api/src/users/users.controller.ts#L95)                    |
+| GET    | `/api/users`                          | ADMIN                      | [`UsersController.list`](../../apps/api/src/users/users.controller.ts#L92)                      |
+| POST   | `/api/users`                          | ADMIN                      | [`UsersController.create`](../../apps/api/src/users/users.controller.ts#L101)                   |
+| PATCH  | `/api/users/{id}`                     | ADMIN                      | [`UsersController.update`](../../apps/api/src/users/users.controller.ts#L127)                   |
+| POST   | `/api/users/{id}/password-reset`      | ADMIN                      | [`UsersController.resetLink`](../../apps/api/src/users/users.controller.ts#L80)                 |
 
 ### Projects and project access
 
@@ -374,14 +405,14 @@ Backend: `apps/api/src/vendors` · Frontend: `apps/studio/components/VendorEdito
 
 | Method | Endpoint                             | Who can call it                         | Handler (file:line)                                                                  |
 | ------ | ------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------ |
-| GET    | `/api/vendor-presets`                | Signed-in (any role except INTERVIEWER) | [`VendorsController.presets`](../../apps/api/src/vendors/vendors.controller.ts#L119) |
-| GET    | `/api/projects/{projectId}/vendors`  | Signed-in (any role except INTERVIEWER) | [`VendorsController.list`](../../apps/api/src/vendors/vendors.controller.ts#L124)    |
-| POST   | `/api/projects/{projectId}/vendors`  | ADMIN, PROGRAMMER                       | [`VendorsController.create`](../../apps/api/src/vendors/vendors.controller.ts#L134)  |
-| GET    | `/api/vendors/{id}`                  | Signed-in (any role except INTERVIEWER) | [`VendorsController.get`](../../apps/api/src/vendors/vendors.controller.ts#L154)     |
-| PUT    | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.update`](../../apps/api/src/vendors/vendors.controller.ts#L160)  |
-| DELETE | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.remove`](../../apps/api/src/vendors/vendors.controller.ts#L179)  |
-| POST   | `/api/vendors/{id}/rotate-secret`    | ADMIN, PROGRAMMER                       | [`VendorsController.rotate`](../../apps/api/src/vendors/vendors.controller.ts#L187)  |
-| POST   | `/api/vendors/{id}/redirect-preview` | Signed-in (any role except INTERVIEWER) | [`VendorsController.preview`](../../apps/api/src/vendors/vendors.controller.ts#L196) |
+| GET    | `/api/vendor-presets`                | Signed-in (any role except INTERVIEWER) | [`VendorsController.presets`](../../apps/api/src/vendors/vendors.controller.ts#L123) |
+| GET    | `/api/projects/{projectId}/vendors`  | Signed-in (any role except INTERVIEWER) | [`VendorsController.list`](../../apps/api/src/vendors/vendors.controller.ts#L128)    |
+| POST   | `/api/projects/{projectId}/vendors`  | ADMIN, PROGRAMMER                       | [`VendorsController.create`](../../apps/api/src/vendors/vendors.controller.ts#L138)  |
+| GET    | `/api/vendors/{id}`                  | Signed-in (any role except INTERVIEWER) | [`VendorsController.get`](../../apps/api/src/vendors/vendors.controller.ts#L158)     |
+| PUT    | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.update`](../../apps/api/src/vendors/vendors.controller.ts#L164)  |
+| DELETE | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.remove`](../../apps/api/src/vendors/vendors.controller.ts#L183)  |
+| POST   | `/api/vendors/{id}/rotate-secret`    | ADMIN, PROGRAMMER                       | [`VendorsController.rotate`](../../apps/api/src/vendors/vendors.controller.ts#L191)  |
+| POST   | `/api/vendors/{id}/redirect-preview` | Signed-in (any role except INTERVIEWER) | [`VendorsController.preview`](../../apps/api/src/vendors/vendors.controller.ts#L200) |
 
 ### Respondent interview (public)
 

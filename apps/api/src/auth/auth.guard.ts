@@ -62,8 +62,7 @@ export class AuthGuard implements CanActivate {
     if (!u || u.tenantId !== payload.tid) throw new UnauthorizedException('Session expired');
     if (u.disabledAt) throw new UnauthorizedException('Your account is disabled');
     // Signed out on the server (Milestone 20): "sign out everywhere", or this one session signed out.
-    if (u.sessionsRevokedAt && (payload.iat ?? 0) * 1000 <= u.sessionsRevokedAt.getTime())
-      throw new UnauthorizedException('Session expired');
+    if (u.sessionsRevokedAt && issuedAtMs(payload) <= u.sessionsRevokedAt.getTime()) throw new UnauthorizedException('Session expired');
     if (payload.jti && (await this.prisma.revokedSession.findUnique({ where: { jti: payload.jti }, select: { jti: true } })))
       throw new UnauthorizedException('Session expired');
     const { disabledAt: _disabled, sessionsRevokedAt: _revoked, ...member } = u;
@@ -96,9 +95,14 @@ export interface SessionPayload {
   sub: string;
   tid: string;
   iat?: number;
+  /** Issue time in milliseconds (sessions issued since the password-reset fix); iat has whole seconds only. */
+  iatMs?: number;
   exp?: number;
   jti?: string;
 }
+
+/** When the session was issued, in milliseconds: iatMs when present, else iat (seconds). */
+export const issuedAtMs = (p: SessionPayload) => (typeof p.iatMs === 'number' ? p.iatMs : (p.iat ?? 0) * 1000);
 
 /** The payload of a valid, unexpired session token signed with HS256, or null. */
 export async function verifySession(jwt: JwtService, token: string): Promise<SessionPayload | null> {

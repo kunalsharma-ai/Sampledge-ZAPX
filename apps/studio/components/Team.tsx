@@ -39,6 +39,7 @@ export function Team() {
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'PROGRAMMER' as Role, projectScope: 'ALL' as Scope });
   const [error, setError] = useState<unknown>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [resetLink, setResetLink] = useState<{ name: string; url: string; expiresAt: string; emailed: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -64,6 +65,18 @@ export function Team() {
             : `Updated ${m.name}. It applies to their next action.`,
       );
       await load();
+    } catch (e) {
+      setError(e);
+    }
+  };
+
+  const reset = async (m: Member) => {
+    if (!window.confirm(`Create a password reset link for ${m.name}? Older links for them stop working.`)) return;
+    setError(null);
+    setNote(null);
+    try {
+      const r = await api<{ url: string; expiresAt: string; emailed: boolean }>(`/users/${m.id}/password-reset`, { method: 'POST' });
+      setResetLink({ name: m.name, ...r });
     } catch (e) {
       setError(e);
     }
@@ -137,11 +150,29 @@ export function Team() {
                     {m.disabledAt ? `Enable ${m.name}` : `Disable ${m.name}`}
                   </button>
                 )}
+                {m.id === me?.id || m.disabledAt ? null : (
+                  <>
+                    {' '}
+                    <button className="link" onClick={() => void reset(m)}>
+                      Reset password
+                    </button>
+                  </>
+                )}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {resetLink ? (
+        <div className="stack" role="status" data-testid="reset-link">
+          <p className="small" style={{ margin: 0 }}>
+            Password reset link for {resetLink.name}
+            {resetLink.emailed ? ' (also emailed to them)' : ''}. It works once, until {new Date(resetLink.expiresAt).toLocaleString()}.
+            Send it to them privately; it is shown only now.
+          </p>
+          <input readOnly className="mono small" value={resetLink.url} onFocus={(e) => e.currentTarget.select()} aria-label="Reset link" />
+        </div>
+      ) : null}
       <p className="muted small" style={{ margin: 0 }}>
         Members with assigned project access only see projects an administrator adds them to, on the project page under Project access.
       </p>

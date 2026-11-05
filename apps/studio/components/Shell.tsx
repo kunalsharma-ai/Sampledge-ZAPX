@@ -176,6 +176,9 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
                 >
                   Sign out everywhere
                 </button>
+                <Link href="/account" className="nx-text-btn" data-testid="my-account">
+                  My account
+                </Link>
               </div>
             </div>
           ) : null}

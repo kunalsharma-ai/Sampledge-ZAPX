@@ -57,6 +57,7 @@ Provider switches are checked too: turning a provider on without its credentials
 | `SIGNUP_RATE_PER_MINUTE`     | sign-ups per minute per address                                                             | `5`     | `5`                         |
 | `LOGIN_MAX_FAILURES`         | wrong passwords in a row before the account locks                                           | `10`    | `10`                        |
 | `LOGIN_LOCK_MINUTES`         | lock length                                                                                 | `15`    | `15`                        |
+| `PASSWORD_RESET_HOURS`       | hours a password reset link works (1–168) _(branch `security-fixes`)_                       | `24`    | `24`                        |
 | `SSO_ALLOW_INSECURE_ISSUER`  | allow http/private identity providers (development and tests only; refused in production)   | off     | `false`                     |
 | `TRUST_PROXY_HOPS`           | proxies in front of the API that add `X-Forwarded-For`                                      | `1`     | `1`                         |
 | `EDGE_SHARED_SECRET`         | secret the CDN sends as `X-Zapx-Edge`; only then viewer address/country headers are trusted | unset   | `<openssl rand -hex 32>`    |
@@ -153,8 +154,8 @@ S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS
   `TELEPHONY_RING_SECONDS`, `TRANSCRIPTION_TIMEOUT_S`, `NETWORK_REPUTATION_TIMEOUT_MS`,
   `AI_TIMEOUT_MS`, `STRIPE_API_BASE`. They all have safe defaults, so nothing breaks, but they are
   easy to miss.
-- On AWS, `app_secret_keys` (`infra/terraform/variables.tf`) includes `TWILIO_AUTH_TOKEN`, but the
-  example secret JSON in `infra/terraform/README.md` does not. Every key in `app_secret_keys` must
-  exist in the secret or the tasks fail to start, so add `"TWILIO_AUTH_TOKEN": ""` to the secret.
-  `SENDGRID_API_KEY` is not in `app_secret_keys` at all; to use email on AWS add it there and to the
-  secret. (PR #28 changes this area; re-check after it merges.)
+- **Fixed on branch `security-fixes`:** on AWS, `app_secret_keys` (`infra/terraform/variables.tf`)
+  included `TWILIO_AUTH_TOKEN` but the example secret JSON in `infra/terraform/README.md` did not,
+  and `SENDGRID_API_KEY` had no secret slot. Both now match (and a test checks it). Every key in
+  `app_secret_keys` must exist in the secret, empty if unused, or the tasks fail to start. PR #28
+  changes this area; re-check after it merges.

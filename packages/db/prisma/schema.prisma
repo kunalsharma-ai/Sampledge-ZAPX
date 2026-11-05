@@ -1039,6 +1039,22 @@ model RevokedSession {
   @@index([expiresAt])
 }
 
+/// One-time password reset link. Created by an administrator (createdById set) or by "forgot
+/// password" (createdById null, emailed only). Only a SHA-256 hash of the token is stored; a link
+/// works once, until expiresAt, and creating a new one for the member voids the older ones.
+model PasswordReset {
+  id          String    @id @default(cuid())
+  tenantId    String
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
 enum LibraryItemKind {
   QUESTION
   SURVEY

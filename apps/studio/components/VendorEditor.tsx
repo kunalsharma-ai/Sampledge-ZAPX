@@ -29,7 +29,8 @@ export interface Vendor {
   partnerBaseUrl: string | null;
   partnerSecretSet: boolean;
   partnerS2s: boolean;
-  secret: string;
+  /** Only for administrators. */
+  secret?: string;
 }
 
 export type VendorDraft = Omit<Vendor, 'id' | 'secret' | 'partnerSecretSet'> & { id?: string; secret?: string; partnerSecretSet?: boolean };

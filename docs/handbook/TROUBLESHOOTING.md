@@ -300,23 +300,23 @@ For a clean local database: `dropdb zapx && createdb zapx && pnpm db:migrate && 
 
 - Check the email exactly (stored as given at creation). The login checks the password even for
   unknown emails (dummy hash) so the message is the same either way.
-- There is **no password reset or change route** in the API: `apps/api/src/auth/auth.controller.ts`
-  has only `login`, `register`, `logout`, `logout-all`, and `PATCH /api/users/:id` changes only
-  `role`, `projectScope` and `disabled`. A forgotten password today needs a new hash written to the
-  database by someone with database access, for example with a one-off script:
-  ```bash
-  cd apps/api && node -e "require('bcryptjs').hash(process.argv[1],10).then(console.log)" '<new-password>'
-  # then: UPDATE "User" SET "passwordHash" = '<hash>' WHERE email = '<email>';
-  ```
-  The API hashes with `bcryptjs`, cost 10. This gap is listed in [SECURITY_REVIEW.md](SECURITY_REVIEW.md).
+- **Fix:** the member uses **Forgot your password?** on the sign-in page (emails a link when
+  `EMAIL_PROVIDER` is set), or an ADMIN opens Settings → Team → **Reset password** and passes the
+  one-time link on privately. The link works once, for `PASSWORD_RESET_HOURS` (default 24), and a
+  newer link voids older ones. Code: `apps/api/src/auth/password-reset.service.ts` _(branch
+  `security-fixes`; before it, there was no reset at all and the only way was a database update)_.
+- **"This reset link is invalid or has expired"** (400): the link was used, expired, replaced by a
+  newer one, or the member is disabled. Create a new link.
+- **Confirm:** the member signs in with the new password; their old sessions are signed out.
 
 ### 6c. Account locked (429 `ACCOUNT_LOCKED`)
 
 - **Cause:** `LOGIN_MAX_FAILURES` (default 10) wrong passwords in a row lock the account for
   `LOGIN_LOCK_MINUTES` (default 15). Code: `apps/api/src/auth/auth.controller.ts` `login` and
   `recordFailure`.
-- **Fix:** wait for the lock to end. There is no unlock button or endpoint in the code. To unlock
-  sooner, clear the lock in the database (this changes data; do it deliberately):
+- **Fix:** wait for the lock to end, or reset the member's password (6b): a reset clears the lock.
+  There is no separate unlock button. To unlock without a reset, clear the lock in the database
+  (this changes data; do it deliberately):
   ```sql
   UPDATE "User" SET "failedLogins" = 0, "lockedUntil" = NULL WHERE email = '<email>';
   ```
