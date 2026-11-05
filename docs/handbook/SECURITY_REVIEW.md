@@ -64,8 +64,10 @@ finding ends with what the fix changed.
   is audited; seal it with `SecretBox` like the partner secret. Existing secrets can then be rotated
   with `POST /api/vendors/:id/rotate-secret`.
 
-- **Fixed (branch `security-fixes`):** `presentVendor(v, role)` now leaves `secret` out for every
-  role outside `CAN_EDIT` (ADMIN, PROGRAMMER); viewers still see the rest of the vendor. Test: `apps/api/test/security-fixes.test.ts`. Sealing the column
+- **Fixed (branch `security-fixes`):** `presentVendor(v, role)` returns `secret` only to ADMIN
+  (`SEES_VENDOR_SECRET`; ZAPX has no separate super admin role). Programmers and viewers get the
+  rest of the vendor without it; programmers can still edit vendors and rotate the secret, but an
+  admin hands the new secret to the vendor. Test: `apps/api/test/security-fixes.test.ts`. Sealing the column
   with `SecretBox` is still open (it needs a data migration of every vendor).
 
 ### S2. Terraform secret keys and the documented secret JSON disagree (Medium, deployment)

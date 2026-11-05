@@ -88,23 +88,30 @@ afterAll(async () => {
 });
 
 describe('vendor shared secret', () => {
-  it('is returned to admins and programmers but not to viewers', async () => {
+  it('is returned to admins only, not to programmers or viewers', async () => {
     const projectId = (await http.post('/api/projects').set(admin).send({ name: 'Secrets' }).expect(201)).body.id as string;
     const created = (await http.post(`/api/projects/${projectId}/vendors`).set(admin).send({ name: 'Panel', code: 'SX' }).expect(201)).body;
     expect(created.secret).toMatch(/^[0-9a-f]{64}$/);
 
     const programmer = await member('PROGRAMMER');
     const viewer = await member('VIEWER');
-    const asProgrammer = (await http.get(`/api/vendors/${created.id}`).set(programmer.headers).expect(200)).body;
-    expect(asProgrammer.secret).toBe(created.secret);
 
+    const asProgrammer = (await http.get(`/api/vendors/${created.id}`).set(programmer.headers).expect(200)).body;
+    expect(asProgrammer.code).toBe('SX');
+    expect(asProgrammer).not.toHaveProperty('secret');
+    // A programmer may still rotate the secret, but the answer does not reveal the new one.
+    const rotated = (await http.post(`/api/vendors/${created.id}/rotate-secret`).set(programmer.headers).expect(201)).body;
+    expect(rotated).not.toHaveProperty('secret');
+    const asAdmin = (await http.get(`/api/vendors/${created.id}`).set(admin).expect(200)).body;
+    expect(asAdmin.secret).toMatch(/^[0-9a-f]{64}$/);
+    expect(asAdmin.secret).not.toBe(created.secret);
     const one = (await http.get(`/api/vendors/${created.id}`).set(viewer.headers).expect(200)).body;
     const list = (await http.get(`/api/projects/${projectId}/vendors`).set(viewer.headers).expect(200)).body;
     for (const v of [one, list[0]]) {
       expect(v.code).toBe('SX');
       expect(v).not.toHaveProperty('secret');
       expect(v).not.toHaveProperty('partnerSecretEnc');
-      expect(JSON.stringify(v)).not.toContain(created.secret);
+      expect(JSON.stringify(v)).not.toContain(asAdmin.secret);
     }
     // Rotating stays an editor's action.
     await http.post(`/api/vendors/${created.id}/rotate-secret`).set(viewer.headers).expect(403);
