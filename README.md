@@ -219,3 +219,10 @@ Placeholders: `[UID] [VID] [CC] [STATUS] [RID] [param:name]`. Signed entry links
 `sig = HMAC-SHA256(secret, sorted query string without sig)`. Rule precedence, callbacks, signing,
 the vendor API and the PROJEXA adapter are documented in
 [docs/modules/redirects.md](docs/modules/redirects.md).
+
+## Maintainer handbook
+
+For troubleshooting, maintaining and extending ZAPX, start with the
+[maintainer handbook](docs/handbook/README.md): architecture, file structure, database, API
+reference, configuration, development guide, troubleshooting, deployment, security review and
+changelog.
