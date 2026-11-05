@@ -8,3 +8,5 @@ e2e/test-results
 e2e/playwright-report
 **/.terraform
 apps/runtime/public/eyetracking/wasm
+apps/mobile/.expo
+apps/mobile/package-lock.json

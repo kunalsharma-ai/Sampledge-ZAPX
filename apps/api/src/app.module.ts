@@ -40,6 +40,7 @@ import { DistributionService } from './distribution/distribution.service';
 import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
 import { HealthController } from './health.controller';
+import { MobileController } from './mobile/mobile.controller';
 import { PlatformIntegrationsController } from './platform/integrations.controller';
 import { IntegrationSettingsService } from './platform/integration-settings.service';
 import { DynamicAiProvider } from './ai/dynamic-ai.provider';
@@ -97,6 +98,7 @@ import { PlatformAutomationService } from './super-admin/platform-automation.ser
   ],
   controllers: [
     HealthController,
+    MobileController,
     DashboardController,
     PlatformIntegrationsController,
     TelephonyController,

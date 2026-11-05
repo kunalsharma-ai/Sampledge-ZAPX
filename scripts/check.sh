@@ -36,6 +36,8 @@ step "Database migrations"
 pnpm db:migrate || { echo "Could not migrate the database at DATABASE_URL. Is PostgreSQL running? (docker compose up -d postgres)"; exit 1; }
 passed+=("migrations")
 step "Unit and API tests";            pnpm test;          passed+=("tests")
+step "Mobile app (type check and unit tests)"
+( cd apps/mobile && npm ci --no-audit --no-fund --loglevel error && npm run typecheck && npm test ); passed+=("mobile")
 
 if [ "$quick" = 0 ]; then
   step "Dependency audit (high and critical)"; pnpm audit --prod --audit-level high; passed+=("audit")
