@@ -4,10 +4,10 @@
  * or with "Sync now".
  */
 import { useCallback, useEffect, useState } from 'react';
-import { nextPageIndex, prepareSurvey } from '@zapx/logic-engine';
+import { checkGeofence, nextPageIndex, prepareSurvey } from '@zapx/logic-engine';
 import { capiSettingsOf, parseSurveyDefinition } from '@zapx/survey-schema';
 import { locate } from './capture';
-import { NotSignedIn, downloadPackage, signIn, signOut, syncNow } from './api';
+import { NotSignedIn, appeal, downloadPackage, myResults, signIn, signOut, syncNow, type ServerResult } from './api';
 import { Interview } from './Interview';
 import { interviews, meta, type Interviewer, type LocalInterview, type PackagedSurvey, type SurveyPackage } from './store';
 
@@ -135,6 +135,18 @@ export function App() {
           'This survey records where each interview takes place. Allow this app to use your location (and turn on location services), then start the interview again.',
         );
       location = { start: at, end: null };
+      if (capture.geofences.length) {
+        const fence = checkGeofence(at, capture.geofences);
+        if (
+          !fence.inside &&
+          !window.confirm(
+            fence.nearest
+              ? `You seem to be ${(fence.nearest.distanceM / 1000).toFixed(1)} km outside the interview areas of this survey (nearest: ${fence.nearest.label}). The interview will be flagged for review. Start anyway?`
+              : "Your location is unknown, so this interview cannot be checked against the survey's interview areas and will be flagged for review. Start anyway?",
+          )
+        )
+          return;
+      }
     }
     const clientId = crypto.randomUUID();
     const record: LocalInterview = {
@@ -283,8 +295,81 @@ export function App() {
               })}
           </tbody>
         </table>
+        <Results online={online} />
       </main>
     </div>
+  );
+}
+
+/** What the server decided for synced interviews, with appeals for rejected ones (online only). */
+function Results({ online }: { online: boolean }) {
+  const [rows, setRows] = useState<ServerResult[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = async () => {
+    setError(null);
+    try {
+      setRows(await myResults());
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const raise = async (r: ServerResult) => {
+    const message = window.prompt('Explain why this interview should be accepted (at least a few words):');
+    if (!message || message.trim().length < 5) return;
+    try {
+      await appeal(r.clientId, message.trim());
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+  const rejected = rows?.filter((r) => r.status === 'quality_fail' || r.appeal) ?? [];
+  return (
+    <section data-testid="results">
+      <h2>Results and appeals</h2>
+      <p className="capi-muted">
+        Interviews rejected by the quality checks or a back-check can be appealed once; a supervisor looks at it again.
+      </p>
+      <button className="capi-button" disabled={!online} onClick={() => void load()}>
+        {rows ? 'Refresh results' : 'Check my results'}
+      </button>
+      {error ? (
+        <p className="capi-problem" role="alert">
+          {error}
+        </p>
+      ) : null}
+      {rows ? (
+        <p className="capi-muted">
+          {rows.filter((r) => r.status === 'complete').length} accepted completes in the last 90 days · {rejected.length} rejected or
+          appealed
+        </p>
+      ) : null}
+      {rejected.length ? (
+        <table className="capi-table">
+          <tbody>
+            {rejected.map((r) => (
+              <tr key={r.clientId}>
+                <td className="capi-mono">{r.clientId.slice(0, 8)}</td>
+                <td>{r.survey}</td>
+                <td>{r.reviewNote ?? r.reason ?? r.status}</td>
+                <td>
+                  {r.appeal ? (
+                    <span className={`capi-pill ${r.appeal.state === 'overturned' ? 'ok' : r.appeal.state === 'upheld' ? 'off' : ''}`}>
+                      appeal {r.appeal.state}
+                      {r.appeal.decisionNote ? `: ${r.appeal.decisionNote}` : ''}
+                    </span>
+                  ) : r.canAppeal ? (
+                    <button className="capi-link" onClick={() => void raise(r)}>
+                      Appeal
+                    </button>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+    </section>
   );
 }
 

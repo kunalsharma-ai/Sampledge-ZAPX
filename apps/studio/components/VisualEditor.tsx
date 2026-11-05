@@ -32,6 +32,8 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   cardsort: 'Card sort',
   hotspot: 'Image hot-spot',
   photo: 'Photo',
+  signature: 'Signature',
+  barcode: 'Barcode / QR code',
   info: 'Information',
 };
 
@@ -72,6 +74,10 @@ function newQuestion(def: SurveyDefinition, type: QuestionType): Question {
       };
     case 'photo':
       return { ...base, type, text: 'Please take a photo' };
+    case 'signature':
+      return { ...base, type, text: 'Please sign to confirm' };
+    case 'barcode':
+      return { ...base, type, text: 'Scan the barcode on the pack', maxLength: 200 };
     case 'cardsort':
       return {
         ...base,
@@ -880,6 +886,28 @@ function QuestionForm({
           location metadata removed on the device, and they are private: only your team can open them, from the review queue. In logic, use{' '}
           {q.id} != null to check one was given.
         </p>
+      ) : null}
+      {q.type === 'signature' ? (
+        <p className="muted small">
+          The respondent signs on screen; the drawing is kept with the answers and shown in exports as &quot;signed&quot;. It shows that
+          someone signed on the device, not who they are: it is not a qualified electronic signature.
+        </p>
+      ) : null}
+      {q.type === 'barcode' ? (
+        <>
+          <div className="row">
+            <Text
+              label="Code format (regular expression)"
+              value={q.pattern}
+              onChange={(v) => onChange({ ...q, pattern: v || undefined })}
+            />
+            <Num label="Max characters" value={q.maxLength} onChange={(v) => onChange({ ...q, maxLength: v ?? 200 })} />
+          </div>
+          <p className="muted small">
+            Scanning uses the camera where the browser can read codes (Chrome on Android, for example); everywhere else the code is typed.
+            Example format for a 13-digit EAN: ^\d{'{'}13{'}'}$
+          </p>
+        </>
       ) : null}
       {q.type === 'open' ? (
         <div className="row">

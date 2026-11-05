@@ -32,6 +32,10 @@ import { ExportService } from './exports/export.service';
 import { VendorsController } from './vendors/vendors.controller';
 import { LibraryController } from './library/library.controller';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { CapiAppealsController, FieldworkController } from './fieldwork/fieldwork.controller';
+import { FieldworkService } from './fieldwork/fieldwork.service';
+import { DistributionController, UnsubscribeController } from './distribution/distribution.controller';
+import { DistributionService } from './distribution/distribution.service';
 import { InterviewController } from './interview/interview.controller';
 import { InterviewService } from './interview/interview.service';
 import { HealthController } from './health.controller';
@@ -108,6 +112,10 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     CaptureController,
     CapiAssignmentsController,
     CapiAppController,
+    FieldworkController,
+    DistributionController,
+    UnsubscribeController,
+    CapiAppealsController,
     ProjectMembersController,
     ApiKeysController,
     AuditLogController,
@@ -134,6 +142,8 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
     TranscriptionService,
     CaptureService,
     CapiService,
+    FieldworkService,
+    DistributionService,
     QaService,
     ExportRunner,
     ProposeService,

@@ -26,6 +26,8 @@ import {
   numericQuestionSchema,
   openQuestionSchema,
   photoQuestionSchema,
+  signatureQuestionSchema,
+  barcodeQuestionSchema,
   rankingQuestionSchema,
   scaleQuestionSchema,
   singleQuestionSchema,
@@ -344,6 +346,8 @@ const QUESTION_SCHEMAS = {
   cardsort: cardSortQuestionSchema,
   hotspot: hotspotQuestionSchema,
   photo: photoQuestionSchema,
+  signature: signatureQuestionSchema,
+  barcode: barcodeQuestionSchema,
   info: infoElementSchema,
 } as const;
 const shapeKeys = (schema: { shape: Record<string, unknown> }) => new Set(Object.keys(schema.shape));

@@ -44,6 +44,11 @@ export interface RendererMessages {
   photoSaved: string;
   /** Card sort: the tray of cards not yet put in a group. */
   unsorted: string;
+  signHere: string;
+  clearSignature: string;
+  scanCode: string;
+  stopScan: string;
+  scanUnavailable: string;
 }
 export const DEFAULT_RENDERER_MESSAGES: RendererMessages = {
   unsorted: 'Not sorted',
@@ -58,6 +63,11 @@ export const DEFAULT_RENDERER_MESSAGES: RendererMessages = {
   playToEnd: 'Please play the media to the end to continue.',
   readAloud: 'Read aloud',
   stopReading: 'Stop reading',
+  signHere: 'Sign in the box with your finger, a pen or the mouse.',
+  clearSignature: 'Clear',
+  scanCode: 'Scan with the camera',
+  stopScan: 'Stop scanning',
+  scanUnavailable: 'This device cannot scan codes. Type the code instead.',
 };
 
 /** Where media files are loaded from: the API's public media endpoint by default. */
@@ -361,6 +371,10 @@ export function QuestionView({
       {q.type === 'sum' ? <ConstantSum question={q} value={value} onChange={onChange} messages={messages} /> : null}
       {q.type === 'photo' ? (
         <PhotoInput questionId={q.id} label={text} value={value} onChange={onChange} handler={photos} messages={messages} />
+      ) : null}
+      {q.type === 'signature' ? <SignaturePad label={text} value={value} onChange={onChange} messages={messages} /> : null}
+      {q.type === 'barcode' ? (
+        <BarcodeInput label={text} maxLength={q.maxLength} value={value} onChange={onChange} messages={messages} />
       ) : null}
       {q.type === 'open' ? (
         q.multiline ? (
@@ -713,6 +727,200 @@ function PhotoInput({
   );
 }
 
+/** Signature strokes on a 1000 x 400 grid, as stored in the answer ("x,y x,y;x,y ..."). */
+const SIG_W = 1000;
+const SIG_H = 400;
+function parseStrokes(v: AnswerValue): Array<Array<[number, number]>> {
+  if (typeof v !== 'string' || !v) return [];
+  return v.split(';').map((s) => s.split(' ').map((p) => p.split(',').map(Number) as [number, number]));
+}
+const strokesText = (strokes: Array<Array<[number, number]>>) =>
+  strokes
+    .filter((s) => s.length)
+    .map((s) => s.map(([x, y]) => `${x},${y}`).join(' '))
+    .join(';');
+
+function SignaturePad({
+  label,
+  value,
+  onChange,
+  messages,
+}: {
+  label: string;
+  value: AnswerValue;
+  onChange: (v: AnswerValue) => void;
+  messages: RendererMessages;
+}) {
+  const canvas = useRef<HTMLCanvasElement | null>(null);
+  const strokes = useRef<Array<Array<[number, number]>>>(parseStrokes(value));
+  const drawing = useRef(false);
+  const paint = () => {
+    const c = canvas.current;
+    const g = c?.getContext('2d');
+    if (!c || !g) return;
+    g.clearRect(0, 0, SIG_W, SIG_H);
+    g.lineWidth = 4;
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+    g.strokeStyle = getComputedStyle(c).color || '#111';
+    for (const s of strokes.current) {
+      g.beginPath();
+      s.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
+      if (s.length === 1) g.lineTo(s[0]![0] + 0.5, s[0]![1]);
+      g.stroke();
+    }
+  };
+  useEffect(() => {
+    strokes.current = parseStrokes(value);
+    paint();
+  }, [value]);
+  const at = (e: React.PointerEvent<HTMLCanvasElement>): [number, number] => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(((e.clientX - r.left) / r.width) * SIG_W);
+    const y = Math.round(((e.clientY - r.top) / r.height) * SIG_H);
+    return [Math.max(0, Math.min(SIG_W, x)), Math.max(0, Math.min(SIG_H, y))];
+  };
+  const end = () => {
+    if (!drawing.current) return;
+    drawing.current = false;
+    const text = strokesText(strokes.current);
+    // Very long signatures are thinned so the answer stays small.
+    onChange(text.length > 24_000 ? strokesText(strokes.current.map((s) => s.filter((_, i) => i % 2 === 0))) : text);
+  };
+  return (
+    <div className="zx-signature">
+      <p className="zx-help">{messages.signHere}</p>
+      <canvas
+        ref={canvas}
+        className="zx-signature-pad"
+        width={SIG_W}
+        height={SIG_H}
+        role="img"
+        aria-label={`${label}: ${value ? 'signed' : 'not signed yet'}`}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          drawing.current = true;
+          strokes.current = [...strokes.current, [at(e)]];
+          paint();
+        }}
+        onPointerMove={(e) => {
+          if (!drawing.current) return;
+          const p = at(e);
+          const s = strokes.current[strokes.current.length - 1]!;
+          const last = s[s.length - 1]!;
+          if (Math.abs(last[0] - p[0]) + Math.abs(last[1] - p[1]) < 3) return;
+          s.push(p);
+          paint();
+        }}
+        onPointerUp={end}
+        onPointerCancel={end}
+      />
+      <button
+        type="button"
+        className="zx-button zx-secondary zx-signature-clear"
+        onClick={() => {
+          strokes.current = [];
+          paint();
+          onChange(null);
+        }}
+      >
+        {messages.clearSignature}
+      </button>
+    </div>
+  );
+}
+
+interface DetectedCode {
+  rawValue: string;
+}
+interface CodeDetector {
+  detect(source: HTMLVideoElement): Promise<DetectedCode[]>;
+}
+/** The browser's code reader (BarcodeDetector), where it exists: Chrome on Android and some others. */
+function codeDetector(): CodeDetector | null {
+  const Ctor = (globalThis as { BarcodeDetector?: new () => CodeDetector }).BarcodeDetector;
+  if (!Ctor) return null;
+  try {
+    return new Ctor();
+  } catch {
+    return null;
+  }
+}
+
+function BarcodeInput({
+  label,
+  maxLength,
+  value,
+  onChange,
+  messages,
+}: {
+  label: string;
+  maxLength: number;
+  value: AnswerValue;
+  onChange: (v: AnswerValue) => void;
+  messages: RendererMessages;
+}) {
+  const [scanning, setScanning] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  const video = useRef<HTMLVideoElement | null>(null);
+  const changed = useRef(onChange);
+  changed.current = onChange;
+  useEffect(() => {
+    if (!scanning) return;
+    const detector = codeDetector();
+    let stream: MediaStream | null = null;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let stopped = false;
+    void (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        if (stopped || !video.current || !detector) throw new Error('stopped');
+        video.current.srcObject = stream;
+        await video.current.play();
+        timer = setInterval(async () => {
+          const found = await detector.detect(video.current!).catch(() => []);
+          if (found[0]?.rawValue) {
+            changed.current(found[0].rawValue.slice(0, maxLength));
+            setScanning(false);
+          }
+        }, 300);
+      } catch {
+        if (!stopped) {
+          setUnavailable(true);
+          setScanning(false);
+        }
+      }
+    })();
+    return () => {
+      stopped = true;
+      if (timer) clearInterval(timer);
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [scanning, maxLength]);
+  const canScan = typeof navigator !== 'undefined' && !!navigator.mediaDevices && !!codeDetector();
+  return (
+    <div className="zx-barcode">
+      <input
+        className="zx-input"
+        type="text"
+        aria-label={label}
+        maxLength={maxLength}
+        autoComplete="off"
+        value={typeof value === 'string' ? value : ''}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {canScan && !unavailable ? (
+        <button type="button" className="zx-button zx-secondary" onClick={() => setScanning((s) => !s)}>
+          {scanning ? messages.stopScan : messages.scanCode}
+        </button>
+      ) : (
+        <p className="zx-help">{messages.scanUnavailable}</p>
+      )}
+      {scanning ? <video ref={video} className="zx-barcode-video" muted playsInline aria-label={messages.scanCode} /> : null}
+    </div>
+  );
+}
+
 function ConstantSum({
   question: q,
   value,
@@ -1036,6 +1244,11 @@ export const defaultThemeCss = `
 .zx-cards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;}
 .zx-card{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--zx-border);border-radius:calc(var(--zx-radius) - 4px);background:var(--zx-bg);cursor:grab;}
 .zx-card-select{max-width:50%;font:inherit;padding:4px;border-radius:6px;border:1px solid var(--zx-border);background:var(--zx-card);color:var(--zx-text);}
+.zx-signature-pad{display:block;width:100%;max-width:560px;aspect-ratio:5/2;border:2px dashed var(--zx-border,#c8ccd4);border-radius:var(--zx-radius);background:var(--zx-card,#fff);touch-action:none;cursor:crosshair;color:var(--zx-text,#111);}
+.zx-signature-clear{margin-top:8px;}
+.zx-barcode{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.zx-barcode .zx-input{flex:1 1 220px;}
+.zx-barcode-video{width:100%;max-width:420px;border-radius:var(--zx-radius);background:#000;}
 .zx-hotspot{position:relative;display:inline-block;max-width:100%;line-height:0;}
 .zx-hotspot-img{max-width:100%;height:auto;border-radius:var(--zx-radius);}
 .zx-hotspot-area{position:absolute;border:2px dashed transparent;border-radius:6px;background:transparent;cursor:pointer;padding:0;}

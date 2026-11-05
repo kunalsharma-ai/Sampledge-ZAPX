@@ -87,7 +87,7 @@ test('program, publish, respond, redirect, export', async ({ page, context }) =>
   await expect(page.locator('.badge.live')).toBeVisible();
 
   // --- Links ---
-  await page.getByRole('tab', { name: 'Links & status' }).click();
+  await page.getByRole('tab', { name: 'Distribution' }).click();
   const linkFor = async (uid: string) => {
     await page.getByLabel('UID (for a single link)').fill(uid);
     await page.getByRole('button', { name: 'Generate link' }).click();

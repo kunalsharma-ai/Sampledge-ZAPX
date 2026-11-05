@@ -62,6 +62,11 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   /** Video and audio played to the end, as "pageIndex:questionId". */
   const [played, setPlayed] = useState<ReadonlySet<string>>(new Set());
   const shownAt = useRef(Date.now());
+  /** When the page now on screen was shown (wall clock, for the page timestamps). */
+  const shownIso = useRef(new Date().toISOString());
+  const latest = useRef(current);
+  latest.current = current;
+  const [paused, setPaused] = useState<number | null>(null);
   const capture = useMemo(() => (source ? capiSettingsOf(source) : null), [source]);
   const recorder = useRef<InterviewRecorder | null>(null);
   const [recording, setRecording] = useState(false);
@@ -121,6 +126,37 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
     shownAt.current = Date.now();
     return ms;
   };
+  /** Time on the page now on screen, added to the interview's page timestamps. */
+  const leavePage = (r: LocalInterview): LocalInterview => {
+    const ms = elapsed();
+    const pageId = def?.pages[r.pageIndex]?.id;
+    const entry = pageId ? [{ pageId, shownAt: shownIso.current, ms }] : [];
+    shownIso.current = new Date().toISOString();
+    return { ...r, durationMs: r.durationMs + ms, pageTimes: [...(r.pageTimes ?? []), ...entry] };
+  };
+  /** An interruption ended: log it, and leave its time out of the page time. */
+  const interrupted = async (kind: 'hidden' | 'paused', since: number) => {
+    const ms = Date.now() - since;
+    shownAt.current += ms;
+    const r = latest.current;
+    if (r.state !== 'in_progress' || !capture?.interruptions) return;
+    await save({ ...r, interruptions: [...(r.interruptions ?? []), { kind, at: new Date(since).toISOString(), ms }] });
+  };
+
+  useEffect(() => {
+    let hiddenSince: number | null = null;
+    const onChange = () => {
+      if (document.visibilityState === 'hidden') hiddenSince = Date.now();
+      else if (hiddenSince !== null) {
+        const since = hiddenSince;
+        hiddenSince = null;
+        // Under two seconds is a glance at a notification, not an interruption.
+        if (Date.now() - since >= 2000) void interrupted('hidden', since);
+      }
+    };
+    document.addEventListener('visibilitychange', onChange);
+    return () => document.removeEventListener('visibilitychange', onChange);
+  }, []);
 
   const finish = async (r: LocalInterview, outcome: string, endedEarly = false) => {
     setEnding(true);
@@ -166,7 +202,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
       return;
     }
     const answers = { ...current.answers, ...result.answers };
-    const moved = { ...current, answers, durationMs: current.durationMs + elapsed() };
+    const moved = { ...leavePage(current), answers };
     setErrors({});
     const t = firstMatchingTermination(def, answers);
     if (t) return finish(moved, t.status);
@@ -180,7 +216,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   const back = async () => {
     const i = prevPageIndex(def, current.answers, current.pageIndex, current.clientId);
     if (i === -1) return;
-    const moved = { ...current, pageIndex: i, durationMs: current.durationMs + elapsed() };
+    const moved = { ...leavePage(current), pageIndex: i };
     await save(moved);
     setPageAnswers(pageAnswersOf(moved));
     setErrors({});
@@ -188,7 +224,7 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
 
   const breakOff = async () => {
     if (!window.confirm('End this interview now? It is kept and synced as unfinished (partial).')) return;
-    await finish({ ...current, durationMs: current.durationMs + elapsed() }, 'partial', true);
+    await finish(leavePage(current), 'partial', true);
   };
 
   const languages = [
@@ -228,7 +264,23 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
             {notice}
           </p>
         ) : null}
-        {ending ? (
+        {paused !== null ? (
+          <div className="zx-card" data-testid="capi-paused">
+            <h1 className="zx-title">Interview paused</h1>
+            <p>The pause is logged with the interview. Time paused does not count toward the interview length.</p>
+            <button
+              type="button"
+              className="zx-button"
+              onClick={() => {
+                const since = paused;
+                setPaused(null);
+                void interrupted('paused', since);
+              }}
+            >
+              Resume the interview
+            </button>
+          </div>
+        ) : ending ? (
           <div className="zx-card" aria-busy="true">
             Saving the interview{capture?.gps !== 'off' ? ' and its location' : ''}…
           </div>
@@ -301,7 +353,10 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
                 {msg.next}
               </button>
             </div>
-            <p style={{ marginTop: 16 }}>
+            <p style={{ marginTop: 16, display: 'flex', gap: 16 }}>
+              <button type="button" className="capi-link" onClick={() => setPaused(Date.now())}>
+                Pause
+              </button>
               <button type="button" className="capi-link capi-danger" onClick={() => void breakOff()}>
                 End interview early
               </button>

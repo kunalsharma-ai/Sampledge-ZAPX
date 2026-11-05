@@ -40,6 +40,34 @@ const interviewSchema = z.object({
     .optional(),
   /** recorded: the respondent agreed and audio was uploaded; declined; unavailable: no microphone. */
   audio: z.enum(['recorded', 'declined', 'unavailable']).optional(),
+  /** Blueprint phase 3: when each page was shown and how long it stayed on screen. */
+  pageTimes: z
+    .array(
+      z.object({
+        pageId: z.string().min(1).max(64),
+        shownAt: z.string().max(40),
+        ms: z
+          .number()
+          .min(0)
+          .max(24 * 3600 * 1000),
+      }),
+    )
+    .max(1000)
+    .optional(),
+  /** Times the interviewer left the app (hidden) or paused the interview, and for how long. */
+  interruptions: z
+    .array(
+      z.object({
+        kind: z.enum(['hidden', 'paused']),
+        at: z.string().max(40),
+        ms: z
+          .number()
+          .min(0)
+          .max(7 * 24 * 3600 * 1000),
+      }),
+    )
+    .max(500)
+    .optional(),
 });
 
 const syncSchema = z.object({

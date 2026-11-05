@@ -6,7 +6,7 @@
  * vendor is told through the normal callback outbox, and the decision is audited. Rejection is
  * final, because the vendor may already have acted on it.
  */
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { createHmac } from 'node:crypto';
 import { Prisma, type Response } from '@zapx/db';
 import { matchingQuotas, prepareSurvey } from '@zapx/logic-engine';
@@ -211,6 +211,7 @@ export class QualityService {
         answers: true,
         versionId: true,
         location: true,
+        evidence: true,
         vendor: { select: { code: true } },
         interviewer: { select: { name: true } },
       },
@@ -241,6 +242,14 @@ export class QualityService {
           .map((q) => q.id),
       ]),
     );
+    const signatureIds = new Map(
+      versions.map((v) => [
+        v.id,
+        allQuestions(prepareSurvey(v.definition as unknown as SurveyDefinition))
+          .filter((q) => q.type === 'signature')
+          .map((q) => q.id),
+      ]),
+    );
     return {
       counts: Object.fromEntries(counts.map((c) => [c.reviewState.toLowerCase(), c._count])),
       items: rows.map(({ answers, versionId, ...r }) => ({
@@ -251,6 +260,9 @@ export class QualityService {
           return c ? [{ questionId, ...c }] : [];
         }),
         recording: captures.get(r.id)?.find((x) => x.kind === 'audio') ?? null,
+        signatures: (signatureIds.get(versionId) ?? [])
+          .map((id) => ({ questionId: id, strokes: (answers as Answers)[id] }))
+          .filter((o): o is { questionId: string; strokes: string } => typeof o.strokes === 'string' && o.strokes !== ''),
         openEnds: (openIds.get(versionId) ?? [])
           .map((id) => ({ questionId: id, text: (answers as Answers)[id] }))
           .filter((o): o is { questionId: string; text: string } => typeof o.text === 'string' && o.text !== ''),
@@ -311,6 +323,48 @@ export class QualityService {
       await this.decided(r, 'rejected');
     }
     return result;
+  }
+
+  /**
+   * Blueprint phase 3: put a quality-failed interview back as a complete (an upheld appeal). It is
+   * counted toward its quotas again, and refused when one of them is full: the server never overfills.
+   */
+  async reinstate(user: AuthUser, surveyId: string, responseId: string, note: string | undefined) {
+    await this.survey(user, surveyId);
+    const r = await this.prisma.forTenant(user.tenantId).response.findFirst({ where: { id: responseId, surveyId } });
+    if (!r) throw new NotFoundException('Interview not found');
+    if (r.status !== 'QUALITY_FAIL') throw new BadRequestException('Only interviews that failed the quality checks can be reinstated');
+    const version = await this.prisma.surveyVersion.findUniqueOrThrow({ where: { id: r.versionId } });
+    const def = version.definition as unknown as SurveyDefinition;
+    await this.prisma.$transaction(async (tx) => {
+      if (!r.isTest)
+        for (const q of matchingQuotas(def, (r.answers ?? {}) as Answers)) {
+          const n = await tx.$executeRaw`UPDATE "QuotaCount" SET "count" = "count" + 1
+            WHERE "surveyId" = ${surveyId} AND "quotaId" = ${q.id} AND "count" < COALESCE("targetOverride", ${q.target})`;
+          if (n === 0) throw new BadRequestException(`Quota ${q.id} is full, so this interview cannot be counted as a complete`);
+        }
+      const n = await tx.response.updateMany({
+        where: { id: r.id, status: 'QUALITY_FAIL' },
+        data: {
+          status: 'COMPLETE',
+          outcomeReason: null,
+          reviewState: 'ACCEPTED',
+          reviewedAt: new Date(),
+          reviewedById: user.id,
+          reviewNote: note ?? null,
+        },
+      });
+      if (n.count === 0) throw new BadRequestException('The interview changed meanwhile; reload and try again');
+      await this.audit.record(
+        user,
+        'quality.reinstate',
+        'response',
+        r.id,
+        { uid: r.uid, previous: r.outcomeReason, note: note ?? null },
+        tx,
+      );
+    });
+    await this.decided(r, 'accepted');
   }
 
   // ---- Block list (Milestone 12) -----------------------------------------------------------------

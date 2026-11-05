@@ -52,6 +52,10 @@ export interface LocalInterview {
   location?: { start: DevicePoint | null; end: DevicePoint | null };
   /** Recording consent: recorded, declined, or unavailable (no microphone or permission). Unset until asked. */
   audio?: 'recorded' | 'declined' | 'unavailable';
+  /** Blueprint phase 3: when each page was shown and for how long (interruptions excluded). */
+  pageTimes?: Array<{ pageId: string; shownAt: string; ms: number }>;
+  /** Times the interviewer left the app or paused the interview. */
+  interruptions?: Array<{ kind: 'hidden' | 'paused'; at: string; ms: number }>;
 }
 
 export interface DevicePoint {

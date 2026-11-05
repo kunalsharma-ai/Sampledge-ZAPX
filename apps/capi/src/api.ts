@@ -173,5 +173,22 @@ function toUpload(i: LocalInterview) {
     ...(i.endedEarly ? { endedEarly: true } : {}),
     ...(i.location ? { location: i.location } : {}),
     ...(i.audio ? { audio: i.audio } : {}),
+    ...(i.pageTimes?.length ? { pageTimes: i.pageTimes.slice(-1000) } : {}),
+    ...(i.interruptions?.length ? { interruptions: i.interruptions.slice(-500) } : {}),
   };
 }
+
+/** Blueprint phase 3: the server's result for each of my synced interviews, and appeals. */
+export interface ServerResult {
+  clientId: string;
+  survey: string;
+  status: string;
+  reason: string | null;
+  reviewNote: string | null;
+  completedAt: string | null;
+  canAppeal: boolean;
+  appeal: { state: 'open' | 'upheld' | 'overturned'; message: string; decisionNote: string | null } | null;
+}
+
+export const myResults = () => call<ServerResult[]>('/capi/interviews');
+export const appeal = (clientId: string, message: string) => call<{ id: string }>('/capi/appeals', { clientId, message });

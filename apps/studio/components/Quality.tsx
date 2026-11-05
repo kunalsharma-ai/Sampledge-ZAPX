@@ -9,6 +9,7 @@ import {
   capiSettingsOf,
   qualitySettingsOf,
   type CapiSettings,
+  type Geofence,
   type QualityCheck,
   type QualitySettings,
   type SurveyDefinition,
@@ -55,6 +56,12 @@ interface Item {
   openEnds: Array<{ questionId: string; text: string }>;
   photos: Array<Capture & { questionId: string }>;
   recording: Capture | null;
+  signatures?: Array<{ questionId: string; strokes: string }>;
+  evidence?: {
+    pageTimes?: Array<{ pageId: string; shownAt: string | null; ms: number }>;
+    interruptions?: { count: number; totalMs: number; log: Array<{ kind: 'hidden' | 'paused'; at: string | null; ms: number }> };
+    geofence?: { inside: boolean; nearest: { label: string; distanceM: number } | null };
+  } | null;
   location: { start?: Point | null; end?: Point | null; audio?: 'recorded' | 'declined' | 'unavailable' } | null;
 }
 interface Capture {
@@ -375,9 +382,57 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
 function Evidence({ item: i }: { item: Item }) {
   const start = i.location?.start;
   const end = i.location?.end;
-  if (!i.photos.length && !i.recording && !i.location) return null;
+  const ev = i.evidence;
+  if (!i.photos.length && !i.recording && !i.location && !ev && !i.signatures?.length) return null;
   return (
     <div className="evidence small" data-testid="evidence">
+      {ev?.geofence ? (
+        <div>
+          <span className="muted">Interview area: </span>
+          {ev.geofence.inside
+            ? `inside${ev.geofence.nearest ? ` (${ev.geofence.nearest.label})` : ''}`
+            : ev.geofence.nearest
+              ? `outside, ${(ev.geofence.nearest.distanceM / 1000).toFixed(1)} km from ${ev.geofence.nearest.label}`
+              : 'not checked: no start location'}
+        </div>
+      ) : null}
+      {ev?.interruptions ? (
+        <div>
+          <span className="muted">Interruptions: </span>
+          {ev.interruptions.count
+            ? `${ev.interruptions.count} (${Math.round(ev.interruptions.totalMs / 1000)} s in total: ${ev.interruptions.log
+                .slice(0, 6)
+                .map((x) => `${x.kind === 'paused' ? 'paused' : 'left the app'} ${Math.round(x.ms / 1000)} s`)
+                .join(', ')}${ev.interruptions.count > 6 ? ', …' : ''})`
+            : 'none'}
+        </div>
+      ) : null}
+      {ev?.pageTimes?.length ? (
+        <details>
+          <summary>Page timestamps ({ev.pageTimes.length})</summary>
+          <table className="data" data-testid="page-times">
+            <tbody>
+              {ev.pageTimes.map((t, k) => (
+                <tr key={k}>
+                  <td className="mono">{t.pageId}</td>
+                  <td>{t.shownAt ? new Date(t.shownAt).toLocaleTimeString() : '?'}</td>
+                  <td>{(t.ms / 1000).toFixed(1)} s</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      ) : null}
+      {i.signatures?.length ? (
+        <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+          {i.signatures.map((sg) => (
+            <figure key={sg.questionId} className="evidence-signature" style={{ margin: 0 }}>
+              <SignatureImage strokes={sg.strokes} label={`Signature ${sg.questionId} of ${i.uid}`} />
+              <figcaption className="mono muted">{sg.questionId}</figcaption>
+            </figure>
+          ))}
+        </div>
+      ) : null}
       {i.location ? (
         <div>
           <span className="muted">Location: </span>
@@ -412,6 +467,25 @@ function Evidence({ item: i }: { item: Item }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/** A signature answer drawn back as lines (1000 x 400 grid). */
+export function SignatureImage({ strokes, label }: { strokes: string; label: string }) {
+  const paths = strokes.split(';').map((s) => `M${s.split(' ').join(' L')}`.replace(/,/g, ' '));
+  return (
+    <svg
+      viewBox="0 0 1000 400"
+      width={200}
+      height={80}
+      role="img"
+      aria-label={label}
+      style={{ border: '1px solid var(--border)', borderRadius: 6 }}
+    >
+      {paths.map((d, k) => (
+        <path key={k} d={d} fill="none" stroke="currentColor" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+      ))}
+    </svg>
   );
 }
 
@@ -461,13 +535,94 @@ function CaptureSettingsEditor({
             />
           </label>
         ) : null}
+        <label className="check">
+          <input type="checkbox" checked={c.interruptions} onChange={(e) => set({ interruptions: e.target.checked })} />
+          Log interruptions (the interviewer leaves the app or pauses); more than {5} or over 15 minutes in total goes to review
+        </label>
+        {c.gps !== 'off' ? <GeofenceEditor fences={c.geofences} onChange={(geofences) => set({ geofences })} /> : null}
         <p className="muted small" style={{ margin: 0 }}>
           The location is taken when an interview starts and ends, rounded to about a metre, and checked: an interview that ends more than 1
-          km from its start, or that overlaps another interview by the same interviewer, goes to review. Recordings start only after the
-          interviewer records the respondent&apos;s answer, and are never made silently.
+          km from its start, starts outside every interview area, or overlaps another interview by the same interviewer, goes to review.
+          Recordings start only after the interviewer records the respondent&apos;s answer, and are never made silently.
         </p>
       </fieldset>
     </section>
+  );
+}
+
+function GeofenceEditor({ fences, onChange }: { fences: Geofence[]; onChange: (f: Geofence[]) => void }) {
+  const edit = (i: number, patch: Partial<Geofence>) => onChange(fences.map((f, j) => (j === i ? { ...f, ...patch } : f)));
+  const num = (v: string) => (v.trim() === '' || !Number.isFinite(Number(v)) ? 0 : Number(v));
+  return (
+    <div className="stack" style={{ gap: 6 }} data-testid="geofences">
+      <strong>Interview areas</strong>
+      <span className="muted small">
+        Circles where interviews may take place. Leave empty to allow anywhere. The GPS accuracy counts in the interviewer&apos;s favour (up
+        to 1 km).
+      </span>
+      {fences.length ? (
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>Latitude</th>
+              <th>Longitude</th>
+              <th>Radius (m)</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {fences.map((f, i) => (
+              <tr key={`${fences.length}-${i}`}>
+                <td>
+                  <input aria-label={`Area ${i + 1} label`} value={f.label} onChange={(e) => edit(i, { label: e.target.value })} />
+                </td>
+                <td>
+                  <input
+                    aria-label={`Area ${i + 1} latitude`}
+                    inputMode="decimal"
+                    defaultValue={f.lat}
+                    onBlur={(e) => edit(i, { lat: num(e.target.value) })}
+                  />
+                </td>
+                <td>
+                  <input
+                    aria-label={`Area ${i + 1} longitude`}
+                    inputMode="decimal"
+                    defaultValue={f.lon}
+                    onBlur={(e) => edit(i, { lon: num(e.target.value) })}
+                  />
+                </td>
+                <td>
+                  <input
+                    aria-label={`Area ${i + 1} radius`}
+                    type="number"
+                    min={10}
+                    value={f.radiusM}
+                    onChange={(e) => edit(i, { radiusM: Math.max(10, num(e.target.value)) })}
+                  />
+                </td>
+                <td>
+                  <button type="button" className="link danger" onClick={() => onChange(fences.filter((_, j) => j !== i))}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+      <div>
+        <button
+          type="button"
+          className="secondary"
+          disabled={fences.length >= 50}
+          onClick={() => onChange([...fences, { label: `Area ${fences.length + 1}`, lat: 0, lon: 0, radiusM: 1000 }])}
+        >
+          + Add interview area
+        </button>
+      </div>
+    </div>
   );
 }
 

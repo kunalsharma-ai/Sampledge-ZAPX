@@ -136,6 +136,16 @@ const schema = z
     TELEPHONY_WEBHOOK_BASE: z.string().default(''),
     /** Seconds to let each phone ring before giving up. */
     TELEPHONY_RING_SECONDS: z.coerce.number().int().min(5).max(120).default(30),
+    /**
+     * Blueprint phase 3: email invitations and reminders. "sendgrid" sends through SendGrid's v3 Mail
+     * Send API from EMAIL_FROM; "off" sends nothing (personal links can still be downloaded and sent
+     * with another tool).
+     */
+    EMAIL_PROVIDER: z.enum(['off', 'sendgrid']).default('off'),
+    SENDGRID_API_KEY: z.string().default(''),
+    SENDGRID_API_BASE: z.string().url().default('https://api.sendgrid.com'),
+    EMAIL_FROM: z.string().default(''),
+    EMAIL_FROM_NAME: z.string().max(100).default('ZAPX surveys'),
     /** Largest interview recording (CAPI audio), in megabytes. Photos are capped at 15. */
     CAPTURE_MAX_MB: z.coerce.number().min(1).max(500).default(100),
     /** Delete photos and recordings this many days after they were uploaded. 0 keeps them until erased. */
@@ -229,6 +239,12 @@ const schema = z
     LOGIN_LOCK_MINUTES: z.coerce.number().int().min(1).max(1440).default(15),
   })
   .superRefine((c, ctx) => {
+    if (c.EMAIL_PROVIDER === 'sendgrid' && (!c.SENDGRID_API_KEY || !/^[^@\s]+@[^@\s]+$/.test(c.EMAIL_FROM)))
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SENDGRID_API_KEY'],
+        message: 'EMAIL_PROVIDER=sendgrid needs SENDGRID_API_KEY and an EMAIL_FROM address',
+      });
     if (c.TRANSCRIPTION === 'deepgram' && (!c.DEEPGRAM_API_KEY || !c.DEEPGRAM_MODEL))
       ctx.addIssue({
         code: 'custom',

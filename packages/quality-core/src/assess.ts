@@ -33,6 +33,9 @@ export const QUALITY_FLAG_CODES = [
   'gps_missing',
   'gps_moved',
   'interviewer_overlap',
+  // Blueprint phase 3: interview evidence
+  'outside_geofence',
+  'interrupted',
 ] as const;
 export type QualityFlagCode = (typeof QUALITY_FLAG_CODES)[number];
 
@@ -74,7 +77,13 @@ export const PENALTY = {
   gps_missing: 30,
   gps_moved: 15,
   interviewer_overlap: 40,
+  outside_geofence: 30,
+  interrupted: 10,
 } as const;
+
+/** A CAPI interview the interviewer left more often or for longer than this is flagged. */
+export const INTERRUPTIONS_FOR_FLAG = 5;
+export const INTERRUPTED_MS_FOR_FLAG = 15 * 60_000;
 
 /** Pages answered with no keyboard, pointer or touch input before no_interaction is flagged. */
 export const QUIET_PAGES_FOR_FLAG = 2;
@@ -118,6 +127,10 @@ export interface FraudInput {
     end?: GeoPoint | null;
     /** Other interviews by the same interviewer whose times overlap this one. */
     overlapping?: number;
+    /** Where the interview started, against the survey's areas (only when areas are set). */
+    geofence?: { inside: boolean; nearest: { label: string; distanceM: number } | null };
+    /** Times the interviewer left the app or paused, and for how long in total. */
+    interruptions?: { count: number; totalMs: number };
   };
 }
 
@@ -299,6 +312,21 @@ function fraudFlags(q: QualitySettings, f: FraudInput): QualityFlag[] {
         code: 'interviewer_overlap',
         penalty: PENALTY.interviewer_overlap,
         detail: `The interviewer recorded ${plural(c.overlapping!, 'other interview')} at the same time.`,
+      });
+    if (c.geofence && !c.geofence.inside)
+      out.push({
+        code: 'outside_geofence',
+        penalty: PENALTY.outside_geofence,
+        detail: c.geofence.nearest
+          ? `The interview started ${(c.geofence.nearest.distanceM / 1000).toFixed(1)} km outside the nearest allowed area (${c.geofence.nearest.label}).`
+          : 'The interview has no start location, so it could not be checked against the allowed areas.',
+      });
+    const i = c.interruptions;
+    if (i && (i.count > INTERRUPTIONS_FOR_FLAG || i.totalMs > INTERRUPTED_MS_FOR_FLAG))
+      out.push({
+        code: 'interrupted',
+        penalty: PENALTY.interrupted,
+        detail: `The interviewer left the interview ${plural(i.count, 'time')} for ${Math.round(i.totalMs / 60_000)} min in total.`,
       });
   }
   return out;

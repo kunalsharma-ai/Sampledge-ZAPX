@@ -202,6 +202,16 @@ function generateAnswer(q: Question, g: GenContext): AnswerValue | undefined {
     case 'photo':
       // A reference only: synthetic respondents never upload files.
       return `synthetic-photo-${++g.serial}`;
+    case 'signature':
+      return `100,200 ${200 + (++g.serial % 700)},150 900,250`;
+    case 'barcode': {
+      // Common code shapes (EAN-13, EAN-8, UPC-A, alphanumeric, a URL in a QR code); the first that fits the pattern.
+      const n = String(++g.serial);
+      const tries = [n.padStart(13, '4'), n.padStart(8, '4'), n.padStart(12, '0'), `SYN${n.padStart(10, '0')}`, `https://example.com/${n}`];
+      if (!q.pattern) return tries[3];
+      const re = new RegExp(q.pattern);
+      return tries.find((t) => re.test(t));
+    }
     case 'grid':
       return Object.fromEntries(q.rows.map((r) => [r.id, pickOption(q, q.columns, g).code]));
     case 'scale': {
