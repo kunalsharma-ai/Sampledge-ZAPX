@@ -10,7 +10,14 @@ export interface AuthUser {
   projectScope: ProjectScopeName;
   /** Set when the request is authenticated with an organization API key (Milestone 6). */
   apiKeyId?: string;
+  /** Super admin of the whole installation (never through an API key). */
+  superAdmin?: boolean;
+  /** The client that sent the request: the mobile app sends X-ZAPX-Client: mobile. */
+  client?: 'web' | 'mobile';
 }
+
+/** The mobile app names itself with this header, so the mobile subscription's features apply. */
+export const CLIENT_HEADER = 'x-zapx-client';
 
 export const AUTH_COOKIE = 'zapx_token';
 /** Mutating requests authenticated by cookie must carry this header (CSRF protection). */

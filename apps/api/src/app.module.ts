@@ -79,6 +79,10 @@ import { AutomationController, NotificationsController } from './automation/auto
 import { AutomationService } from './automation/automation.service';
 import { GovernanceController } from './governance/governance.controller';
 import { GovernanceService } from './governance/governance.service';
+import { EntitlementsController, SuperAdminController } from './super-admin/super-admin.controller';
+import { SuperAdminService } from './super-admin/super-admin.service';
+import { EntitlementsService } from './super-admin/entitlements.service';
+import { PlatformAutomationService } from './super-admin/platform-automation.service';
 
 /**
  * Modular monolith: modules share one process and database but keep their own controllers and
@@ -133,6 +137,8 @@ import { GovernanceService } from './governance/governance.service';
     AutomationController,
     NotificationsController,
     GovernanceController,
+    EntitlementsController,
+    SuperAdminController,
   ],
   providers: [
     IntegrationSettingsService,
@@ -168,6 +174,9 @@ import { GovernanceService } from './governance/governance.service';
     FilesService,
     AutomationService,
     GovernanceService,
+    SuperAdminService,
+    EntitlementsService,
+    PlatformAutomationService,
     // Both follow Settings > Integrations in the CRM (with the environment as the fallback), so a
     // change there takes effect without a restart. Adding OpenAI or Gemini means one more AiProvider
     // subclass and one more case in DynamicAiProvider (docs/modules/ai-gateway.md).

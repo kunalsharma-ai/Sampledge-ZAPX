@@ -146,6 +146,16 @@ model Tenant {
   /// The organization that runs this installation (Integrations in the CRM). Its administrators set
   /// the platform-wide integrations: AI, IPinfo, Deepgram, Twilio, Stripe and file storage.
   platformOperator        Boolean         @default(false)
+  /// Super admin: subscription state (active, trialing, expired, cancelled) and when it ends (null: no end).
+  subscriptionStatus      String          @default("active")
+  subscriptionEndsAt      DateTime?
+  /// Super admin: a suspended organization cannot sign in or use any feature until reactivated.
+  suspendedAt             DateTime?
+  suspendedReason         String?
+  /// Super admin: per-organization feature changes on top of the plan, {web: {key: bool}, mobile: {key: bool}}.
+  featureOverrides        Json            @default("{}")
+  /// Super admin: private notes about the organization (contract, contact, ...).
+  adminNotes              String          @default("")
   createdAt               DateTime        @default(now())
   users                   User[]
   projects                Project[]
@@ -243,6 +253,15 @@ model User {
   lockedUntil       DateTime?
   /// Milestone 20: sessions issued before this moment no longer work ("sign out everywhere").
   sessionsRevokedAt DateTime?
+  /// Super admin of the whole installation: registers organizations, manages plans, features and integrations.
+  superAdmin        Boolean          @default(false)
+  /// Super admin: features removed from this one member, {web: {key: false}, mobile: {key: false}}.
+  featureOverrides  Json             @default("{}")
+  /// Super admin: whether this member may use the mobile app at all.
+  mobileAccess      Boolean          @default(true)
+  /// Last request seen from this member (written at most once a minute) and from which client (web or mobile).
+  lastSeenAt        DateTime?
+  lastClient        String?
 
   @@unique([tenantId, ssoSubject])
   @@index([tenantId])
@@ -510,6 +529,8 @@ model AuditEvent {
 
   @@index([tenantId, entityType, entityId])
   @@index([tenantId, createdAt])
+  /// Super admin: activity across every organization, newest first.
+  @@index([createdAt])
 }
 
 /// A QA Laboratory run: synthetic respondents simulated against one survey version.
@@ -1367,4 +1388,58 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt, createdAt])
+}
+
+/// Super admin: a subscription plan. Its features are listed separately for the web CRM and the
+/// mobile app; its limits have the shape of PlanLimits (apps/api/src/plans/plans.ts).
+model SubscriptionPlan {
+  code           String   @id
+  name           String
+  description    String   @default("")
+  /// Price per interval in the smallest currency unit (display only; Stripe prices are separate).
+  priceCents     Int      @default(0)
+  currency       String   @default("USD")
+  interval       String   @default("month")
+  limits         Json     @default("{}")
+  webFeatures    String[] @default([])
+  mobileFeatures String[] @default([])
+  /// Offered when a super admin registers a new organization.
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+/// Super admin automation: when a trigger matches an organization, run the actions.
+model PlatformAutomation {
+  id          String                  @id @default(cuid())
+  name        String
+  enabled     Boolean                 @default(true)
+  /// org_created, subscription_ending, subscription_ended, completes_used, seats_full, admins_inactive.
+  trigger     String
+  /// Trigger settings, e.g. {days: 7} or {percent: 90}.
+  params      Json                    @default("{}")
+  /// [{type, ...settings}], run in order.
+  actions     Json                    @default("[]")
+  createdById String?
+  lastRunAt   DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  runs        PlatformAutomationRun[]
+}
+
+/// One firing of a platform automation for one organization. dedupeKey makes each firing happen once.
+model PlatformAutomationRun {
+  id           String             @id @default(cuid())
+  automationId String
+  automation   PlatformAutomation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  tenantId     String
+  dedupeKey    String
+  /// ok, partial or failed.
+  outcome      String
+  results      Json               @default("[]")
+  createdAt    DateTime           @default(now())
+
+  @@unique([automationId, dedupeKey])
+  @@index([createdAt])
 }
