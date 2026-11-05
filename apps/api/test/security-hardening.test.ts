@@ -134,8 +134,8 @@ describe('S5: signing keys separate from JWT_SECRET', () => {
     withEnv({ SIGNING_KEYS_SECRET: keys }, () => {
       expect(
         Buffer.compare(
-          signingKey('network-hash', () => ''),
-          signingKey('sso-state', () => ''),
+          signingKey('network-hash', () => Buffer.alloc(0)),
+          signingKey('sso-state', () => Buffer.alloc(0)),
         ) !== 0,
       ).toBe(true);
     });
