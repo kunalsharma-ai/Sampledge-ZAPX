@@ -2,7 +2,7 @@
 
 The ZAPX backend is a REST API under `/api`, served by `apps/api` on port 4000. This file explains the
 common rules, walks through the main flows with **real requests and responses** (captured from a
-local run on 2026-11-05; ids shortened), and then lists **all 246 endpoints** with who may call them
+local run on 2026-11-05; ids shortened), and then lists **all 283 endpoints** with who may call them
 and the exact handler.
 
 Other contracts that already exist and stay authoritative for partners:
@@ -319,15 +319,15 @@ Backend: `apps/api/src/auth` · Frontend: `apps/studio/app/login/page.tsx`, `app
 
 | Method | Endpoint                      | Who can call it                                                       | Handler (file:line)                                                                 |
 | ------ | ----------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| POST   | `/api/auth/login`             | Public · rate limit () => config().LOGIN_RATE_PER_MINUTE/min          | [`AuthController.login`](../../apps/api/src/auth/auth.controller.ts#L69)            |
-| POST   | `/api/auth/register`          | Public · rate limit () => config().SIGNUP_RATE_PER_MINUTE/min         | [`AuthController.register`](../../apps/api/src/auth/auth.controller.ts#L106)        |
-| POST   | `/api/auth/logout`            | Public                                                                | [`AuthController.logout`](../../apps/api/src/auth/auth.controller.ts#L147)          |
-| POST   | `/api/auth/logout-all`        | Any role incl. INTERVIEWER                                            | [`AuthController.logoutAll`](../../apps/api/src/auth/auth.controller.ts#L166)       |
-| POST   | `/api/auth/change-password`   | Any role incl. INTERVIEWER (session, not API key) · rate limit 10/min | [`AuthController.changePassword`](../../apps/api/src/auth/auth.controller.ts#L181)  |
-| POST   | `/api/auth/forgot-password`   | Public · rate limit 5/min                                             | [`AuthController.forgot`](../../apps/api/src/auth/auth.controller.ts#L213)          |
-| GET    | `/api/auth/password-options`  | Public                                                                | [`AuthController.passwordOptions`](../../apps/api/src/auth/auth.controller.ts#L227) |
-| POST   | `/api/auth/reset-password`    | Public · rate limit 10/min                                            | [`AuthController.reset`](../../apps/api/src/auth/auth.controller.ts#L236)           |
-| GET    | `/api/auth/me`                | Any role incl. INTERVIEWER                                            | [`AuthController.me`](../../apps/api/src/auth/auth.controller.ts#L244)              |
+| POST   | `/api/auth/login`             | Public · rate limit () => config().LOGIN_RATE_PER_MINUTE/min          | [`AuthController.login`](../../apps/api/src/auth/auth.controller.ts#L73)            |
+| POST   | `/api/auth/register`          | Public · rate limit () => config().SIGNUP_RATE_PER_MINUTE/min         | [`AuthController.register`](../../apps/api/src/auth/auth.controller.ts#L115)        |
+| POST   | `/api/auth/logout`            | Public                                                                | [`AuthController.logout`](../../apps/api/src/auth/auth.controller.ts#L156)          |
+| POST   | `/api/auth/logout-all`        | Any role incl. INTERVIEWER                                            | [`AuthController.logoutAll`](../../apps/api/src/auth/auth.controller.ts#L175)       |
+| POST   | `/api/auth/change-password`   | Any role incl. INTERVIEWER (session, not API key) · rate limit 10/min | [`AuthController.changePassword`](../../apps/api/src/auth/auth.controller.ts#L190)  |
+| POST   | `/api/auth/forgot-password`   | Public · rate limit 5/min                                             | [`AuthController.forgot`](../../apps/api/src/auth/auth.controller.ts#L223)          |
+| GET    | `/api/auth/password-options`  | Public                                                                | [`AuthController.passwordOptions`](../../apps/api/src/auth/auth.controller.ts#L237) |
+| POST   | `/api/auth/reset-password`    | Public · rate limit 10/min                                            | [`AuthController.reset`](../../apps/api/src/auth/auth.controller.ts#L246)           |
+| GET    | `/api/auth/me`                | Any role incl. INTERVIEWER                                            | [`AuthController.me`](../../apps/api/src/auth/auth.controller.ts#L254)              |
 | POST   | `/api/auth/sso/start`         | Public · rate limit 20/min                                            | [`SsoController.start`](../../apps/api/src/auth/sso.controller.ts#L49)              |
 | GET    | `/api/auth/sso/saml/metadata` | Public                                                                | [`SsoController.metadata`](../../apps/api/src/auth/sso.controller.ts#L67)           |
 | POST   | `/api/auth/sso/saml/acs`      | Public · rate limit 30/min                                            | [`SsoController.acs`](../../apps/api/src/auth/sso.controller.ts#L75)                |
@@ -405,14 +405,14 @@ Backend: `apps/api/src/vendors` · Frontend: `apps/studio/components/VendorEdito
 
 | Method | Endpoint                             | Who can call it                         | Handler (file:line)                                                                  |
 | ------ | ------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------ |
-| GET    | `/api/vendor-presets`                | Signed-in (any role except INTERVIEWER) | [`VendorsController.presets`](../../apps/api/src/vendors/vendors.controller.ts#L123) |
-| GET    | `/api/projects/{projectId}/vendors`  | Signed-in (any role except INTERVIEWER) | [`VendorsController.list`](../../apps/api/src/vendors/vendors.controller.ts#L128)    |
-| POST   | `/api/projects/{projectId}/vendors`  | ADMIN, PROGRAMMER                       | [`VendorsController.create`](../../apps/api/src/vendors/vendors.controller.ts#L138)  |
-| GET    | `/api/vendors/{id}`                  | Signed-in (any role except INTERVIEWER) | [`VendorsController.get`](../../apps/api/src/vendors/vendors.controller.ts#L158)     |
-| PUT    | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.update`](../../apps/api/src/vendors/vendors.controller.ts#L164)  |
-| DELETE | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.remove`](../../apps/api/src/vendors/vendors.controller.ts#L183)  |
-| POST   | `/api/vendors/{id}/rotate-secret`    | ADMIN, PROGRAMMER                       | [`VendorsController.rotate`](../../apps/api/src/vendors/vendors.controller.ts#L191)  |
-| POST   | `/api/vendors/{id}/redirect-preview` | Signed-in (any role except INTERVIEWER) | [`VendorsController.preview`](../../apps/api/src/vendors/vendors.controller.ts#L200) |
+| GET    | `/api/vendor-presets`                | Signed-in (any role except INTERVIEWER) | [`VendorsController.presets`](../../apps/api/src/vendors/vendors.controller.ts#L127) |
+| GET    | `/api/projects/{projectId}/vendors`  | Signed-in (any role except INTERVIEWER) | [`VendorsController.list`](../../apps/api/src/vendors/vendors.controller.ts#L132)    |
+| POST   | `/api/projects/{projectId}/vendors`  | ADMIN, PROGRAMMER                       | [`VendorsController.create`](../../apps/api/src/vendors/vendors.controller.ts#L142)  |
+| GET    | `/api/vendors/{id}`                  | Signed-in (any role except INTERVIEWER) | [`VendorsController.get`](../../apps/api/src/vendors/vendors.controller.ts#L162)     |
+| PUT    | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.update`](../../apps/api/src/vendors/vendors.controller.ts#L168)  |
+| DELETE | `/api/vendors/{id}`                  | ADMIN, PROGRAMMER                       | [`VendorsController.remove`](../../apps/api/src/vendors/vendors.controller.ts#L187)  |
+| POST   | `/api/vendors/{id}/rotate-secret`    | ADMIN, PROGRAMMER                       | [`VendorsController.rotate`](../../apps/api/src/vendors/vendors.controller.ts#L195)  |
+| POST   | `/api/vendors/{id}/redirect-preview` | Signed-in (any role except INTERVIEWER) | [`VendorsController.preview`](../../apps/api/src/vendors/vendors.controller.ts#L204) |
 
 ### Respondent interview (public)
 
@@ -585,24 +585,25 @@ Backend: `apps/api/src/cati` · Frontend: `apps/studio/app/calls/page.tsx`, `app
 
 Backend: `apps/api/src/analysis` · Frontend: `apps/studio/components/Analysis.tsx`, `apps/studio/components/ChoiceResults.tsx`, `apps/studio/components/ResearchAssistant.tsx`
 
-| Method | Endpoint                                                    | Who can call it                               | Handler (file:line)                                                                            |
-| ------ | ----------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| POST   | `/api/surveys/{id}/analysis/assistant/tables`               | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.assistantTables`](../../apps/api/src/analysis/analysis.controller.ts#L40) |
-| POST   | `/api/surveys/{id}/analysis/assistant`                      | ADMIN, PROGRAMMER, VIEWER · rate limit 10/min | [`AnalysisController.ask`](../../apps/api/src/analysis/analysis.controller.ts#L51)             |
-| GET    | `/api/surveys/{id}/analysis/variables`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.variables`](../../apps/api/src/analysis/analysis.controller.ts#L57)       |
-| POST   | `/api/surveys/{id}/analysis/frequencies`                    | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.frequencies`](../../apps/api/src/analysis/analysis.controller.ts#L64)     |
-| POST   | `/api/surveys/{id}/analysis/dashboard`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.dashboard`](../../apps/api/src/analysis/analysis.controller.ts#L73)       |
-| POST   | `/api/surveys/{id}/analysis/crosstab`                       | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.crosstab`](../../apps/api/src/analysis/analysis.controller.ts#L82)        |
-| POST   | `/api/surveys/{id}/analysis/choice/{questionId}`            | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.choice`](../../apps/api/src/analysis/analysis.controller.ts#L89)          |
-| GET    | `/api/surveys/{id}/analysis/choice/{questionId}/design.csv` | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.design`](../../apps/api/src/analysis/analysis.controller.ts#L96)          |
-| POST   | `/api/surveys/{id}/analysis/weights`                        | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.weights`](../../apps/api/src/analysis/analysis.controller.ts#L111)        |
-| GET    | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.list`](../../apps/api/src/analysis/analysis.controller.ts#L118)           |
-| POST   | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER                             | [`AnalysisController.create`](../../apps/api/src/analysis/analysis.controller.ts#L124)         |
-| GET    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.get`](../../apps/api/src/analysis/analysis.controller.ts#L131)            |
-| PUT    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.update`](../../apps/api/src/analysis/analysis.controller.ts#L137)         |
-| DELETE | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.remove`](../../apps/api/src/analysis/analysis.controller.ts#L146)         |
-| POST   | `/api/reports/{id}/run`                                     | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.run`](../../apps/api/src/analysis/analysis.controller.ts#L153)            |
-| GET    | `/api/reports/{id}/export.xlsx`                             | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.export`](../../apps/api/src/analysis/analysis.controller.ts#L160)         |
+| Method | Endpoint                                                    | Who can call it                               | Handler (file:line)                                                                                             |
+| ------ | ----------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| POST   | `/api/surveys/{id}/analysis/assistant/tables`               | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.assistantTables`](../../apps/api/src/analysis/analysis.controller.ts#L40)                  |
+| POST   | `/api/surveys/{id}/analysis/assistant`                      | ADMIN, PROGRAMMER, VIEWER · rate limit 10/min | [`AnalysisController.ask`](../../apps/api/src/analysis/analysis.controller.ts#L51)                              |
+| GET    | `/api/surveys/{id}/analysis/variables`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.variables`](../../apps/api/src/analysis/analysis.controller.ts#L57)                        |
+| POST   | `/api/surveys/{id}/analysis/frequencies`                    | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.frequencies`](../../apps/api/src/analysis/analysis.controller.ts#L64)                      |
+| POST   | `/api/surveys/{id}/analysis/dashboard`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.dashboard`](../../apps/api/src/analysis/analysis.controller.ts#L73)                        |
+| POST   | `/api/surveys/{id}/analysis/crosstab`                       | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.crosstab`](../../apps/api/src/analysis/analysis.controller.ts#L82)                         |
+| POST   | `/api/surveys/{id}/analysis/choice/{questionId}`            | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.choice`](../../apps/api/src/analysis/analysis.controller.ts#L89)                           |
+| POST   | `/api/surveys/{id}/analysis/eyetracking/{questionId}`       | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.eyeTracking`](../../apps/api/src/analysis/analysis.controller.ts#L94) _(PR #37, unmerged)_ |
+| GET    | `/api/surveys/{id}/analysis/choice/{questionId}/design.csv` | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.design`](../../apps/api/src/analysis/analysis.controller.ts#L104)                          |
+| POST   | `/api/surveys/{id}/analysis/weights`                        | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.weights`](../../apps/api/src/analysis/analysis.controller.ts#L119)                         |
+| GET    | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.list`](../../apps/api/src/analysis/analysis.controller.ts#L126)                            |
+| POST   | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER                             | [`AnalysisController.create`](../../apps/api/src/analysis/analysis.controller.ts#L132)                          |
+| GET    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.get`](../../apps/api/src/analysis/analysis.controller.ts#L139)                             |
+| PUT    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.update`](../../apps/api/src/analysis/analysis.controller.ts#L145)                          |
+| DELETE | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.remove`](../../apps/api/src/analysis/analysis.controller.ts#L154)                          |
+| POST   | `/api/reports/{id}/run`                                     | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.run`](../../apps/api/src/analysis/analysis.controller.ts#L161)                             |
+| GET    | `/api/reports/{id}/export.xlsx`                             | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.export`](../../apps/api/src/analysis/analysis.controller.ts#L168)                          |
 
 ### Home dashboard and global search
 
@@ -740,7 +741,40 @@ Backend: `apps/api/src/governance` · Frontend: `apps/studio/components/DataGove
 | GET    | `/api/organization/governance` | ADMIN           | [`GovernanceController.get`](../../apps/api/src/governance/governance.controller.ts#L13)    |
 | PUT    | `/api/organization/governance` | ADMIN           | [`GovernanceController.update`](../../apps/api/src/governance/governance.controller.ts#L18) |
 
-## Super admin and entitlements (ADR 0036)
+### Platform integrations (Settings → Integrations) _(PR #38, unmerged)_
+
+Backend: `apps/api/src/platform` · Frontend: `apps/studio/app/settings/integrations/page.tsx`.
+Only administrators of the organization that runs the installation (`Tenant.platformOperator`; the
+oldest organization until one is marked) or the super admin may use these. Keys are `anthropic`,
+`ipinfo`, `deepgram`, `twilio`, `stripe`, `s3`. Secret fields are sealed with `SECRETS_KEY` and are
+never returned in full ([ADR 0035](../adr/0035-integrations-in-the-crm.md)).
+
+| Method | Endpoint                                | Who can call it      | Handler (file:line)                                                                                  |
+| ------ | --------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------- |
+| GET    | `/api/platform/integrations`            | ADMIN (operator org) | [`PlatformIntegrationsController.list`](../../apps/api/src/platform/integrations.controller.ts#L22)  |
+| PUT    | `/api/platform/integrations/{key}`      | ADMIN (operator org) | [`PlatformIntegrationsController.save`](../../apps/api/src/platform/integrations.controller.ts#L27)  |
+| POST   | `/api/platform/integrations/{key}/test` | ADMIN (operator org) | [`PlatformIntegrationsController.test`](../../apps/api/src/platform/integrations.controller.ts#L33)  |
+| DELETE | `/api/platform/integrations/{key}`      | ADMIN (operator org) | [`PlatformIntegrationsController.reset`](../../apps/api/src/platform/integrations.controller.ts#L38) |
+
+`PUT` body: `{ "enabled": true, "values": { "<field>": "<value>" }, "clear": ["<field>"] }`. A field
+left empty falls back to the environment variable; `DELETE` removes the row so the environment
+applies again.
+
+### Mobile app _(PR #40, unmerged)_
+
+Backend: `apps/api/src/mobile/mobile.controller.ts` · Client: `apps/mobile` ([ADR 0037](../adr/0037-mobile-app.md)).
+The app signs in with `POST /api/auth/login` and sends the token as `Authorization: Bearer …` plus
+`X-ZAPX-Client: mobile`.
+
+| Method | Endpoint              | Who can call it | Handler (file:line)                                                               |
+| ------ | --------------------- | --------------- | --------------------------------------------------------------------------------- |
+| GET    | `/api/mobile/version` | public          | [`MobileController.version`](../../apps/api/src/mobile/mobile.controller.ts#L14)  |
+| GET    | `/api/mobile/config`  | every role      | [`MobileController.settings`](../../apps/api/src/mobile/mobile.controller.ts#L20) |
+
+`version` answers `{ service: "zapx", minimumAppVersion }` (from `MOBILE_MIN_VERSION`, or null);
+`config` adds `capiAppUrl`, `runtimeBaseUrl` and `studioUrl`.
+
+### Super admin and entitlements _(PR #41, unmerged)_ ([ADR 0036](../adr/0036-super-admin.md))
 
 Every signed-in member, including a suspended organization's:
 
@@ -754,13 +788,38 @@ Without `surface`, the `X-ZAPX-Client: mobile` header selects the mobile set. Ga
 403 with `code` `FEATURE_DISABLED` (and `feature`), `ORG_SUSPENDED`, or `MOBILE_DISABLED`. The route
 to feature map is in `apps/api/src/super-admin/features.ts`.
 
-Super admin only (signed in, never an API key; otherwise 403 `SUPER_ADMIN_ONLY`), under `/api/super`:
-`GET overview`; `GET|POST plans`, `PUT|DELETE plans/:code`; `GET|POST organizations`,
-`GET|PATCH organizations/:id`, `PUT organizations/:id/features` (all overrides),
-`PATCH organizations/:id/features` (`{ feature, surface: web|mobile|both, on: true|false|null }`),
-`POST organizations/:id/suspend|reactivate`, `POST organizations/:id/members`; `GET users`,
-`PATCH users/:id` (`role`, `disabled`, `superAdmin`, `mobileAccess`, `featureOverrides`),
-`POST users/:id/password-reset`; `GET activity?tenantId&userId&action&before&limit`;
-`GET integrations`; `GET automation/vocabulary`, `GET|POST automation/rules`,
-`PATCH|DELETE automation/rules/:id`, `GET automation/rules/:id/preview`, `POST automation/run?rule=`,
-`GET automation/runs?rule=`.
+Super admin only (signed in, never an API key; otherwise 403 `SUPER_ADMIN_ONLY`). The first three rows are
+for every signed-in member, the rest are under `/api/super`:
+
+| Method | Endpoint                                   | Handler (file:line)                                                                                        |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/features`                            | [`EntitlementsController.features`](../../apps/api/src/super-admin/super-admin.controller.ts#L42)          |
+| GET    | `/api/me/entitlements`                     | [`EntitlementsController.mine`](../../apps/api/src/super-admin/super-admin.controller.ts#L49)              |
+| GET    | `/api/me/entitlements/stream`              | [`EntitlementsController.stream`](../../apps/api/src/super-admin/super-admin.controller.ts#L71)            |
+| GET    | `/api/super/overview`                      | [`SuperAdminController.overview`](../../apps/api/src/super-admin/super-admin.controller.ts#L124)           |
+| GET    | `/api/super/plans`                         | [`SuperAdminController.plans`](../../apps/api/src/super-admin/super-admin.controller.ts#L130)              |
+| POST   | `/api/super/plans`                         | [`SuperAdminController.createPlan`](../../apps/api/src/super-admin/super-admin.controller.ts#L135)         |
+| PUT    | `/api/super/plans/{code}`                  | [`SuperAdminController.updatePlan`](../../apps/api/src/super-admin/super-admin.controller.ts#L140)         |
+| DELETE | `/api/super/plans/{code}`                  | [`SuperAdminController.deletePlan`](../../apps/api/src/super-admin/super-admin.controller.ts#L146)         |
+| GET    | `/api/super/organizations`                 | [`SuperAdminController.organizations`](../../apps/api/src/super-admin/super-admin.controller.ts#L152)      |
+| POST   | `/api/super/organizations`                 | [`SuperAdminController.createOrganization`](../../apps/api/src/super-admin/super-admin.controller.ts#L157) |
+| GET    | `/api/super/organizations/{id}`            | [`SuperAdminController.organization`](../../apps/api/src/super-admin/super-admin.controller.ts#L162)       |
+| PATCH  | `/api/super/organizations/{id}`            | [`SuperAdminController.updateOrganization`](../../apps/api/src/super-admin/super-admin.controller.ts#L167) |
+| PUT    | `/api/super/organizations/{id}/features`   | [`SuperAdminController.setFeatures`](../../apps/api/src/super-admin/super-admin.controller.ts#L172)        |
+| PATCH  | `/api/super/organizations/{id}/features`   | [`SuperAdminController.setFeature`](../../apps/api/src/super-admin/super-admin.controller.ts#L177)         |
+| POST   | `/api/super/organizations/{id}/suspend`    | [`SuperAdminController.suspend`](../../apps/api/src/super-admin/super-admin.controller.ts#L183)            |
+| POST   | `/api/super/organizations/{id}/reactivate` | [`SuperAdminController.reactivate`](../../apps/api/src/super-admin/super-admin.controller.ts#L189)         |
+| POST   | `/api/super/organizations/{id}/members`    | [`SuperAdminController.createMember`](../../apps/api/src/super-admin/super-admin.controller.ts#L194)       |
+| GET    | `/api/super/users`                         | [`SuperAdminController.users`](../../apps/api/src/super-admin/super-admin.controller.ts#L200)              |
+| PATCH  | `/api/super/users/{id}`                    | [`SuperAdminController.updateUser`](../../apps/api/src/super-admin/super-admin.controller.ts#L205)         |
+| POST   | `/api/super/users/{id}/password-reset`     | [`SuperAdminController.resetLink`](../../apps/api/src/super-admin/super-admin.controller.ts#L210)          |
+| GET    | `/api/super/activity`                      | [`SuperAdminController.activity`](../../apps/api/src/super-admin/super-admin.controller.ts#L216)           |
+| GET    | `/api/super/integrations`                  | [`SuperAdminController.integrations`](../../apps/api/src/super-admin/super-admin.controller.ts#L221)       |
+| GET    | `/api/super/automation/vocabulary`         | [`SuperAdminController.vocabulary`](../../apps/api/src/super-admin/super-admin.controller.ts#L227)         |
+| GET    | `/api/super/automation/rules`              | [`SuperAdminController.rules`](../../apps/api/src/super-admin/super-admin.controller.ts#L236)              |
+| POST   | `/api/super/automation/rules`              | [`SuperAdminController.createRule`](../../apps/api/src/super-admin/super-admin.controller.ts#L241)         |
+| PATCH  | `/api/super/automation/rules/{id}`         | [`SuperAdminController.updateRule`](../../apps/api/src/super-admin/super-admin.controller.ts#L246)         |
+| DELETE | `/api/super/automation/rules/{id}`         | [`SuperAdminController.deleteRule`](../../apps/api/src/super-admin/super-admin.controller.ts#L252)         |
+| GET    | `/api/super/automation/rules/{id}/preview` | [`SuperAdminController.preview`](../../apps/api/src/super-admin/super-admin.controller.ts#L257)            |
+| POST   | `/api/super/automation/run`                | [`SuperAdminController.runNow`](../../apps/api/src/super-admin/super-admin.controller.ts#L264)             |
+| GET    | `/api/super/automation/runs`               | [`SuperAdminController.runs`](../../apps/api/src/super-admin/super-admin.controller.ts#L269)               |

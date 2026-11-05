@@ -1,9 +1,9 @@
 # ZAPX maintainer handbook
 
 This folder explains how ZAPX is built so that you can find the right file when something breaks,
-understand what a change will affect, and add features safely. It was written by reading the code on
-branch `blueprint-p5-enterprise` (the top of the open pull-request stack, PR #34, commit `252ac32`)
-on 2026-11-05. Everything here points at real files; anything that could not be checked from the code
+understand what a change will affect, and add features safely. It was first written from
+branch `blueprint-p5-enterprise` (PR #34, commit `252ac32`) and then refreshed against branch
+`mobile-app` (the top of the open pull-request stack, PR #40, commit `8d8848c`) on 2026-11-05. Everything here points at real files; anything that could not be checked from the code
 alone is marked **Needs Verification**.
 
 The repository already has a README, ADRs and module guides. Nothing was replaced: this handbook sits
@@ -35,6 +35,8 @@ the right outcome (complete, screened out, over quota, and so on). Interviewers 
 survey **face to face** in an offline app (CAPI) or **by phone** from a call list (CATI). ZAPX scores
 the quality of every interview, lets people review suspicious ones, and offers exports, analysis,
 dashboards, automation and enterprise features (single sign-on, API keys, webhooks, audit log).
+A **super admin** runs the whole installation: organizations, subscription plans and which features each
+organization and member may use on the web and in the **mobile app** for Android and iOS _(PRs #41 and #40, unmerged)_.
 
 ## Quick start (local machine)
 
@@ -54,6 +56,7 @@ node apps/api/dist/main.js            # API     http://localhost:4000/api
 pnpm --filter @zapx/studio start      # Studio  http://localhost:3000   (second terminal)
 pnpm --filter @zapx/runtime preview   # Survey  http://localhost:5173   (third terminal)
 pnpm --filter @zapx/capi preview      # CAPI    http://localhost:5174   (fourth terminal)
+( cd apps/mobile && npm ci && npm start )   # Mobile app (Expo, own npm project; PR #40)
 ```
 
 Before merging any change run `pnpm check` (or `pnpm check --quick` while working). The GitHub
@@ -76,15 +79,20 @@ the one before it, so they must be merged in this order.
 | #33   | `blueprint-p4-research`        | `blueprint-p3-fieldwork`       | MaxDiff and conjoint, recodes, AI research assistant (`insights` task), CAPI video, least-fill quota groups, bank blocks, suggested test cases, device matrix ([ADR 0032](../adr/0032-blueprint-research-intelligence.md))              |
 | #34   | `blueprint-p5-enterprise`      | `blueprint-p4-research`        | Automation rules and notifications, data residency and retention, cleaning rules, segments, chart dashboards, SMS invitations through Twilio, area themes and workspace presets ([ADR 0033](../adr/0033-blueprint-enterprise-scale.md)) |
 | #35   | `docs-handbook`                | `blueprint-p5-enterprise`      | This handbook                                                                                                                                                                                                                           |
-| (new) | `security-fixes`               | `docs-handbook`                | Fixes S1–S3 of the [security review](SECURITY_REVIEW.md): vendor secret hidden from viewers, password change/reset, AWS secret list; older docs brought past M13                                                                        |
+| #36   | `security-fixes`               | `docs-handbook`                | Fixes S1–S3 of the [security review](SECURITY_REVIEW.md): vendor secret for administrators only, password change and reset, AWS secret list; older docs brought past M13                                                                |
+| #37   | `blueprint-p6-eye-tracking`    | `security-fixes`               | Webcam eye tracking question (`eyetrack`), experimental and opt-in, with a heat map in analysis ([ADR 0034](../adr/0034-webcam-eye-tracking.md))                                                                                        |
+| #38   | `stack-integrations-in-crm`    | `blueprint-p6-eye-tracking`    | PR #28 rebuilt on this stack: set Claude, IPinfo, Deepgram, Twilio, Stripe and S3 in Settings → Integrations; the `PlatformIntegration` table ([ADR 0035](../adr/0035-integrations-in-the-crm.md))                                      |
+| #39   | `neon-everywhere`              | `stack-integrations-in-crm`    | Neon design on every studio page (shared `PageHeader`, `neon-pages.css`) and the CAPI interviewer app; visual only (ADR 0028 addendum)                                                                                                  |
+| #41   | `super-admin-console`          | `neon-everywhere`              | Super admin console (`/super-admin`): organizations, subscription plans, web and mobile features, suspension, activity, platform automation; live entitlements ([ADR 0036](../adr/0036-super-admin.md))                                 |
+| #40   | `mobile-app`                   | `super-admin-console`          | ZAPX mobile app for Android and iOS (`apps/mobile`, Expo), gated live by the super admin's mobile features ([ADR 0037](../adr/0037-mobile-app.md))                                                                                      |
+| (new) | `docs-handbook-refresh`        | `mobile-app`                   | This refresh of the handbook for #37–#41                                                                                                                                                                                                |
 
-**Not in this branch:** PR #28 (`integrations-in-crm`, configure integrations from Settings →
-Integrations instead of environment variables) is open against `main` but is **not part of this
-stack**, so none of its files (`apps/api/src/platform/integrations.ts`, the `PlatformIntegration`
-table, `/settings/integrations`) exist here. In this branch every integration is configured with
-environment variables ([CONFIGURATION.md](CONFIGURATION.md)). When #28 and this stack are both merged,
-parts of this handbook (configuration, integrations) need updating. The six Dependabot PRs (#20–#25)
-are also open and unrelated.
+Note the order at the top: #41 is merged **before** #40 (the mobile app is built on the super admin
+branch). See [docs/operations/merge-order.md](../operations/merge-order.md).
+
+**PR #28** (`integrations-in-crm`) is still open against `main`, but its work is now part of this
+stack as #38, so #28 can be closed once #38 is merged instead (**Needs Verification** with the
+owner). The six Dependabot PRs (#20–#25) are also open and unrelated.
 
 Throughout the handbook, features from the open PRs are tagged like this: _(PR #33, unmerged)_.
 
@@ -94,4 +102,6 @@ These parts are written and tested against local stand-ins only, so treat them a
 have tried them on a staging environment ([docs/operations/go-live.md](../operations/go-live.md)):
 Claude AI calls, S3 storage, OpenID Connect and SAML sign-in, SCIM, Stripe billing, the AWS Terraform
 and release script, PROJEXA (checked against its code, not a deployed PROJEXA), IPinfo, Deepgram,
-Twilio (voice and SMS) and SendGrid.
+Twilio (voice and SMS) and SendGrid. Also unproven: webcam eye tracking on real webcams (PR #37), and the
+mobile app on real Android and iOS devices and in the app stores (PR #40; it has been type-checked,
+unit-tested and previewed on the web only).

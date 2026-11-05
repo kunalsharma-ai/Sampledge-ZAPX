@@ -22,7 +22,7 @@ the repository's `package.json` files or scripts; they were run on 2026-11-05 on
 # 1. get the code (use the branch you want to work on)
 git clone https://github.com/kunalsharma-ai/Sampledge-ZAPX.git
 cd Sampledge-ZAPX
-git checkout blueprint-p5-enterprise     # or main
+git checkout mobile-app                  # top of the open stack, or main
 
 # 2. settings
 cp .env.example .env                     # edit DATABASE_URL if needed; see CONFIGURATION.md
@@ -54,6 +54,22 @@ pnpm --filter @zapx/studio start         # Studio  http://localhost:3000
 pnpm --filter @zapx/runtime preview      # Respondent runtime http://localhost:5173
 pnpm --filter @zapx/capi preview         # Interviewer app    http://localhost:5174
 ```
+
+Mobile app _(PR #40)_, which is its own npm project outside the pnpm workspace:
+
+```bash
+cd apps/mobile
+npm ci
+npm start              # Expo dev server: scan the QR code with Expo Go, or press w for the web preview
+npm run typecheck && npm test
+```
+
+On a phone, sign in with your computer's network address and the studio port, for example
+`http://192.168.x.x:3000`, not `localhost`.
+
+Super admin _(PR #41)_ on your machine: `pnpm db:seed` also creates one (`SEED_SUPER_EMAIL` /
+`SEED_SUPER_PASSWORD`, development defaults in `packages/db/src/seed.ts`), or run
+`node apps/api/dist/cli/set-super-admin.js <your email>`. Then open http://localhost:3000/super-admin.
 
 Development servers with reload: `pnpm --filter @zapx/studio dev`, `pnpm --filter @zapx/runtime dev`,
 `pnpm --filter @zapx/capi dev`. The API has no watch mode: `pnpm --filter @zapx/api dev` compiles once
@@ -125,6 +141,8 @@ Example: a "Reports" page at `/reports`.
 1. Create `apps/studio/app/reports/page.tsx`. Start with `'use client';`, wrap the content in
    `<Shell>` from `@/components/Shell`, load data with `api()` from `@/lib/api`, and get the member
    with `useMe()` from `@/lib/useMe`. Copy the structure of `apps/studio/app/library/page.tsx`.
+   From PR #39 every signed-in page starts with `PageHeader` from `@/components/neon/PageHeader`
+   (icon, eyebrow, title, actions); keep the heading text, e2e tests look for it.
 2. Add a menu item in `apps/studio/components/Shell.tsx` (the `items.push({ href, label, icon })`
    list; icons from `lucide-react`). Hide it for roles that cannot use it.
 3. Add styles to `apps/studio/app/globals.css` using the existing `--q-*` custom properties.
@@ -186,6 +204,11 @@ Example: `GET /api/projects/:id/summary`.
 7. Call it from the studio with `api('/projects/' + id + '/summary')`.
 8. Test it in `apps/api/test/` with Supertest (copy the setup from an existing file).
 9. If partners use it, document it in `docs/api/openapi.yaml`.
+10. _(PR #41)_ If the route belongs to a feature that plans can switch off, add its path pattern to
+    `RULES` in `apps/api/src/super-admin/features.ts`. A route that is not listed there is open to
+    every plan (see [SECURITY_REVIEW.md S10](SECURITY_REVIEW.md)). A new feature key also goes in
+    `FEATURES` there and, if the mobile app uses it, in `apps/mobile/src/lib/features.ts`.
+11. Add the route to [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
 
 ### Modify an existing API
 
@@ -253,7 +276,9 @@ Roles touch many files; plan carefully.
 9. Tests: the M5 and M6 API tests walk routes as limited roles; extend them.
 
 To give a project-level permission instead of a new role, use project access
-(`ProjectMember`, `AccessService`).
+(`ProjectMember`, `AccessService`). To sell a capability per plan instead, use a feature
+(`apps/api/src/super-admin/features.ts`) _(PR #41)_. The super admin is a flag (`User.superAdmin`),
+not a role; do not add it to `@Roles`.
 
 ### Modify business logic
 
@@ -276,18 +301,21 @@ Pure packages have fast unit tests next to the code; write the test first, then 
 
 ## 5. Quick reference
 
-| Task                       | Files to check                                                                                                                                                                              | What to modify                                                                                                 |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Fix login issue            | `apps/api/src/auth/auth.controller.ts`, `auth.guard.ts`, `session.ts`, `sso.service.ts`, `apps/studio/app/login/page.tsx`, `apps/studio/lib/api.ts`, `.env` (`JWT_SECRET`, `COOKIE_SECURE`) | lockout/disabled state on the `User` row, cookie settings, CSRF header, SSO enforcement (`TenantSso.enforced`) |
-| Add new page               | `apps/studio/app/<route>/page.tsx`, `apps/studio/components/Shell.tsx`, `apps/studio/app/globals.css`                                                                                       | new page file, menu item, styles                                                                               |
-| Change database field      | `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/`, the module's controller Zod schema and service, the studio component                                                  | schema + new migration, validation, reads/writes, UI                                                           |
-| Modify API                 | the controller and service in `apps/api/src/<module>/`, callers in `apps/studio`, `apps/runtime`, `apps/capi`, `docs/api/openapi.yaml` for partner routes                                   | handler, schema, callers, tests                                                                                |
-| Fix frontend issue         | the page in `apps/studio/app/`, the component in `apps/studio/components/`, `packages/survey-renderer/src/index.tsx` (respondent screens), `apps/runtime/src/App.tsx`                       | the component; check the browser console and the network tab for the API answer                                |
-| Change business logic      | `packages/logic-engine`, `packages/redirect-core`, `packages/quality-core`, `packages/analysis-core`, or the module service in `apps/api/src`                                               | the pure function first (with its unit test), then the service                                                 |
-| Add a setting              | `apps/api/src/config.ts`, `.env.example`, `infra/terraform/ecs.tf` / `variables.tf`                                                                                                         | Zod field with a safe default                                                                                  |
-| Change respondent redirect | vendor in the studio, or `packages/redirect-core`, `apps/api/src/integrations/integration-config.ts`                                                                                        | URLs/status words (data), or precedence logic (code)                                                           |
-| Change an email/SMS        | `apps/api/src/distribution/distribution.service.ts`, `mailer.ts`, `sms.ts`                                                                                                                  | template rendering and sending                                                                                 |
-| Add a background task      | `apps/api/src/jobs/job.worker.ts`, `jobs.controller.ts`                                                                                                                                     | job type and handler, or a step in `pass()` / `housekeeping()`                                                 |
+| Task                                           | Files to check                                                                                                                                                                              | What to modify                                                                                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Fix login issue                                | `apps/api/src/auth/auth.controller.ts`, `auth.guard.ts`, `session.ts`, `sso.service.ts`, `apps/studio/app/login/page.tsx`, `apps/studio/lib/api.ts`, `.env` (`JWT_SECRET`, `COOKIE_SECURE`) | lockout/disabled state on the `User` row, cookie settings, CSRF header, SSO enforcement (`TenantSso.enforced`) |
+| Add new page                                   | `apps/studio/app/<route>/page.tsx`, `apps/studio/components/Shell.tsx`, `apps/studio/app/globals.css`                                                                                       | new page file, menu item, styles                                                                               |
+| Change database field                          | `packages/db/prisma/schema.prisma`, `packages/db/prisma/migrations/`, the module's controller Zod schema and service, the studio component                                                  | schema + new migration, validation, reads/writes, UI                                                           |
+| Modify API                                     | the controller and service in `apps/api/src/<module>/`, callers in `apps/studio`, `apps/runtime`, `apps/capi`, `docs/api/openapi.yaml` for partner routes                                   | handler, schema, callers, tests                                                                                |
+| Fix frontend issue                             | the page in `apps/studio/app/`, the component in `apps/studio/components/`, `packages/survey-renderer/src/index.tsx` (respondent screens), `apps/runtime/src/App.tsx`                       | the component; check the browser console and the network tab for the API answer                                |
+| Change business logic                          | `packages/logic-engine`, `packages/redirect-core`, `packages/quality-core`, `packages/analysis-core`, or the module service in `apps/api/src`                                               | the pure function first (with its unit test), then the service                                                 |
+| Add a setting                                  | `apps/api/src/config.ts`, `.env.example`, `infra/terraform/ecs.tf` / `variables.tf`                                                                                                         | Zod field with a safe default                                                                                  |
+| Change respondent redirect                     | vendor in the studio, or `packages/redirect-core`, `apps/api/src/integrations/integration-config.ts`                                                                                        | URLs/status words (data), or precedence logic (code)                                                           |
+| Change an email/SMS                            | `apps/api/src/distribution/distribution.service.ts`, `mailer.ts`, `sms.ts`                                                                                                                  | template rendering and sending                                                                                 |
+| Turn a feature on or off for a plan _(PR #41)_ | super admin console (`/super-admin/plans`, `/super-admin/organizations`), `apps/api/src/super-admin/features.ts`, `apps/mobile/src/lib/features.ts`                                         | plan features (data) or the route map and catalog (code)                                                       |
+| Change a provider key _(PR #38)_               | Settings → Integrations in the studio, `apps/api/src/platform/integrations.ts`                                                                                                              | saved values (data) or the field list (code)                                                                   |
+| Change a mobile screen _(PR #40)_              | `apps/mobile/src/app/`, `src/screens/survey/`, `src/lib/api.ts`                                                                                                                             | the screen; wrap gated parts in `<Gate>` / `<IfFeature>`                                                       |
+| Add a background task                          | `apps/api/src/jobs/job.worker.ts`, `jobs.controller.ts`                                                                                                                                     | job type and handler, or a step in `pass()` / `housekeeping()`                                                 |
 
 ## 6. Version control habits used in this repository
 

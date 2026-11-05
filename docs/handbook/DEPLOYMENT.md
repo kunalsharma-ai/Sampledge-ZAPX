@@ -13,23 +13,28 @@ The deeper guides it builds on: [infra/terraform/README.md](../../infra/terrafor
 
 ### Implemented
 
-| Layer                 | Tool                     | Where                                                                                                                               | Run it                                                                                               |
-| --------------------- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Package unit tests    | Vitest                   | `packages/*/src/**/*.test.ts` (logic-engine 18 files, survey-schema 2, quality-core 2, analysis-core 3, redirect-core 1, quantum 1) | `pnpm test` or `pnpm --filter @zapx/logic-engine test`                                               |
-| API integration tests | Vitest + a real database | `apps/api/test/*.test.ts` (one file per milestone or phase, 26 files)                                                               | `pnpm --filter @zapx/api test` (needs PostgreSQL at `DATABASE_URL`)                                  |
-| End-to-end (browser)  | Playwright               | `e2e/tests/*.spec.ts` (29 files: `milestone*.spec.ts`, `blueprint*.spec.ts`, `quantum`, `neon`)                                     | `pnpm e2e` (builds must exist; starts API, studio, runtime and CAPI from `e2e/playwright.config.ts`) |
-| Infrastructure        | `terraform test`         | `infra/terraform/tests/plan.tftest.hcl` (mocked provider)                                                                           | inside `pnpm check` when Terraform is installed                                                      |
-| Static checks         | Prettier, ESLint, `tsc`  | `.prettierrc`, `eslint.config.*`, every `tsconfig.json`                                                                             | `pnpm format:check`, `pnpm lint`, `pnpm typecheck`                                                   |
-| Secret scan           | own script               | `scripts/secret-scan.mjs`, also in the pre-commit hook `.githooks/`                                                                 | `pnpm secrets:scan`                                                                                  |
-| Dependency audit      | `pnpm audit`             | accepted exceptions in [docs/security.md](../security.md)                                                                           | inside full `pnpm check`                                                                             |
-| Everything at once    | `scripts/check.sh`       | —                                                                                                                                   | `pnpm check` / `--quick` / `--no-docker` / `--no-e2e`                                                |
+| Layer                 | Tool                     | Where                                                                                                                                                  | Run it                                                                                               |
+| --------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| Package unit tests    | Vitest                   | `packages/*/src/**/*.test.ts` (logic-engine 19 files, analysis-core 4, survey-schema 2, quality-core 2, redirect-core 1, quantum 1, survey-renderer 1) | `pnpm test` or `pnpm --filter @zapx/logic-engine test`                                               |
+| API integration tests | Vitest + a real database | `apps/api/test/*.test.ts` (one file per milestone or phase, 31 files)                                                                                  | `pnpm --filter @zapx/api test` (needs PostgreSQL at `DATABASE_URL`)                                  |
+| End-to-end (browser)  | Playwright               | `e2e/tests/*.spec.ts` (28 files: `milestone*.spec.ts`, `blueprint*.spec.ts`, `quantum`, `neon`, `eyetracking`, `super-admin`, `security-fixes`)        | `pnpm e2e` (builds must exist; starts API, studio, runtime and CAPI from `e2e/playwright.config.ts`) |
+| Mobile app _(PR #40)_ | Vitest, `tsc`            | `apps/mobile/test/*.test.ts` (API client, logic, entitlements; a test checks the feature keys match the server)                                        | `cd apps/mobile && npm ci && npm run typecheck && npm test` (inside `pnpm check`)                    |
+| Infrastructure        | `terraform test`         | `infra/terraform/tests/plan.tftest.hcl` (mocked provider)                                                                                              | inside `pnpm check` when Terraform is installed                                                      |
+| Static checks         | Prettier, ESLint, `tsc`  | `.prettierrc`, `eslint.config.*`, every `tsconfig.json`                                                                                                | `pnpm format:check`, `pnpm lint`, `pnpm typecheck`                                                   |
+| Secret scan           | own script               | `scripts/secret-scan.mjs`, also in the pre-commit hook `.githooks/`                                                                                    | `pnpm secrets:scan`                                                                                  |
+| Dependency audit      | `pnpm audit`             | accepted exceptions in [docs/security.md](../security.md)                                                                                              | inside full `pnpm check`                                                                             |
+| Everything at once    | `scripts/check.sh`       | —                                                                                                                                                      | `pnpm check` / `--quick` / `--no-docker` / `--no-e2e`                                                |
 
-Results at the time of writing (branch `blueprint-p5-enterprise`, run on 2026-11-05): `pnpm test`
-passed **590 tests** (api 281, logic-engine 126, quantum 108, analysis-core 30, quality-core 21,
-redirect-core 18, survey-schema 6). The Playwright suite was **not run** while writing this handbook.
+Results at the time of writing (branch `mobile-app`, the top of the stack, run on 2026-11-05):
+`pnpm test` passed **651 tests** (api 322, logic-engine 133, quantum 108, analysis-core 37,
+quality-core 21, redirect-core 18, survey-schema 6, survey-renderer 6). The Playwright suite was
+**not run** for this refresh.
 
-The GitHub workflows `.github/workflows/ci.yml` and `codeql.yml` exist but **do not run**: the
-repository is on the free plan without Actions (ADR 0009). `pnpm check` on your machine is the gate.
+The GitHub workflows `.github/workflows/ci.yml` and `codeql.yml` exist but **do not run**: GitHub
+refuses to start the jobs ("recent account payments have failed or your spending limit needs to be
+increased"), so every pull request shows red checks that are not code failures (ADR 0009). Fixing the
+account's billing under GitHub → Settings → Billing would let them run. Until then `pnpm check` on
+your machine is the gate.
 
 ### How to test a change
 
@@ -149,6 +154,26 @@ aws logs tail /zapx/<env>/api --since 15m
 
 Then sign in to the studio, open one survey, and open one test link in the runtime.
 
+## 4b. Releasing the mobile app _(PR #40, unmerged)_
+
+The Android and iOS apps are built and signed in the cloud by Expo Application Services (EAS). The full
+steps, accounts and costs are in [docs/operations/mobile-release.md](../operations/mobile-release.md).
+In short:
+
+| Step                        | Command or place                                                                                                                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One time                    | Expo account, Google Play Console (USD 25 once), Apple Developer Program (USD 99 a year); decide the bundle id `com.sampledge.zapx` before the first upload |
+| Link the project            | `cd apps/mobile && npm ci && npx eas-cli@latest login && npx eas-cli@latest init`                                                                           |
+| Test build (Android `.apk`) | `npx eas-cli@latest build --profile preview --platform android`                                                                                             |
+| Store builds                | `npx eas-cli@latest build --profile production --platform all`                                                                                              |
+| Submit                      | `npx eas-cli@latest submit --platform android` / `--platform ios` (Play internal track, TestFlight)                                                         |
+| JavaScript-only update      | `npx eas-cli@latest update --channel production` (over the air, no store review)                                                                            |
+| Force old apps to update    | set `MOBILE_MIN_VERSION` on the API                                                                                                                         |
+
+The server needs nothing extra: the app uses the studio address and `/api`. `CAPI_APP_URL` must be
+reachable from phones. **Not done yet:** no store build or submission has been made; it needs the
+owner's store accounts.
+
 ## 5. Rolling back
 
 ### Implemented
@@ -222,6 +247,11 @@ The API refuses to start in production without these (enforced in `apps/api/src/
 - `CALLBACK_ALLOW_PRIVATE_HOSTS` and `SSO_ALLOW_INSECURE_ISSUER` false
 - `S3_BUCKET` when `FILE_STORE=s3`
 
+With PR #38 the provider keys can instead be entered after the first sign-in under Settings →
+Integrations (the operator organization's administrators or the super admin). With PR #41, make the
+first super admin right after the first release: `node apps/api/dist/cli/set-super-admin.js <email>`
+(run it as a one-off task, like the migration).
+
 Also set (not enforced, but needed): `STUDIO_URL` and `RUNTIME_BASE_URL`, `EDGE_SHARED_SECRET`
 behind CloudFront, `TRUST_PROXY_HOPS` for the load balancer, `ALLOW_SIGNUP=false`, and the provider
 keys you use. Full list: [CONFIGURATION.md](CONFIGURATION.md).
@@ -236,6 +266,8 @@ keys you use. Full list: [CONFIGURATION.md](CONFIGURATION.md).
   retention `log_retention_days`); WAF logs `aws-waf-logs-zapx-<env>-edge` (us-east-1) and `-alb`.
 - **Alarms** (`infra/terraform/monitoring.tf`, to an SNS topic): `api_5xx`, `api_unhealthy`
   (unhealthy targets), `db_cpu`, `db_storage` (free storage low).
+- **Super admin console** _(PR #41)_: activity across every organization (`/super-admin/activity`),
+  each member's last request and client (`lastSeenAt`, `lastClient`), and platform automation runs.
 - **In the app:** the audit log (Settings → Audit), vendor callback and webhook delivery logs, job
   status per survey, AI usage and budgets.
 
@@ -264,11 +296,12 @@ Regular tasks:
 
 Improvements worth planning (details in [SECURITY_REVIEW.md](SECURITY_REVIEW.md)):
 
-1. **Merge or close the open stack** (#27 → #34, and #28 separately). Eight unmerged branches make
-   every fix harder; the longer they stay open the more conflicts they collect.
+1. **Merge or close the open stack** (#27 → #41 → #40, in the order of
+   [merge-order.md](../operations/merge-order.md); #28 is superseded by #38). Fifteen unmerged branches
+   make every fix harder; the longer they stay open the more conflicts they collect.
 2. **Done on branch `security-fixes`:** the root `README.md`, `docs/architecture.md` and
    `go-live.md` now go past milestone 13; password change and reset exist; the vendor secret is
-   hidden from viewers; the AWS secret list matches its README.
+   hidden from everyone but administrators; the AWS secret list matches its README.
 3. **Seal the vendor shared secret at rest** with `SecretBox`, like the partner secret (needs a
    data migration).
 4. **Shared rate limiting**: the throttler is per process; with two or more API tasks the limits
@@ -276,5 +309,10 @@ Improvements worth planning (details in [SECURITY_REVIEW.md](SECURITY_REVIEW.md)
 5. **Studio unit tests** and a coverage report (section 1).
 6. **Node 22 → newer LTS** when Dependabot PR #20 is reviewed; test with `pnpm check` and the Docker
    build.
-7. **Re-check after PR #28 merges**: it moves integration keys into the CRM, which changes the
-   Terraform secret list and [CONFIGURATION.md](CONFIGURATION.md).
+7. **Decide where provider keys live** now that PR #38 lets them be set in the CRM: either keep them
+   in Secrets Manager (`app_secret_keys`) or remove them there and enter them in Settings →
+   Integrations, but not half of each ([CONFIGURATION.md](CONFIGURATION.md)).
+8. **Release the mobile app** to the stores once the owner's Expo, Google Play and Apple accounts
+   exist (section 4b), and test it on real phones first.
+9. **Validate eye tracking on real webcams** before offering it to clients (PR #37 is marked
+   experimental).

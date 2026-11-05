@@ -2,20 +2,20 @@
 
 ZAPX stores everything in one **PostgreSQL 16** database, accessed only through **Prisma 6**
 (`packages/db`). This file lists every table (Prisma "model"), field, relationship and index on branch
-`blueprint-p5-enterprise`, generated from `packages/db/prisma/schema.prisma` and checked against the
+`mobile-app` (PR #40, the top of the stack), generated from `packages/db/prisma/schema.prisma` and checked against the
 migrations. ZAPX does not use MongoDB.
 
 ## 1. The essentials
 
-| Question                | Answer                                                                                                                                                                                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Database name           | `zapx` locally and in Docker (`.env.example`, `docker-compose.yml`); on AWS `DB_NAME` (default `zapx`, `apps/api/src/database-url.ts`)                                                                                                                 |
-| Connection setting      | `DATABASE_URL=postgresql://user:password@host:5432/zapx?connection_limit=10&pool_timeout=20`, or `DB_HOST` + `DB_USER` + `DB_PASSWORD` (+ `DB_PORT`, `DB_NAME`, `DB_SSLMODE`, `DB_CONNECTION_LIMIT`)                                                   |
-| Schema file             | `packages/db/prisma/schema.prisma` (51 models with `PasswordReset` from branch `security-fixes`, 22 enums)                                                                                                                                             |
-| Migrations              | `packages/db/prisma/migrations/` — 28 folders (the last, `20261117000000_password_reset`, from branch `security-fixes`), one per milestone/phase, applied in name order                                                                                |
-| Client used by the code | `PrismaService` (`apps/api/src/common/prisma.service.ts`), which extends the generated `PrismaClient` from `@zapx/db`                                                                                                                                  |
-| Seed                    | `packages/db/src/seed.ts`: one organization "Demo tenant" and an admin account whose email and password are set by `SEED_EMAIL` and `SEED_PASSWORD` (the development defaults are in `seed.ts`; never use them outside your laptop). Development only. |
-| Ids                     | `cuid()` strings, except `Response.id` (UUID set by the code), `MediaAsset.id` and `Capture.id` (22-character random ids, because they appear in URLs), `CatiDial.id` (random)                                                                         |
+| Question                | Answer                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Database name           | `zapx` locally and in Docker (`.env.example`, `docker-compose.yml`); on AWS `DB_NAME` (default `zapx`, `apps/api/src/database-url.ts`)                                                                                                                                                                                                                                                        |
+| Connection setting      | `DATABASE_URL=postgresql://user:password@host:5432/zapx?connection_limit=10&pool_timeout=20`, or `DB_HOST` + `DB_USER` + `DB_PASSWORD` (+ `DB_PORT`, `DB_NAME`, `DB_SSLMODE`, `DB_CONNECTION_LIMIT`)                                                                                                                                                                                          |
+| Schema file             | `packages/db/prisma/schema.prisma` (55 models on branch `mobile-app`, 22 enums)                                                                                                                                                                                                                                                                                                               |
+| Migrations              | `packages/db/prisma/migrations/` — 30 folders (the last two, `20261118000000_integrations_in_crm` from PR #38 and `20261119000000_super_admin` from PR #41), one per milestone/phase, applied in name order                                                                                                                                                                                   |
+| Client used by the code | `PrismaService` (`apps/api/src/common/prisma.service.ts`), which extends the generated `PrismaClient` from `@zapx/db`                                                                                                                                                                                                                                                                         |
+| Seed                    | `packages/db/src/seed.ts`: one organization "Demo tenant" (marked as the platform operator) and an admin account whose email and password are set by `SEED_EMAIL` and `SEED_PASSWORD`; from PR #41 also a super admin in the same organization (`SEED_SUPER_EMAIL`, `SEED_SUPER_PASSWORD`) (the development defaults are in `seed.ts`; never use them outside your laptop). Development only. |
+| Ids                     | `cuid()` strings, except `Response.id` (UUID set by the code), `MediaAsset.id` and `Capture.id` (22-character random ids, because they appear in URLs), `CatiDial.id` (random)                                                                                                                                                                                                                |
 
 ### How the questionnaire is stored
 
@@ -70,6 +70,7 @@ erDiagram
   Job ||--o{ StoredFile : files
   Distribution ||--o{ Invitation : sends
   AutomationRule ||--o{ AutomationRun : runs
+  PlatformAutomation ||--o{ PlatformAutomationRun : runs
 ```
 
 ## 3. Tables by area
@@ -86,11 +87,12 @@ erDiagram
 | Jobs and files            | `Job`, `StoredFile`                                                                                                                                                 |
 | Analysis                  | `Report`                                                                                                                                                            |
 | Automation _(PR #34)_     | `AutomationRule`, `AutomationRun`, `Notification`                                                                                                                   |
+| Platform _(PR #38, #41)_  | `PlatformIntegration`, `SubscriptionPlan`, `PlatformAutomation`, `PlatformAutomationRun`                                                                            |
 | Audit                     | `AuditEvent`                                                                                                                                                        |
 
 Tables that exist only on the open PR branches (not on `main`): `LibraryItem` (#30), `GlossaryTerm`,
 `BlockExposure`, `QaTestCase` (#31), `BackCheck`, `QualityAppeal`, `Contact`, `Distribution`,
-`Invitation` (#32), `AutomationRule`, `AutomationRun`, `Notification` (#34). Columns added by PR #27
+`Invitation` (#32), `AutomationRule`, `AutomationRun`, `Notification` (#34), `PlatformIntegration` (#38), `SubscriptionPlan`, `PlatformAutomation`, `PlatformAutomationRun` (#41). PR #41 also adds super admin columns to `Tenant` (subscription, suspension, feature overrides) and `User` (`superAdmin`, `featureOverrides`, `mobileAccess`, `lastSeenAt`, `lastClient`). Columns added by PR #27
 (`User.preferences`, `Tenant.appearanceDefaults`) and later phases are in migrations
 `20261110000000_quantum_appearance` onwards.
 
@@ -110,6 +112,11 @@ bad value will not raise an error; it will just make the row invisible to querie
 | `CatiDial.caseId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `CatiCase.id`      |
 | `CatiDial.captureId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | `Capture.id`       |
 | `Invitation.contactId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | `Contact.id`       |
+
+Added by PR #41: `Tenant.plan` → `SubscriptionPlan.code` (a plain string; when no saved plan has that code,
+`PlanCatalogService.get` uses the built-in plan of that name with every feature, or, for an unknown
+code, the free limits with **no features**), `PlatformAutomationRun.tenantId` → `Tenant.id`,
+`PlatformAutomation.createdById` and `PlatformIntegration.updatedById` → `User.id`.
 
 ## 5. Indexes, unique rules and database-level security
 
@@ -190,22 +197,29 @@ objects that join tables) are summarised under "Relations".
 
 #### Tenant
 
-| Field                     | Type        | Required | Key / default            | Meaning                                                                                                                                                                   |
-| ------------------------- | ----------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                      | `String`    | yes      | **PK**, default `cuid()` |                                                                                                                                                                           |
-| `name`                    | `String`    | yes      |                          |                                                                                                                                                                           |
-| `redirectDefaults`        | `Json`      | yes      | default `"{}"`           | Organization-level redirect defaults: {urls, words, countries} (lowest precedence).                                                                                       |
-| `plan`                    | `String`    | yes      | default `"enterprise"`   | Plan code (Milestone 8): free, team, business or enterprise. Limits live in code (plans.ts).                                                                              |
-| `billingCustomerId`       | `String?`   | no       | unique                   | Billing (Milestone 13): the Stripe customer and subscription behind the plan, when billing is on.                                                                         |
-| `billingSubscriptionId`   | `String?`   | no       |                          |                                                                                                                                                                           |
-| `billingStatus`           | `String?`   | no       |                          | Stripe subscription status (active, trialing, past_due, canceled, ...).                                                                                                   |
-| `billingPeriodEnd`        | `DateTime?` | no       |                          |                                                                                                                                                                           |
-| `appearanceDefaults`      | `Json`      | yes      | default `"{}"`           | Quantum Design System: the organization's default appearance for members who have not chosen their own.                                                                   |
-| `appearancePresets`       | `Json`      | yes      | default `"[]"`           | Blueprint phase 5: saved workspace presets, [{id, name, appearance, modules}], shared with members.                                                                       |
-| `dataRegion`              | `String?`   | no       |                          | Blueprint phase 5: the region the organization's data must stay in (e.g. "eu"), checked against the deployment's DATA_REGION; null when the organization has not set one. |
-| `blockExternalProcessors` | `Boolean`   | yes      | default `false`          | Blueprint phase 5: when on, features that send data to a processor outside the deployment (AI, transcription) are refused for this organization.                          |
-| `retention`               | `Json`      | yes      | default `"{}"`           | Blueprint phase 5: retention policy {responsesDays?, capturesDays?, contactsDays?} (null: keep).                                                                          |
-| `createdAt`               | `DateTime`  | yes      | default `now()`          |                                                                                                                                                                           |
+| Field                     | Type        | Required | Key / default            | Meaning                                                                                                                                                                               |
+| ------------------------- | ----------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                      | `String`    | yes      | **PK**, default `cuid()` |                                                                                                                                                                                       |
+| `name`                    | `String`    | yes      |                          |                                                                                                                                                                                       |
+| `redirectDefaults`        | `Json`      | yes      | default `"{}"`           | Organization-level redirect defaults: {urls, words, countries} (lowest precedence).                                                                                                   |
+| `plan`                    | `String`    | yes      | default `"enterprise"`   | Plan code (Milestone 8): free, team, business or enterprise. Limits live in code (plans.ts).                                                                                          |
+| `billingCustomerId`       | `String?`   | no       | unique                   | Billing (Milestone 13): the Stripe customer and subscription behind the plan, when billing is on.                                                                                     |
+| `billingSubscriptionId`   | `String?`   | no       |                          |                                                                                                                                                                                       |
+| `billingStatus`           | `String?`   | no       |                          | Stripe subscription status (active, trialing, past_due, canceled, ...).                                                                                                               |
+| `billingPeriodEnd`        | `DateTime?` | no       |                          |                                                                                                                                                                                       |
+| `appearanceDefaults`      | `Json`      | yes      | default `"{}"`           | Quantum Design System: the organization's default appearance for members who have not chosen their own.                                                                               |
+| `appearancePresets`       | `Json`      | yes      | default `"[]"`           | Blueprint phase 5: saved workspace presets, [{id, name, appearance, modules}], shared with members.                                                                                   |
+| `dataRegion`              | `String?`   | no       |                          | Blueprint phase 5: the region the organization's data must stay in (e.g. "eu"), checked against the deployment's DATA_REGION; null when the organization has not set one.             |
+| `blockExternalProcessors` | `Boolean`   | yes      | default `false`          | Blueprint phase 5: when on, features that send data to a processor outside the deployment (AI, transcription) are refused for this organization.                                      |
+| `retention`               | `Json`      | yes      | default `"{}"`           | Blueprint phase 5: retention policy {responsesDays?, capturesDays?, contactsDays?} (null: keep).                                                                                      |
+| `platformOperator`        | `Boolean`   | yes      | default `false`          | The organization that runs this installation (Integrations in the CRM). Its administrators set the platform-wide integrations: AI, IPinfo, Deepgram, Twilio, Stripe and file storage. |
+| `subscriptionStatus`      | `String`    | yes      | default `"active"`       | Super admin: subscription state (active, trialing, expired, cancelled) and when it ends (null: no end).                                                                               |
+| `subscriptionEndsAt`      | `DateTime?` | no       |                          |                                                                                                                                                                                       |
+| `suspendedAt`             | `DateTime?` | no       |                          | Super admin: a suspended organization cannot sign in or use any feature until reactivated.                                                                                            |
+| `suspendedReason`         | `String?`   | no       |                          |                                                                                                                                                                                       |
+| `featureOverrides`        | `Json`      | yes      | default `"{}"`           | Super admin: per-organization feature changes on top of the plan, {web: {key: bool}, mobile: {key: bool}}.                                                                            |
+| `adminNotes`              | `String`    | yes      | default `""`             | Super admin: private notes about the organization (contract, contact, ...).                                                                                                           |
+| `createdAt`               | `DateTime`  | yes      | default `now()`          |                                                                                                                                                                                       |
 
 Relations: has many `User` (`users`); has many `Project` (`projects`); has one `TenantAiPolicy` (`aiPolicy`); has one `TenantSso` (`sso`); has one `TenantScim` (`scim`).
 
@@ -314,6 +328,11 @@ Relations: `tenantId` → `Tenant.id`.
 | `failedLogins`      | `Int`               | yes      | default `0`              | Milestone 20: failed password sign-ins in a row, and when the account may try again.                       |
 | `lockedUntil`       | `DateTime?`         | no       |                          |                                                                                                            |
 | `sessionsRevokedAt` | `DateTime?`         | no       |                          | Milestone 20: sessions issued before this moment no longer work ("sign out everywhere").                   |
+| `superAdmin`        | `Boolean`           | yes      | default `false`          | Super admin of the whole installation: registers organizations, manages plans, features and integrations.  |
+| `featureOverrides`  | `Json`              | yes      | default `"{}"`           | Super admin: features removed from this one member, {web: {key: false}, mobile: {key: false}}.             |
+| `mobileAccess`      | `Boolean`           | yes      | default `true`           | Super admin: whether this member may use the mobile app at all.                                            |
+| `lastSeenAt`        | `DateTime?`         | no       |                          | Last request seen from this member (written at most once a minute) and from which client (web or mobile).  |
+| `lastClient`        | `String?`           | no       |                          |                                                                                                            |
 
 Relations: `tenantId` → `Tenant.id`; has many `CapiAssignment` (`capiAssignments`); has many `Response` (`capiInterviews`); has many `ProjectMember` (`projects`); has many `ApiKey` (`apiKeys`).
 
@@ -503,7 +522,7 @@ Indexes and constraints: `@@unique([surveyId, quotaId])`.
 | `data`       | `Json`     | yes      | default `"{}"`           |         |
 | `createdAt`  | `DateTime` | yes      | default `now()`          |         |
 
-Indexes and constraints: `@@index([tenantId, entityType, entityId])`; `@@index([tenantId, createdAt])`.
+Indexes and constraints: `@@index([tenantId, entityType, entityId])`; `@@index([tenantId, createdAt])`, `@@index([createdAt])` (PR #41: activity across organizations).
 
 #### QaRun
 
@@ -1279,6 +1298,76 @@ An in-app notification for one member.
 
 Indexes and constraints: `@@index([userId, readAt, createdAt])`.
 
+#### PlatformIntegration
+
+_PR #38._ A platform-wide integration set up in the CRM (Settings > Integrations). When a row exists it wins over the environment; a field left empty falls back to the environment variable.
+
+| Field           | Type       | Required | Key / default   | Meaning                                                                                        |
+| --------------- | ---------- | -------- | --------------- | ---------------------------------------------------------------------------------------------- |
+| `key`           | `String`   | yes      | **PK**          | anthropic, ipinfo, deepgram, twilio, stripe or s3                                              |
+| `enabled`       | `Boolean`  | yes      | default `false` |                                                                                                |
+| `settings`      | `Json`     | yes      | default `"{}"`  | Non-secret fields, e.g. {"model": "...", "callerId": "+44..."}.                                |
+| `secretsSealed` | `String?`  | no       |                 | Secret fields as one JSON object sealed with SecretBox (SECRETS_KEY). Never sent back in full. |
+| `updatedById`   | `String?`  | no       |                 |                                                                                                |
+| `updatedAt`     | `DateTime` | yes      | auto-updated    |                                                                                                |
+
+#### SubscriptionPlan
+
+_PR #41._ Super admin: a subscription plan. Its features are listed separately for the web CRM and the mobile app; its limits have the shape of PlanLimits (apps/api/src/plans/plans.ts).
+
+| Field            | Type       | Required   | Key / default     | Meaning                                                                                      |
+| ---------------- | ---------- | ---------- | ----------------- | -------------------------------------------------------------------------------------------- |
+| `code`           | `String`   | yes        | **PK**            |                                                                                              |
+| `name`           | `String`   | yes        |                   |                                                                                              |
+| `description`    | `String`   | yes        | default `""`      |                                                                                              |
+| `priceCents`     | `Int`      | yes        | default `0`       | Price per interval in the smallest currency unit (display only; Stripe prices are separate). |
+| `currency`       | `String`   | yes        | default `"USD"`   |                                                                                              |
+| `interval`       | `String`   | yes        | default `"month"` |                                                                                              |
+| `limits`         | `Json`     | yes        | default `"{}"`    |                                                                                              |
+| `webFeatures`    | `String[]` | yes (list) | default `[]`      |                                                                                              |
+| `mobileFeatures` | `String[]` | yes (list) | default `[]`      |                                                                                              |
+| `active`         | `Boolean`  | yes        | default `true`    | Offered when a super admin registers a new organization.                                     |
+| `sortOrder`      | `Int`      | yes        | default `0`       |                                                                                              |
+| `createdAt`      | `DateTime` | yes        | default `now()`   |                                                                                              |
+| `updatedAt`      | `DateTime` | yes        | auto-updated      |                                                                                              |
+
+#### PlatformAutomation
+
+_PR #41._ Super admin automation: when a trigger matches an organization, run the actions.
+
+| Field         | Type        | Required | Key / default            | Meaning                                                                                            |
+| ------------- | ----------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------------- |
+| `id`          | `String`    | yes      | **PK**, default `cuid()` |                                                                                                    |
+| `name`        | `String`    | yes      |                          |                                                                                                    |
+| `enabled`     | `Boolean`   | yes      | default `true`           |                                                                                                    |
+| `trigger`     | `String`    | yes      |                          | org_created, subscription_ending, subscription_ended, completes_used, seats_full, admins_inactive. |
+| `params`      | `Json`      | yes      | default `"{}"`           | Trigger settings, e.g. {days: 7} or {percent: 90}.                                                 |
+| `actions`     | `Json`      | yes      | default `"[]"`           | [{type, ...settings}], run in order.                                                               |
+| `createdById` | `String?`   | no       |                          |                                                                                                    |
+| `lastRunAt`   | `DateTime?` | no       |                          |                                                                                                    |
+| `createdAt`   | `DateTime`  | yes      | default `now()`          |                                                                                                    |
+| `updatedAt`   | `DateTime`  | yes      | auto-updated             |                                                                                                    |
+
+Relations: has many `PlatformAutomationRun` (`runs`).
+
+#### PlatformAutomationRun
+
+_PR #41._ One firing of a platform automation for one organization. dedupeKey makes each firing happen once.
+
+| Field          | Type       | Required | Key / default            | Meaning                |
+| -------------- | ---------- | -------- | ------------------------ | ---------------------- |
+| `id`           | `String`   | yes      | **PK**, default `cuid()` |                        |
+| `automationId` | `String`   | yes      |                          |                        |
+| `tenantId`     | `String`   | yes      |                          |                        |
+| `dedupeKey`    | `String`   | yes      |                          |                        |
+| `outcome`      | `String`   | yes      |                          | ok, partial or failed. |
+| `results`      | `Json`     | yes      | default `"[]"`           |                        |
+| `createdAt`    | `DateTime` | yes      | default `now()`          |                        |
+
+Relations: `automationId` → `PlatformAutomation.id`.
+
+Indexes and constraints: `@@unique([automationId, dedupeKey])`, `@@index([createdAt])`.
+
 ### Enums
 
 | Enum                  | Values                                                                                                                             |
@@ -1306,4 +1395,4 @@ Indexes and constraints: `@@index([userId, readAt, createdAt])`.
 | `InvitationState`     | `QUEUED`, `SENT`, `FAILED`, `SKIPPED`                                                                                              |
 | `AutomationRunState`  | `PENDING`, `AWAITING_APPROVAL`, `RUNNING`, `DONE`, `SKIPPED`, `REJECTED`, `FAILED`                                                 |
 
-<!-- 51 models, 22 enums -->
+<!-- 55 models, 22 enums -->

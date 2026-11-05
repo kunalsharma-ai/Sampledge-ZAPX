@@ -35,20 +35,23 @@ the API's `message`.
 
 ## Quick index
 
-| Symptom                                               | Section                                                              |
-| ----------------------------------------------------- | -------------------------------------------------------------------- |
-| API exits at once with `Invalid configuration: …`     | [1. App does not start](#1-app-does-not-start)                       |
-| `EADDRINUSE`, port already used                       | [1. App does not start](#1-app-does-not-start)                       |
-| Studio page blank, "Something went wrong", 404 pages  | [2. Frontend errors](#2-frontend-errors)                             |
-| 500 Internal server error                             | [3. Backend errors](#3-backend-errors)                               |
-| 400 / 403 / 404 / 409 / 422 / 429 from the API        | [4. API failures](#4-api-failures)                                   |
-| `Can't reach database server`, P1001, migrations fail | [5. Database connection](#5-database-connection)                     |
-| Login fails, keeps returning to login, locked account | [6. Authentication](#6-authentication)                               |
-| Saved but not shown, answers missing, wrong counts    | [7. Data not saving or displaying](#7-data-not-saving-or-displaying) |
-| Export never finishes, download 404, upload rejected  | [8. File upload and download](#8-file-upload-and-download)           |
-| Vendor callbacks or webhooks not arriving             | [9. Background work](#9-background-work-jobs-callbacks-webhooks)     |
-| Docker build or AWS release fails                     | [10. Server and deployment](#10-server-and-deployment)               |
-| Slow pages, timeouts                                  | [11. Performance](#11-performance)                                   |
+| Symptom                                               | Section                                                                                    |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| API exits at once with `Invalid configuration: …`     | [1. App does not start](#1-app-does-not-start)                                             |
+| `EADDRINUSE`, port already used                       | [1. App does not start](#1-app-does-not-start)                                             |
+| Studio page blank, "Something went wrong", 404 pages  | [2. Frontend errors](#2-frontend-errors)                                                   |
+| 500 Internal server error                             | [3. Backend errors](#3-backend-errors)                                                     |
+| 400 / 403 / 404 / 409 / 422 / 429 from the API        | [4. API failures](#4-api-failures)                                                         |
+| `Can't reach database server`, P1001, migrations fail | [5. Database connection](#5-database-connection)                                           |
+| Login fails, keeps returning to login, locked account | [6. Authentication](#6-authentication)                                                     |
+| Saved but not shown, answers missing, wrong counts    | [7. Data not saving or displaying](#7-data-not-saving-or-displaying)                       |
+| Export never finishes, download 404, upload rejected  | [8. File upload and download](#8-file-upload-and-download)                                 |
+| Vendor callbacks or webhooks not arriving             | [9. Background work](#9-background-work-jobs-callbacks-webhooks)                           |
+| Docker build or AWS release fails                     | [10. Server and deployment](#10-server-and-deployment)                                     |
+| Slow pages, timeouts                                  | [11. Performance](#11-performance)                                                         |
+| `FEATURE_DISABLED`, `ORG_SUSPENDED`, super admin      | [12. Super admin, plans and features](#12-super-admin-plans-and-features-_pr-41-unmerged_) |
+| Integration key saved in the CRM has no effect        | [13. Integrations set in the CRM](#13-integrations-set-in-the-crm-_pr-38-unmerged_)        |
+| Mobile app cannot sign in, screens missing            | [14. Mobile app](#14-mobile-app-_pr-40-unmerged_)                                          |
 
 ---
 
@@ -199,17 +202,18 @@ API code change, stop it and run it again (or run `pnpm --filter @zapx/api build
 
 ## 4. API failures
 
-| Status | Typical `message`                                          | Cause                                                                       | Fix                                                            |
-| ------ | ---------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| 400    | `Invalid request` with `issues[]`                          | body failed the Zod schema in `parseBody`                                   | read `issues[].path`; fix the request                          |
-| 401    | `Not signed in`, `Session expired`                         | no cookie/token, token older than 12 h, "sign out everywhere"               | sign in again                                                  |
-| 401    | `Invalid API key`, `This API key was revoked/has expired`  | wrong, revoked or expired key, or its creator was disabled                  | create a new key (Settings → API keys)                         |
-| 403    | `Missing CSRF header`                                      | cookie request without `x-zapx-csrf: 1`                                     | add the header (the studio does this; curl must too)           |
-| 403    | `Your role cannot do this`                                 | the route's `@Roles(...)` excludes the role; INTERVIEWER is deny-by-default | change the member's role or use another account                |
-| 404    | `Not found` on something that exists                       | project not assigned to this member (`AccessService`)                       | assign the project                                             |
-| 409    | stale draft, duplicate vendor code or email                | someone saved first, or the value is taken                                  | reload, merge, retry; choose another code                      |
-| 422    | `{message, errors:[{questionId,message}]}`                 | respondent answer failed validation (`InterviewValidationError`)            | expected behaviour; the runtime shows the messages             |
-| 429    | `ThrottlerException: Too Many Requests` / `ACCOUNT_LOCKED` | rate limit (600/min default, lower per route) or login lockout              | wait a minute; see [6c](#6c-account-locked-429-account_locked) |
+| Status | Typical `message`                                                                           | Cause                                                                                             | Fix                                                                   |
+| ------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 400    | `Invalid request` with `issues[]`                                                           | body failed the Zod schema in `parseBody`                                                         | read `issues[].path`; fix the request                                 |
+| 401    | `Not signed in`, `Session expired`                                                          | no cookie/token, token older than 12 h, "sign out everywhere"                                     | sign in again                                                         |
+| 401    | `Invalid API key`, `This API key was revoked/has expired`                                   | wrong, revoked or expired key, or its creator was disabled                                        | create a new key (Settings → API keys)                                |
+| 403    | `Missing CSRF header`                                                                       | cookie request without `x-zapx-csrf: 1`                                                           | add the header (the studio does this; curl must too)                  |
+| 403    | `Your role cannot do this`                                                                  | the route's `@Roles(...)` excludes the role; INTERVIEWER is deny-by-default                       | change the member's role or use another account                       |
+| 403    | `code: FEATURE_DISABLED`, `ORG_SUSPENDED`, `MOBILE_DISABLED`, `SUPER_ADMIN_ONLY` _(PR #41)_ | the plan or a super admin switched the feature off, suspended the organization, or blocked mobile | see [section 12](#12-super-admin-plans-and-features-_pr-41-unmerged_) |
+| 404    | `Not found` on something that exists                                                        | project not assigned to this member (`AccessService`)                                             | assign the project                                                    |
+| 409    | stale draft, duplicate vendor code or email                                                 | someone saved first, or the value is taken                                                        | reload, merge, retry; choose another code                             |
+| 422    | `{message, errors:[{questionId,message}]}`                                                  | respondent answer failed validation (`InterviewValidationError`)                                  | expected behaviour; the runtime shows the messages                    |
+| 429    | `ThrottlerException: Too Many Requests` / `ACCOUNT_LOCKED`                                  | rate limit (600/min default, lower per route) or login lockout                                    | wait a minute; see [6c](#6c-account-locked-429-account_locked)        |
 
 Reproducing a studio call with curl (local only, demo accounts from the seed):
 
@@ -535,6 +539,108 @@ staging. More in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 - Look at queued work: `SELECT type, count(*) FROM "Job" WHERE status='QUEUED' GROUP BY type;`.
   Add a worker process (safe, see 9c) or lower the work per job.
+
+---
+
+## 12. Super admin, plans and features _(PR #41, unmerged)_
+
+### 12a. 403 `This feature is not included in your subscription` (`FEATURE_DISABLED`)
+
+- **Cause:** the route's feature (`featureForRoute` in `apps/api/src/super-admin/features.ts`) is off
+  for this member on this surface. The answer's `feature` field names it. It is off when the
+  organization's plan does not list it (`SubscriptionPlan.webFeatures` / `mobileFeatures`), when the
+  organization's `featureOverrides` turns it off, or when the member's `featureOverrides` does.
+- **Check:** `GET /api/me/entitlements?surface=web` as that member shows `plan` and `features`. In the
+  super admin console open the organization (feature matrix) and the member.
+- **Fix:** turn the feature on for the plan, the organization or the member. Changes reach open
+  pages and the mobile app live (server-sent events), no sign-out needed.
+- **Every organization lost a feature after an upgrade:** an organization whose `Tenant.plan` code is
+  not a saved `SubscriptionPlan` and not one of `free`, `team`, `business`, `enterprise` gets **no
+  features** (`PlanCatalogService.get`). Set a valid plan in the console or with `set-plan.js`.
+- **A new route is open to every plan:** it is missing from `RULES` in `features.ts`. Add it there.
+
+### 12b. Everyone in an organization sees "Your organization is suspended" (`ORG_SUSPENDED`)
+
+The super admin suspended it (`Tenant.suspendedAt`, reason in `suspendedReason`). The studio sends
+members to `/suspended`. **Fix:** super admin console → organization → Reactivate
+(`POST /api/super/organizations/:id/reactivate`). A platform automation rule (for example
+`subscription_ended`) may have done it; check `GET /api/super/automation/runs`.
+
+### 12c. No one can open the super admin console (`SUPER_ADMIN_ONLY`)
+
+Only members with `User.superAdmin = true`, signed in with a session (never an API key), may use
+`/api/super/*`. There is no button for the first one. **Fix**, on a machine that can reach the
+database:
+
+```bash
+node apps/api/dist/cli/set-operator.js <org id or admin email>   # once: the organization that runs ZAPX
+node apps/api/dist/cli/set-super-admin.js <email>                # add --remove to take it away
+```
+
+The member must belong to the operator organization (`set-operator.js <organization id | member email>`).
+
+### 12d. Platform automation does nothing or runs twice
+
+- `PLATFORM_AUTOMATION` must be `on` in at least one API process; it checks every
+  `PLATFORM_AUTOMATION_MS` (60 s).
+- A rule fires **once per organization and event** (unique `dedupeKey` in `PlatformAutomationRun`), so a
+  rule that already fired will not fire again for the same event. Use **Preview**
+  (`GET /api/super/automation/rules/:id/preview`) to see which organizations match and which are
+  `alreadyDone`.
+
+---
+
+## 13. Integrations set in the CRM _(PR #38, unmerged)_
+
+### 13a. A key saved in Settings → Integrations has no effect
+
+- Wait up to `INTEGRATIONS_REFRESH_MS` (15 s): each process re-reads the saved values on a timer.
+- The integration must be switched **on** in the CRM; once saved there, its switch wins over the
+  environment switch (`TELEPHONY`, `BILLING`, …).
+- Press **Test** on the integration; the error message comes from `apps/api/src/platform/integration-checks.ts`.
+
+### 13b. "Only administrators can see integrations" or the page is empty
+
+Only administrators of the operator organization (`Tenant.platformOperator`) or the super admin may
+open it. On a new installation the oldest organization becomes the operator automatically.
+
+### 13c. Integrations stopped working after changing `SECRETS_KEY`
+
+The saved secrets are sealed with `SECRETS_KEY`. A new key cannot open them: enter the keys again in
+Settings → Integrations (and the vendor partner secrets, SSO secrets and webhook secrets).
+
+---
+
+## 14. Mobile app _(PR #40, unmerged)_
+
+### 14a. "Update the app" at sign-in
+
+The server's `MOBILE_MIN_VERSION` is newer than the app (`GET /api/mobile/version`). Install the
+newer build, or lower or unset `MOBILE_MIN_VERSION`.
+
+### 14b. The app cannot reach the server
+
+- The address on the sign-in screen is the **studio** address (it serves `/api`), for example
+  `https://zapx.example.com`; on a local network `http://192.168.x.x:3000`.
+- `GET <address>/api/mobile/version` must answer `{"service":"zapx", …}` from the phone's network.
+- Single sign-on organizations cannot sign in from the app yet (password only).
+
+### 14c. 403 `MOBILE_DISABLED`, or a screen is missing or locked
+
+`User.mobileAccess` is off for the member, or the plan's `mobileFeatures` (or an override) leaves the
+feature out. Fix it in the super admin console (member → mobile access; organization or plan →
+mobile features). The app follows the change live.
+
+### 14d. CAPI in the app shows a blank page
+
+The app opens `CAPI_APP_URL` (from `GET /api/mobile/config`) in a WebView. It must be a public
+https address the phone can reach, not `localhost`.
+
+### 14e. `npm ci` or the type check fails in `apps/mobile`
+
+The mobile app is **not** in the pnpm workspace; use `npm ci` inside `apps/mobile`, not `pnpm install`.
+`pnpm check` runs `npm ci`, `npm run typecheck` and `npm test` there. Expo version problems:
+`npm run doctor`.
 
 ---
 
