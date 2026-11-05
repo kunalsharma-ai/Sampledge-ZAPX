@@ -6,6 +6,7 @@ import { CreateSurveyDialog } from '@/components/neon/CreateSurvey';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { useThemeModule } from '@/lib/theme/ThemeProvider';
+import { PageHeader } from '@/components/neon/PageHeader';
 
 export interface LibraryItem {
   id: string;
@@ -76,13 +77,10 @@ export default function QuestionBankPage() {
 
   return (
     <Shell>
-      <div className="nx-page-head">
-        <h1>Question bank</h1>
-        <p className="muted">
-          Questions and surveys your team saved for reuse, and ready-made templates. Save a question from the survey editor with &ldquo;Save
-          to question bank&rdquo;, and add it to another survey with &ldquo;Insert from question bank&rdquo;.
-        </p>
-      </div>
+      <PageHeader icon={Library} tone={2} eyebrow="Reuse" title="Question bank">
+        Questions and surveys your team saved for reuse, and ready-made templates. Save a question from the survey editor with &ldquo;Save
+        to question bank&rdquo;, and add it to another survey with &ldquo;Insert from question bank&rdquo;.
+      </PageHeader>
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div className="tabs" role="tablist" aria-label="Question bank">
           {tabs.map(([k, label]) => (

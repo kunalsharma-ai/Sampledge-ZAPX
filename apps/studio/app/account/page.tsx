@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote, Shell } from '@/components/Shell';
+import { PageHeader } from '@/components/neon/PageHeader';
+import { UserRound } from 'lucide-react';
 
 export default function AccountPage() {
   const me = useMe();
@@ -35,12 +37,13 @@ export default function AccountPage() {
 
   return (
     <Shell>
-      <h1>My account</h1>
-      {me ? (
-        <p className="muted">
-          {me.name} · {me.email} · {me.role.toLowerCase()}
-        </p>
-      ) : null}
+      <PageHeader icon={UserRound} tone={4} eyebrow="Profile & security" title="My account">
+        {me ? (
+          <>
+            {me.name} · {me.email} · {me.role.toLowerCase()}
+          </>
+        ) : null}
+      </PageHeader>
       <form className="panel stack" style={{ maxWidth: 420 }} onSubmit={submit} data-testid="change-password">
         <h2>Change password</h2>
         <p className="small muted">Your other signed-in devices are signed out. This one stays signed in.</p>

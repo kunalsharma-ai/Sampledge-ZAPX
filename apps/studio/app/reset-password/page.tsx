@@ -5,6 +5,7 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
+import { AuthBrand, AuthFrame } from '@/components/neon/AuthFrame';
 
 function ResetForm() {
   const token = useSearchParams().get('token') ?? '';
@@ -32,10 +33,8 @@ function ResetForm() {
   };
 
   return (
-    <form className="panel stack center-card" onSubmit={submit}>
-      <div className="brand" style={{ fontSize: 18 }}>
-        SAMPLEDGE <span>ZAPX</span>
-      </div>
+    <form className="panel stack nx-auth-card" onSubmit={submit}>
+      <AuthBrand />
       <h1>Set a new password</h1>
       {!token ? (
         <p className="error-text" role="alert">
@@ -82,8 +81,10 @@ function ResetForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <Suspense>
-      <ResetForm />
-    </Suspense>
+    <AuthFrame>
+      <Suspense>
+        <ResetForm />
+      </Suspense>
+    </AuthFrame>
   );
 }

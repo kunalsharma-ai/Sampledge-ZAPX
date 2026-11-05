@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import './globals.css';
 import './quantum.css';
 import './neon.css';
+import './neon-pages.css';
 
 export const metadata = { title: 'ZAPX Studio', description: 'SAMPLEDGE ZAPX survey programming studio' };
 

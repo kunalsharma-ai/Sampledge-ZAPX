@@ -31,6 +31,41 @@ import { EmailInvitations } from '@/components/EmailInvitations';
 import { CatiCalls, DoNotCallList } from '@/components/CatiCalls';
 import { ExportJobs } from '@/components/ExportJobs';
 import { Analysis } from '@/components/Analysis';
+import { PageHeader } from '@/components/neon/PageHeader';
+import {
+  BarChart3,
+  Braces,
+  ClipboardCheck,
+  ClipboardList,
+  Code2,
+  Eye,
+  FlaskConical,
+  Languages as LanguagesIcon,
+  Paintbrush,
+  PencilRuler,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Table2,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
+
+const TAB_ICONS: Record<string, LucideIcon> = {
+  build: PencilRuler,
+  json: Braces,
+  code: Code2,
+  assist: Sparkles,
+  design: Paintbrush,
+  languages: LanguagesIcon,
+  preview: Eye,
+  qa: FlaskConical,
+  distribute: Send,
+  capi: UsersRound,
+  quality: ShieldCheck,
+  results: Table2,
+  analysis: BarChart3,
+};
 
 interface SurveyDetail {
   id: string;
@@ -223,55 +258,57 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         </>
       }
     >
-      <div className="row">
-        <div>
-          <h1>{survey.name}</h1>
-          <div className="row small">
-            <span className={`badge ${survey.status.toLowerCase()}`}>{survey.status.toLowerCase()}</span>
-            <span className="muted">
-              Editing draft v{draft.version}
-              {draft.status !== 'DRAFT' ? ` (${draft.status.toLowerCase()})` : ''} · live version: {live ? `v${live.version}` : 'none'}
-            </span>
-            {unsaved ? <span className="badge warn">unsaved changes</span> : null}
-          </div>
-        </div>
-        <div style={{ flex: 1 }} />
-        {!readOnly ? (
-          <>
-            <VoiceCommandButton
-              language={def.language}
-              onCommand={(c, heard) => {
-                if (c.kind === 'tab' && (TABS as readonly string[]).includes(c.tab)) {
-                  setTab(c.tab as Tab);
-                  setNotice(`Heard “${heard}”.`);
-                } else if (c.kind === 'save') {
-                  setNotice(`Heard “${heard}”.`);
-                  if (unsaved) void save();
-                } else if (c.kind === 'ai') {
-                  setVoiceInstruction({ text: c.instruction, n: Date.now() });
-                  setTab('assist');
-                  setNotice(`Heard “${heard}”. Check the instruction, then draft the proposal.`);
-                } else setNotice(`Heard “${heard}”, but that is not a command.`);
-              }}
-            />
-            <button onClick={save} disabled={busy || !unsaved}>
-              Save draft
-            </button>
-            <button
-              className="primary"
-              onClick={publish}
-              disabled={busy || !publishable}
-              title={publishable ? '' : languageBlockers.length ? languageBlockers.join(' ') : 'Fix the errors in the logic check first'}
-            >
-              Publish
-            </button>
-          </>
-        ) : null}
-      </div>
+      <PageHeader
+        icon={ClipboardList}
+        eyebrow="Survey"
+        title={survey.name}
+        actions={
+          !readOnly ? (
+            <>
+              <VoiceCommandButton
+                language={def.language}
+                onCommand={(c, heard) => {
+                  if (c.kind === 'tab' && (TABS as readonly string[]).includes(c.tab)) {
+                    setTab(c.tab as Tab);
+                    setNotice(`Heard “${heard}”.`);
+                  } else if (c.kind === 'save') {
+                    setNotice(`Heard “${heard}”.`);
+                    if (unsaved) void save();
+                  } else if (c.kind === 'ai') {
+                    setVoiceInstruction({ text: c.instruction, n: Date.now() });
+                    setTab('assist');
+                    setNotice(`Heard “${heard}”. Check the instruction, then draft the proposal.`);
+                  } else setNotice(`Heard “${heard}”, but that is not a command.`);
+                }}
+              />
+              <button onClick={save} disabled={busy || !unsaved}>
+                Save draft
+              </button>
+              <button
+                className="primary"
+                onClick={publish}
+                disabled={busy || !publishable}
+                title={publishable ? '' : languageBlockers.length ? languageBlockers.join(' ') : 'Fix the errors in the logic check first'}
+              >
+                Publish
+              </button>
+            </>
+          ) : null
+        }
+      >
+        <span className="row small">
+          <span className={`badge ${survey.status.toLowerCase()}`}>{survey.status.toLowerCase()}</span>
+          <span>
+            Editing draft v{draft.version}
+            {draft.status !== 'DRAFT' ? ` (${draft.status.toLowerCase()})` : ''} · live version: {live ? `v${live.version}` : 'none'}
+          </span>
+          {unsaved ? <span className="badge warn">unsaved changes</span> : null}
+        </span>
+      </PageHeader>
       {notice ? <p className="ok-text">{notice}</p> : null}
       <ErrorNote error={error} />
 
-      <div className="tabs" role="tablist">
+      <div className="tabs nx-tabs" role="tablist" aria-label="Survey sections">
         {(
           [
             ['build', 'Build'],
@@ -288,11 +325,15 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             ['results', 'Quotas & data'],
             ['analysis', 'Analysis'],
           ] as Array<[Tab, string]>
-        ).map(([k, label]) => (
-          <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
-            {label}
-          </button>
-        ))}
+        ).map(([k, label]) => {
+          const Icon = TAB_ICONS[k] ?? ClipboardCheck;
+          return (
+            <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>
+              <Icon size={15} aria-hidden="true" />
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {tab === 'build' || tab === 'json' ? (

@@ -7,6 +7,8 @@ import { VendorEditor, emptyVendor, type Vendor, type VendorDraft } from '@/comp
 import { LayerEditor, emptyLayer, type Layer } from '@/components/RedirectRules';
 import { ProjectAccess } from '@/components/ProjectAccess';
 import { useMe } from '@/lib/useMe';
+import { PageHeader } from '@/components/neon/PageHeader';
+import { FolderOpen } from 'lucide-react';
 
 interface Project {
   id: string;
@@ -55,8 +57,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <ErrorNote error={error} />
       ) : (
         <>
-          <h1>{project.name}</h1>
-          <p className="muted">{project.client ? `Client: ${project.client}` : 'No client set'}</p>
+          <PageHeader icon={FolderOpen} eyebrow="Project" title={project.name}>
+            {project.client ? `Client: ${project.client}` : 'No client set'}
+          </PageHeader>
           <div className="grid2" style={{ marginTop: 16 }}>
             <section className="panel stack">
               <h2>Surveys</h2>

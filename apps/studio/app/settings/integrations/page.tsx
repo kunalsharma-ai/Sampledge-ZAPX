@@ -9,6 +9,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { CopyField, ErrorNote, Shell } from '@/components/Shell';
+import { PageHeader } from '@/components/neon/PageHeader';
+import { Plug } from 'lucide-react';
 
 interface Field {
   name: string;
@@ -320,7 +322,7 @@ export default function IntegrationsPage() {
   if (me && !me.canManageIntegrations) {
     return (
       <Shell crumbs={crumbs}>
-        <h1>Integrations</h1>
+        <PageHeader icon={Plug} tone={2} eyebrow="Administration" title="Integrations" />
         <p className="muted">
           Integrations are managed by the administrators of the organization that runs this installation. Your organization&apos;s own
           single sign-on, SCIM, webhooks and API keys are on the <Link href="/settings">settings page</Link>.
@@ -331,12 +333,11 @@ export default function IntegrationsPage() {
 
   return (
     <Shell crumbs={crumbs}>
-      <h1 style={{ marginBottom: 4 }}>Integrations</h1>
-      <p className="muted small" style={{ marginTop: 0 }}>
+      <PageHeader icon={Plug} tone={2} eyebrow="Administration" title="Integrations">
         Connect the services ZAPX uses for every organization on this installation. Paste a key, test the connection, then turn it on. Keys
         are stored encrypted and are never shown again; every change and test is recorded in the{' '}
         <Link href="/settings/audit">audit log</Link>. Anything saved here takes over from the server environment.
-      </p>
+      </PageHeader>
       <ErrorNote error={error} />
       <div className="grid2" style={{ marginTop: 16 }}>
         {(items ?? []).map((i) => (

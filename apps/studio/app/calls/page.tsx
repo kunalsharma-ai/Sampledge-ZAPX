@@ -8,6 +8,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ErrorNote, Shell } from '@/components/Shell';
+import { PageHeader } from '@/components/neon/PageHeader';
+import { PhoneCall } from 'lucide-react';
 
 interface CallSurvey {
   id: string;
@@ -231,9 +233,12 @@ export default function CallsPage() {
 
   return (
     <Shell forInterviewers crumbs={<span>Calls</span>}>
+      <PageHeader icon={PhoneCall} tone={3} eyebrow="Fieldwork" title="Calls">
+        Phone interviews assigned to you. Take the next case, call the respondent and record the outcome.
+      </PageHeader>
       <div className="grid2">
         <section className="panel stack" data-testid="call-surveys">
-          <h1 style={{ margin: 0 }}>Calls</h1>
+          <h2 style={{ margin: 0 }}>Phone surveys</h2>
           {surveys === null ? null : surveys.length === 0 ? (
             <p className="muted">No phone surveys are assigned to you, or none is live.</p>
           ) : (

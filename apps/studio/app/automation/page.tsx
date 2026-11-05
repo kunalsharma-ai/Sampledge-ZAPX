@@ -5,6 +5,7 @@ import { Shell, ErrorNote } from '@/components/Shell';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { useThemeModule } from '@/lib/theme/ThemeProvider';
+import { PageHeader } from '@/components/neon/PageHeader';
 
 type Op = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
 interface Condition {
@@ -162,22 +163,22 @@ export default function AutomationPage() {
 
   return (
     <Shell crumbs={<span>Automation</span>}>
-      <section className="nx-page-head">
-        <div>
-          <h1 className="row" style={{ gap: 8 }}>
-            <Workflow size={22} aria-hidden /> Automation
-          </h1>
-          <p className="muted">
-            Rules that act on survey events or on a schedule: notify the team, email them, send a webhook, or pause or close a survey. A
-            rule can wait for an administrator to approve before it acts.
-          </p>
-        </div>
-        {canEdit && !draft ? (
-          <button className="primary" onClick={() => setDraft(blank())} data-testid="new-rule">
-            <Plus size={15} aria-hidden /> New rule
-          </button>
-        ) : null}
-      </section>
+      <PageHeader
+        icon={Workflow}
+        tone={1}
+        eyebrow="Rules & schedules"
+        title="Automation"
+        actions={
+          canEdit && !draft ? (
+            <button className="primary" onClick={() => setDraft(blank())} data-testid="new-rule">
+              <Plus size={15} aria-hidden /> New rule
+            </button>
+          ) : null
+        }
+      >
+        Rules that act on survey events or on a schedule: notify the team, email them, send a webhook, or pause or close a survey. A rule
+        can wait for an administrator to approve before it acts.
+      </PageHeader>
       <ErrorNote error={error} />
 
       {waiting.length ? (
