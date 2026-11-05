@@ -42,19 +42,21 @@ interface DraftVersion {
   presentation: unknown;
 }
 
-type Tab =
-  | 'build'
-  | 'json'
-  | 'assist'
-  | 'design'
-  | 'languages'
-  | 'preview'
-  | 'qa'
-  | 'distribute'
-  | 'capi'
-  | 'quality'
-  | 'results'
-  | 'analysis';
+const TABS = [
+  'build',
+  'json',
+  'assist',
+  'design',
+  'languages',
+  'preview',
+  'qa',
+  'distribute',
+  'capi',
+  'quality',
+  'results',
+  'analysis',
+] as const;
+type Tab = (typeof TABS)[number];
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -68,6 +70,14 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [presDirty, setPresDirty] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
   const [tab, setTab] = useState<Tab>('build');
+  // Deep links from the dashboard: ?tab=assist&prompt=… or ?tab=qa.
+  const [linkParams] = useState(() =>
+    typeof window === 'undefined' ? new URLSearchParams() : new URLSearchParams(window.location.search),
+  );
+  useEffect(() => {
+    const t = linkParams.get('tab');
+    if (t && (TABS as readonly string[]).includes(t)) setTab(t as Tab);
+  }, [linkParams]);
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -196,7 +206,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
     <Shell
       crumbs={
         <>
-          <Link href="/">Projects</Link> / <Link href={`/projects/${survey.projectId}`}>Project</Link>
+          <Link href="/">Dashboard</Link> / <Link href={`/projects/${survey.projectId}`}>Project</Link>
         </>
       }
     >
@@ -285,7 +295,17 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
           }}
         />
       ) : null}
-      {tab === 'assist' ? <Assist surveyId={id} language={def.language} readOnly={readOnly} dirty={unsaved} onApplied={load} /> : null}
+      {tab === 'assist' ? (
+        <Assist
+          surveyId={id}
+          language={def.language}
+          readOnly={readOnly}
+          dirty={unsaved}
+          onApplied={load}
+          initialInstruction={linkParams.get('prompt') ?? ''}
+          focusImport={linkParams.get('focus') === 'import'}
+        />
+      ) : null}
       {tab === 'qa' ? <QaLab surveyId={id} readOnly={readOnly} dirty={dirty} hasLive={!!survey.liveVersionId} /> : null}
       {tab === 'distribute' ? <Distribute survey={survey} readOnly={readOnly} onChanged={load} /> : null}
       {tab === 'capi' ? (

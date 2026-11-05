@@ -11,6 +11,7 @@ import { PreferencesController } from './users/preferences.controller';
 import { MediaController } from './media/media.controller';
 import { MediaService } from './media/media.service';
 import { AnalysisController } from './analysis/analysis.controller';
+import { DashboardController } from './dashboard/dashboard.controller';
 import { AnalysisService } from './analysis/analysis.service';
 import { CatiController } from './cati/cati.controller';
 import { CatiService } from './cati/cati.service';
@@ -76,6 +77,7 @@ import { FileStore, fileStoreFromConfig } from './jobs/file-store';
   ],
   controllers: [
     HealthController,
+    DashboardController,
     TelephonyController,
     AuthController,
     UsersController,

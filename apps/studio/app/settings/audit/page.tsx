@@ -59,7 +59,7 @@ export default function AuditPage() {
 
   const crumbs = (
     <>
-      <Link href="/">Projects</Link> / <Link href="/settings">Settings</Link>
+      <Link href="/">Dashboard</Link> / <span>Audit log</span>
     </>
   );
   if (me && me.role !== 'ADMIN')
