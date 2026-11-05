@@ -100,6 +100,8 @@ export class IntegrationSettingsService implements OnModuleInit, OnModuleDestroy
   }
 
   private async operatorAdmin(user: AuthUser) {
+    // The super admin manages every integration (super admin console > Integrations).
+    if (user.superAdmin && !user.apiKeyId) return;
     if (user.role !== 'ADMIN') throw new ForbiddenException('Only administrators can see integrations');
     if (user.apiKeyId) throw new ForbiddenException('Integrations can only be changed when signed in, not with an API key');
     if (!(await this.isOperator(user.tenantId)))

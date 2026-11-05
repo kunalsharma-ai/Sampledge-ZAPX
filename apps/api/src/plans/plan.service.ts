@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { monthStart, planOf, type PlanLimits } from './plans';
+import { monthStart, type PlanLimits } from './plans';
+import { PlanCatalogService } from '../super-admin/plan-catalog.service';
 
 type Seat = 'seats' | 'interviewers';
 
@@ -14,11 +15,16 @@ export class PlanLimitError extends HttpException {
 /** Reads an organization's plan and usage, and refuses actions that would go over a limit. */
 @Injectable()
 export class PlanService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalog: PlanCatalogService,
+  ) {}
 
   async plan(tenantId: string) {
     const t = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { plan: true } });
-    return { code: t.plan, ...planOf(t.plan) };
+    // Plans and their limits are managed by the super admin (super-admin/plan-catalog.service.ts).
+    const p = this.catalog.get(t.plan);
+    return { code: t.plan, name: p.name, limits: p.limits };
   }
 
   async usage(tenantId: string) {
