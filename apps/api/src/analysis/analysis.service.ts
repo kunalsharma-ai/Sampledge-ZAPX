@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException, PayloadTooLargeExce
 import ExcelJS from 'exceljs';
 import type { Prisma } from '@zapx/db';
 import {
+  eyeTrackSummary,
   crosstab,
   describeSegment,
   frequency,
@@ -308,6 +309,15 @@ export class AnalysisService {
     return q.type === 'maxdiff'
       ? { type: 'maxdiff' as const, questionId, total: records.length, weighting: w, result: maxDiffScores(q, answers, weights) }
       : { type: 'conjoint' as const, questionId, total: records.length, weighting: w, result: conjointAnalysis(q, answers, weights) };
+  }
+
+  /** Webcam eye tracking (experimental): statuses, accuracy, heatmap and areas of interest for one question. */
+  async eyeTracking(user: AuthUser, surveyId: string, questionId: string, filters: Filters, weighting?: Weighting) {
+    const { vars, records, def } = await this.load(user, surveyId, filters);
+    const w = weighting ? this.applyWeights(vars, records, weighting) : null;
+    const q = def.pages.flatMap((p) => p.questions).find((x) => x.id === questionId);
+    if (!q || q.type !== 'eyetrack') throw new BadRequestException('Choose an eye-tracking question');
+    return { questionId, image: q.image ?? null, total: records.length, weighting: w, result: eyeTrackSummary(q, records) };
   }
 
   /** The design of a MaxDiff or conjoint question as CSV (one row per item or concept shown). */

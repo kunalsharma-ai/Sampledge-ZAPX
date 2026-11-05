@@ -9,6 +9,10 @@ import { createContext, useContext, useEffect, useId, useMemo, useRef, useState 
 import { conditionHoldsFor, conjointTasksFor, maxDiffSetsFor } from '@zapx/logic-engine';
 import type { AnswerValue, Answers, DeviceSettings, Option, Question, QuestionMedia, Theme } from '@zapx/survey-schema';
 import { formatNumber, textDirection } from '@zapx/survey-schema';
+import { DEFAULT_EYE_MESSAGES, EYETRACK_CSS, EyeTrack, type EyeTrackMessages, type EyeTrackingHost } from './eyetrack';
+
+export * from './gaze';
+export { DEFAULT_EYE_MESSAGES, EyeTrack, type EyeTrackMessages, type EyeTrackingHost, type FaceLandmarkSource } from './eyetrack';
 
 export type DisplayQuestion = Question & {
   renderedText?: string;
@@ -35,7 +39,7 @@ export function answersToSubmit(questions: DisplayQuestion[], answers: Answers, 
 }
 
 /** Respondent-screen words the components need (translated by the host; English defaults). */
-export interface RendererMessages {
+export interface RendererMessages extends EyeTrackMessages {
   rankUp: string;
   rankDown: string;
   sumRemaining: string;
@@ -59,6 +63,7 @@ export interface RendererMessages {
   choiceOption: string;
 }
 export const DEFAULT_RENDERER_MESSAGES: RendererMessages = {
+  ...DEFAULT_EYE_MESSAGES,
   unsorted: 'Not sorted',
   takePhoto: 'Take or choose a photo',
   retakePhoto: 'Use a different photo',
@@ -190,6 +195,8 @@ export interface SurveyPageProps {
   messages?: Partial<RendererMessages>;
   /** Stores photo answers. Without it, photo questions say they cannot be answered here. */
   photos?: PhotoHandler;
+  /** Face landmarks for webcam eye tracking. Without it, eye-tracking tasks are stored as unavailable. */
+  eyeTracking?: EyeTrackingHost;
 }
 
 export function SurveyPage({
@@ -205,6 +212,7 @@ export function SurveyPage({
   language,
   messages,
   photos,
+  eyeTracking,
 }: SurveyPageProps) {
   const visible = visibleOnPage(questions, answers, context);
   const msg = { ...DEFAULT_RENDERER_MESSAGES, ...messages };
@@ -225,6 +233,7 @@ export function SurveyPage({
             language={language}
             messages={msg}
             photos={photos}
+            eyeTracking={eyeTracking}
           />
         ))}
       </div>
@@ -251,6 +260,7 @@ interface QuestionViewProps {
   language?: string;
   messages?: RendererMessages;
   photos?: PhotoHandler;
+  eyeTracking?: EyeTrackingHost;
 }
 
 /** What read aloud says for a question: its text, help and answer labels. */
@@ -329,6 +339,7 @@ export function QuestionView({
   language,
   messages = DEFAULT_RENDERER_MESSAGES,
   photos,
+  eyeTracking,
 }: QuestionViewProps) {
   const id = useId();
   const text = q.renderedText ?? q.text;
@@ -432,6 +443,16 @@ export function QuestionView({
       {q.type === 'grid' ? <Grid question={q} name={id} value={value} onChange={onChange} /> : null}
       {q.type === 'cardsort' ? <CardSort question={q} value={value} onChange={onChange} messages={messages} /> : null}
       {q.type === 'hotspot' ? <Hotspot question={q} value={value} onChange={onChange} mediaUrl={mediaUrl} /> : null}
+      {q.type === 'eyetrack' ? (
+        <EyeTrack
+          question={q}
+          value={value}
+          onChange={onChange}
+          imageUrl={q.image ? mediaUrl(q.image) : undefined}
+          host={eyeTracking}
+          messages={messages}
+        />
+      ) : null}
       {error ? (
         <p className="zx-error" id={errId} role="alert">
           {error}
@@ -1436,6 +1457,7 @@ export const defaultThemeCss = `
   .zx-scale{grid-template-columns:repeat(min(var(--zx-points),6),minmax(0,1fr));}
 }
 @media (prefers-reduced-motion:reduce){.zx-root *{transition:none!important;animation:none!important;}}
+${EYETRACK_CSS}
 `;
 
 // ---- Themes (Milestone 3) -------------------------------------------------------------------

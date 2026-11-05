@@ -91,6 +91,14 @@ export class AnalysisController {
     return this.analysis.choice(user, id, questionId, input.filters, input.weighting);
   }
 
+  @Post('surveys/:id/analysis/eyetracking/:questionId')
+  @Roles(...READERS)
+  @HttpCode(200)
+  eyeTracking(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('questionId') questionId: string, @Body() body: unknown) {
+    const input = parseBody(frequenciesSchema, body ?? {});
+    return this.analysis.eyeTracking(user, id, questionId, input.filters, input.weighting);
+  }
+
   @Get('surveys/:id/analysis/choice/:questionId/design.csv')
   @Roles(...READERS)
   async design(

@@ -826,10 +826,31 @@ export function CardSortForm({
 }
 
 /**
- * Hot-spot editor: choose the picture, then drag on it to draw an area; each area gets a code and a
- * label (its name for screen readers). Areas are stored in percent so they scale with the picture.
+ * A picture with rectangular areas drawn on it (hot-spot areas, eye-tracking areas of interest):
+ * choose the picture, then drag on it to draw an area; each area gets a code and a label. Areas are
+ * stored in percent so they scale with the picture.
  */
-export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hotspot' }>; onChange: (q: Question) => void }) {
+function PictureAreas({
+  id,
+  image,
+  imageAlt,
+  areas,
+  minAreas,
+  noun,
+  onImage,
+  onAlt,
+  onAreas,
+}: {
+  id: string;
+  image?: string;
+  imageAlt: string;
+  areas: HotspotRegion[];
+  minAreas: number;
+  noun: 'area' | 'area of interest';
+  onImage: (image: string | undefined) => void;
+  onAlt: (alt: string) => void;
+  onAreas: (areas: HotspotRegion[]) => void;
+}) {
   const hasLibrary = useHasMediaLibrary();
   const box = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
@@ -840,24 +861,23 @@ export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hot
       y: Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100)),
     };
   };
-  const setRegion = (i: number, patch: Partial<HotspotRegion>) =>
-    onChange({ ...q, regions: q.regions.map((r, j) => (j === i ? { ...r, ...patch } : r)) });
+  const setRegion = (i: number, patch: Partial<HotspotRegion>) => onAreas(areas.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const round = (n: number) => Math.round(n * 10) / 10;
   return (
     <>
       <h3>Picture</h3>
       {hasLibrary ? (
-        <OptionImagePicker image={q.image} label={q.id} onChange={(image) => onChange({ ...q, image })} />
+        <OptionImagePicker image={image} label={id} onChange={onImage} />
       ) : (
         <p className="muted small">Open the survey to upload a picture.</p>
       )}
       <label className="field">
         Describe the picture (for screen readers)
-        <input value={q.imageAlt} onChange={(e) => onChange({ ...q, imageAlt: e.target.value })} />
+        <input value={imageAlt} onChange={(e) => onAlt(e.target.value)} />
       </label>
-      {q.image ? (
+      {image ? (
         <>
-          <p className="muted small">Drag on the picture to add an area.</p>
+          <p className="muted small">Drag on the picture to add {noun === 'area' ? 'an area' : `an ${noun}`}.</p>
           <div
             ref={box}
             className="hotspot-canvas"
@@ -875,15 +895,12 @@ export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hot
               const h = Math.abs(draft.y1 - draft.y0);
               setDraft(null);
               if (w < 2 || h < 2) return;
-              const code = Math.max(0, ...q.regions.map((r) => r.code)) + 1;
-              onChange({
-                ...q,
-                regions: [...q.regions, { code, label: `Area ${code}`, x: round(x), y: round(y), w: round(w), h: round(h) }],
-              });
+              const code = Math.max(0, ...areas.map((r) => r.code)) + 1;
+              onAreas([...areas, { code, label: `Area ${code}`, x: round(x), y: round(y), w: round(w), h: round(h) }]);
             }}
           >
-            <img src={mediaSrc(q.image)} alt="" draggable={false} />
-            {q.regions.map((r) => (
+            <img src={mediaSrc(image)} alt="" draggable={false} />
+            {areas.map((r) => (
               <span
                 key={r.code}
                 className="hotspot-region"
@@ -906,7 +923,7 @@ export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hot
           </div>
         </>
       ) : null}
-      <h3>Areas</h3>
+      <h3>{noun === 'area' ? 'Areas' : 'Areas of interest'}</h3>
       <table className="data list-editor">
         <thead>
           <tr>
@@ -920,7 +937,7 @@ export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hot
           </tr>
         </thead>
         <tbody>
-          {q.regions.map((r, i) => (
+          {areas.map((r, i) => (
             <tr key={i}>
               <td>
                 <input
@@ -948,8 +965,8 @@ export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hot
               <td>
                 <button
                   className="link danger"
-                  disabled={q.regions.length <= 1}
-                  onClick={() => onChange({ ...q, regions: q.regions.filter((_, j) => j !== i) })}
+                  disabled={areas.length <= minAreas}
+                  onClick={() => onAreas(areas.filter((_, j) => j !== i))}
                 >
                   Remove
                 </button>
@@ -958,6 +975,26 @@ export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hot
           ))}
         </tbody>
       </table>
+    </>
+  );
+}
+
+/** Hot-spot editor: the picture and its clickable areas, plus how many a respondent may pick. */
+export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hotspot' }>; onChange: (q: Question) => void }) {
+  return (
+    <>
+      <PictureAreas
+        id={q.id}
+        image={q.image}
+        imageAlt={q.imageAlt}
+        areas={q.regions}
+        minAreas={1}
+        noun="area"
+        onImage={(image) => onChange({ ...q, image })}
+        onAlt={(imageAlt) => onChange({ ...q, imageAlt })}
+        onAreas={(regions) => onChange({ ...q, regions })}
+      />
+
       <div className="row">
         <label className="field">
           Minimum areas
@@ -980,6 +1017,62 @@ export function HotspotForm({ q, onChange }: { q: Extract<Question, { type: 'hot
           />
         </label>
       </div>
+    </>
+  );
+}
+
+/**
+ * Webcam eye tracking (experimental): the picture, its areas of interest, how long it is shown, the
+ * calibration error above which a recording is left out of results, and the consent text.
+ */
+export function EyeTrackForm({ q, onChange }: { q: Extract<Question, { type: 'eyetrack' }>; onChange: (q: Question) => void }) {
+  return (
+    <>
+      <p className="callout small" data-testid="eyetrack-experimental">
+        Experimental. The gaze is estimated in the respondent&apos;s browser from the webcam after a short calibration. It is approximate
+        (several percent of the screen at best) and has not been validated on real webcams, so read heatmaps as a rough guide. The camera
+        picture never leaves the device; only the estimated points on the picture are saved. Respondents can always skip, and the task runs
+        only in the online survey (not in the offline app or the preview).
+      </p>
+      <PictureAreas
+        id={q.id}
+        image={q.image}
+        imageAlt={q.imageAlt}
+        areas={q.aois}
+        minAreas={0}
+        noun="area of interest"
+        onImage={(image) => onChange({ ...q, image })}
+        onAlt={(imageAlt) => onChange({ ...q, imageAlt })}
+        onAreas={(aois) => onChange({ ...q, aois })}
+      />
+      <div className="row">
+        <label className="field">
+          Show the picture for (seconds)
+          <input
+            type="number"
+            min={3}
+            max={30}
+            style={{ width: 90 }}
+            value={q.durationSec}
+            onChange={(e) => onChange({ ...q, durationSec: Number(e.target.value) })}
+          />
+        </label>
+        <label className="field">
+          Leave out recordings less accurate than (% of screen)
+          <input
+            type="number"
+            min={2}
+            max={40}
+            style={{ width: 90 }}
+            value={q.maxErrorPct}
+            onChange={(e) => onChange({ ...q, maxErrorPct: Number(e.target.value) })}
+          />
+        </label>
+      </div>
+      <label className="field">
+        Camera consent (shown before the camera turns on)
+        <textarea rows={3} value={q.consentText} onChange={(e) => onChange({ ...q, consentText: e.target.value })} />
+      </label>
     </>
   );
 }

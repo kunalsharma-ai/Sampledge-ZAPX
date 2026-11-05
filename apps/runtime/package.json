@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --port 5173 --strictPort",
-    "build": "tsc --noEmit && vite build",
+    "dev": "node scripts/copy-eye-assets.mjs && vite --port 5173 --strictPort",
+    "build": "node scripts/copy-eye-assets.mjs && tsc --noEmit && vite build",
     "preview": "vite preview --port 5173 --strictPort",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.2",
     "@zapx/survey-renderer": "workspace:*",
     "@zapx/survey-schema": "workspace:*",
     "react": "19.1.0",

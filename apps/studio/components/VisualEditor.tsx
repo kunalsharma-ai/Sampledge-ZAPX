@@ -13,6 +13,7 @@ import {
   CleaningEditor,
   DynamicListEditor,
   HotspotForm,
+  EyeTrackForm,
   LoopsEditor,
   QuotaTableBuilder,
   RecodesEditor,
@@ -39,6 +40,7 @@ const TYPE_LABELS: Record<QuestionType, string> = {
   barcode: 'Barcode / QR code',
   maxdiff: 'MaxDiff (best-worst)',
   conjoint: 'Conjoint (choice-based)',
+  eyetrack: 'Eye tracking (webcam, experimental)',
   info: 'Information',
 };
 
@@ -146,6 +148,18 @@ function newQuestion(def: SurveyDefinition, type: QuestionType): Question {
         text: 'Click the parts of the picture that catch your eye',
         imageAlt: '',
         regions: [{ code: 1, label: 'Area 1', x: 10, y: 10, w: 30, h: 20 }],
+      };
+    case 'eyetrack':
+      return {
+        ...base,
+        type,
+        text: 'Please look at the picture as you normally would',
+        imageAlt: '',
+        aois: [],
+        durationSec: 8,
+        maxErrorPct: 15,
+        consentText:
+          'This question uses your camera to estimate where you look at a picture. The video never leaves your device and is not recorded: only the estimated points on the picture are saved. You can skip it.',
       };
     case 'grid':
       return { ...base, type, rows: [{ id: 'r1', label: 'Item 1' }], columns: opts, randomizeRows: false };
@@ -853,6 +867,7 @@ function QuestionForm({
       {q.type === 'conjoint' ? <ConjointForm q={q} onChange={onChange} /> : null}
       {q.type === 'cardsort' ? <CardSortForm q={q} onChange={onChange} OptionsEditor={OptionsEditor} /> : null}
       {q.type === 'hotspot' ? <HotspotForm q={q} onChange={onChange} /> : null}
+      {q.type === 'eyetrack' ? <EyeTrackForm q={q} onChange={onChange} /> : null}
       {q.type === 'multi' ? (
         <div className="row">
           <Num label="Minimum selections" value={q.minSelected} onChange={(v) => onChange({ ...q, minSelected: v })} />

@@ -292,6 +292,94 @@ export const maxDiffQuestionSchema = z.object({
   worstLabel: z.string().min(1).max(60).default('Least important'),
 });
 
+/**
+ * Webcam eye tracking (blueprint, after phase 5). EXPERIMENTAL: the gaze is estimated in the
+ * respondent's browser from the webcam (face landmarks, a short calibration), so it is approximate,
+ * typically several percent of the screen, and it has not been validated on real webcams. Nothing
+ * from the camera leaves the device: only the estimated gaze points on the picture are stored.
+ *
+ * The respondent first agrees (or skips), then calibrates by looking at dots, then sees the picture
+ * for `durationSec`. Areas of interest (AOIs) are rectangles in percent of the picture, like hot-spot
+ * regions. The answer is always stored, so skips and failures are counted:
+ *   "declined" | "unavailable" | "no_face" | "calibration_failed"
+ *   "recorded|<error in tenths of a percent>|<duration ms>|<t>,<x>,<y> <t>,- ..."
+ * where x and y are thousandths of the picture's width and height, and "-" is a moment with no gaze
+ * on the picture (looking away, or no face found).
+ */
+export const eyeTrackQuestionSchema = z.object({
+  ...baseQuestion,
+  type: z.literal('eyetrack'),
+  /** The picture (uploaded in the studio). Publishing requires one. */
+  image: z.string().regex(MEDIA_ID, 'Upload the image in the studio').optional(),
+  imageAlt: z.string().max(300).default(''),
+  aois: z.array(hotspotRegionSchema).max(20).default([]),
+  durationSec: z.number().int().min(3).max(30).default(8),
+  /** Recordings whose measured calibration error is above this (percent of the screen) are left out of results. */
+  maxErrorPct: z.number().min(2).max(40).default(15),
+  consentText: z
+    .string()
+    .min(1)
+    .max(1000)
+    .default(
+      'This question uses your camera to estimate where you look at a picture. The video never leaves your device and is not recorded: only the estimated points on the picture are saved. You can skip it.',
+    ),
+});
+
+export const EYETRACK_STATUSES = ['recorded', 'declined', 'unavailable', 'no_face', 'calibration_failed'] as const;
+export type EyeTrackStatus = (typeof EYETRACK_STATUSES)[number];
+export const EYETRACK_MAX_LENGTH = 40_000;
+export interface GazeSample {
+  /** Milliseconds since the picture appeared. */
+  t: number;
+  /** Thousandths of the picture's width and height; null when the gaze was not on the picture. */
+  x: number | null;
+  y: number | null;
+}
+export interface EyeTrackAnswer {
+  status: EyeTrackStatus;
+  /** Measured calibration error, percent of the screen (recorded only). */
+  errorPct?: number;
+  durationMs?: number;
+  samples?: GazeSample[];
+}
+
+/** Read a stored eye-tracking answer; null when it is not one. */
+export function parseEyeTrack(v: unknown): EyeTrackAnswer | null {
+  if (typeof v !== 'string' || v.length > EYETRACK_MAX_LENGTH) return null;
+  if (v === 'declined' || v === 'unavailable' || v === 'no_face' || v === 'calibration_failed') return { status: v };
+  const parts = v.split('|');
+  if (parts.length !== 4 || parts[0] !== 'recorded') return null;
+  const err = Number(parts[1]);
+  const dur = Number(parts[2]);
+  if (!Number.isInteger(err) || err < 0 || err > 1000 || !Number.isInteger(dur) || dur < 0 || dur > 60_000) return null;
+  const samples: GazeSample[] = [];
+  let last = -1;
+  for (const s of parts[3] ? parts[3].split(' ') : []) {
+    const m = /^(\d{1,5}),(?:(\d{1,4}),(\d{1,4})|-)$/.exec(s);
+    if (!m) return null;
+    const t = Number(m[1]);
+    if (t < last || t > dur + 1000) return null;
+    last = t;
+    if (m[2] === undefined) samples.push({ t, x: null, y: null });
+    else {
+      const x = Number(m[2]);
+      const y = Number(m[3]);
+      if (x > 1000 || y > 1000) return null;
+      samples.push({ t, x, y });
+    }
+  }
+  return { status: 'recorded', errorPct: err / 10, durationMs: dur, samples };
+}
+
+/** Write an eye-tracking answer in its stored form. */
+export function formatEyeTrack(a: EyeTrackAnswer): string {
+  if (a.status !== 'recorded') return a.status;
+  const pts = (a.samples ?? [])
+    .map((s) => (s.x === null || s.y === null ? `${Math.round(s.t)},-` : `${Math.round(s.t)},${Math.round(s.x)},${Math.round(s.y)}`))
+    .join(' ');
+  return `recorded|${Math.round((a.errorPct ?? 0) * 10)}|${Math.round(a.durationMs ?? 0)}|${pts}`;
+}
+
 export const conjointLevelSchema = z.object({ code: z.number().int(), label: z.string().min(1).max(200) });
 export const conjointAttributeSchema = z.object({
   id: variableName,
@@ -343,6 +431,7 @@ export const questionSchema = z.discriminatedUnion('type', [
   barcodeQuestionSchema,
   maxDiffQuestionSchema,
   conjointQuestionSchema,
+  eyeTrackQuestionSchema,
   infoElementSchema,
 ]);
 export type Question = z.infer<typeof questionSchema>;
@@ -365,6 +454,7 @@ export type ConjointQuestion = z.infer<typeof conjointQuestionSchema>;
 export type ConjointAttribute = z.infer<typeof conjointAttributeSchema>;
 export type CardSortQuestion = z.infer<typeof cardSortQuestionSchema>;
 export type HotspotQuestion = z.infer<typeof hotspotQuestionSchema>;
+export type EyeTrackQuestion = z.infer<typeof eyeTrackQuestionSchema>;
 
 /** Codes a scale question can store: every point of the scale, plus "don't know" when offered. */
 export function scaleCodes(q: Pick<ScaleQuestion, 'min' | 'max' | 'dontKnow'>): number[] {
@@ -380,7 +470,7 @@ export function mediaIdsOf(def: { pages: Array<{ questions: Question[] }> }): st
   for (const p of def.pages)
     for (const q of p.questions) {
       if (q.media) ids.add(q.media.id);
-      if (q.type === 'hotspot' && q.image) ids.add(q.image);
+      if ((q.type === 'hotspot' || q.type === 'eyetrack') && q.image) ids.add(q.image);
       if ('options' in q) for (const o of q.options) if (o.image) ids.add(o.image);
     }
   return [...ids];
@@ -750,7 +840,7 @@ export function parseSurveyDefinition(input: unknown): { ok: true; definition: S
 export type AnswerValue =
   | number // single, numeric
   | number[] // multi; ranking (codes in rank order); hotspot (region codes)
-  | string // open; photo (capture reference)
+  | string // open; photo (capture reference); signature; barcode; eyetrack (see parseEyeTrack)
   | Record<string, number> // grid: rowId -> column code; sum: option code -> amount; cardsort: card -> group; maxdiff/conjoint: v, b1/w1 or t1
   | null;
 

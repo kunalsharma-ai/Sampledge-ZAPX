@@ -197,6 +197,9 @@ importers:
 
   apps/runtime:
     dependencies:
+      '@mediapipe/tasks-vision':
+        specifier: 1.2.2
+        version: 1.2.2
       '@zapx/survey-renderer':
         specifier: workspace:*
         version: link:../../packages/survey-renderer
@@ -444,6 +447,9 @@ importers:
       typescript:
         specifier: 5.8.3
         version: 5.8.3
+      vitest:
+        specifier: 3.2.4
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@22.15.30)(jiti@2.4.2)
 
   packages/survey-schema:
     dependencies:
@@ -1074,6 +1080,9 @@ packages:
 
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
+
+  '@mediapipe/tasks-vision@1.2.2':
+    resolution: {integrity: sha512-Z7BikxnTvlKgc3d/Nw+LV6B0xyAACxYeAHHUu/xUhm1SV7jlExa9M37beiF/wZFoy0H+cs1PlIT2Z4km02UEHQ==}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     resolution: {integrity: sha512-oTXEIha4SsuXdTA4Iyskj0kpdx2yVXdhd75c2v3xGrHFfVMsbhTPZU/nMPL4sWKo4pBHm3aucLaqGlF696dTyQ==}
@@ -4407,6 +4416,8 @@ snapshots:
   '@lukeed/csprng@1.1.0': {}
 
   '@marijn/find-cluster-break@1.0.4': {}
+
+  '@mediapipe/tasks-vision@1.2.2': {}
 
   '@napi-rs/lzma-linux-x64-gnu@1.5.1':
     optional: true

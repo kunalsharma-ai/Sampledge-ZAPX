@@ -354,11 +354,19 @@ describe('email distribution', () => {
     const waves = (await http.get(`/api/surveys/${surveyId}/distributions`).set(admin).expect(200)).body;
     expect(waves.items[0]).toMatchObject({ state: 'sent', invited: 3, sent: 2, failed: 1, started: 1, completed: 1 });
 
+    // The sender works every organization's waves, and the shared test database can hold reminders
+    // left by other test runs, so count only the emails for this survey.
+    const mine = async (at: Date) => {
+      const from = mail.sent.length;
+      await svc.pass(mail, at);
+      return mail.sent.slice(from).filter((m) => m.text.includes(`/s/${surveyId}`));
+    };
     const later = new Date(t0.getTime() + 3 * 24 * 3_600_000 + 5000);
-    expect(await svc.pass(mail, later)).toEqual({ sent: 0, failed: 0, reminded: 1 });
-    expect(mail.sent.at(-1)).toMatchObject({ to: { email: 'chen@example.com' }, subject: 'Reminder: Your view, Chen' });
+    const reminders = await mine(later);
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0]).toMatchObject({ to: { email: 'chen@example.com' }, subject: 'Reminder: Your view, Chen' });
     // Only one reminder was asked for.
-    expect(await svc.pass(mail, new Date(later.getTime() + 10 * 24 * 3_600_000))).toEqual({ sent: 0, failed: 0, reminded: 0 });
+    expect(await mine(new Date(later.getTime() + 10 * 24 * 3_600_000))).toHaveLength(0);
   });
 
   it('downloads personal links and unsubscribes with one click', async () => {

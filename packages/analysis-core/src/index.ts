@@ -669,3 +669,4 @@ export function crosstab(banner: Variable, stub: Variable, records: AnalysisReco
 }
 
 export * from './weighting';
+export * from './eyetracking';

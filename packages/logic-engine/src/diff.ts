@@ -59,6 +59,7 @@ function codesOf(q: Question): number[] {
   if (q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum' || q.type === 'cardsort')
     return q.options.map((o) => o.code);
   if (q.type === 'hotspot') return q.regions.map((r) => r.code);
+  if (q.type === 'eyetrack') return q.aois.map((r) => r.code);
   if (q.type === 'grid') return q.columns.map((o) => o.code);
   if (q.type === 'scale') return scaleCodes(q);
   return [];

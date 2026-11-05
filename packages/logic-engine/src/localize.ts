@@ -39,6 +39,10 @@ export function textKeys(def: SurveyDefinition, presentation?: Pick<Presentation
       if (q.type === 'single' || q.type === 'multi' || q.type === 'ranking' || q.type === 'sum' || q.type === 'cardsort')
         q.options.forEach((o) => add(`q.${q.id}.opt.${o.code}`, o.label, `${q.id} ${q.type === 'cardsort' ? 'card' : 'answer'} ${o.code}`));
       if (q.type === 'cardsort') q.groups.forEach((o) => add(`q.${q.id}.group.${o.code}`, o.label, `${q.id} group ${o.code}`));
+      if (q.type === 'eyetrack') {
+        add(`q.${q.id}.imageAlt`, q.imageAlt, `${q.id} picture description`);
+        add(`q.${q.id}.consent`, q.consentText, `${q.id} camera consent text`);
+      }
       if (q.type === 'hotspot') {
         add(`q.${q.id}.imageAlt`, q.imageAlt, `${q.id} picture description`);
         q.regions.forEach((r) => add(`q.${q.id}.region.${r.code}`, r.label, `${q.id} area ${r.code}`));
@@ -116,6 +120,12 @@ export function localizeDefinition(def: SurveyDefinition, lang: Language | undef
             ...base,
             options: base.options.map((o) => ({ ...o, label: t(`q.${q.id}.opt.${o.code}`, o.label) })),
             groups: base.groups.map((o) => ({ ...o, label: t(`q.${q.id}.group.${o.code}`, o.label) })),
+          };
+        if (base.type === 'eyetrack')
+          return {
+            ...base,
+            imageAlt: t(`q.${q.id}.imageAlt`, base.imageAlt),
+            consentText: t(`q.${q.id}.consent`, base.consentText),
           };
         if (base.type === 'hotspot')
           return {

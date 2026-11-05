@@ -20,6 +20,7 @@ import {
 } from '@zapx/survey-renderer';
 import type { AnswerValue, Answers, Theme } from '@zapx/survey-schema';
 import { textDirection } from '@zapx/survey-schema';
+import { eyeTrackingHost } from './eyetracking';
 
 interface Look {
   theme: Theme;
@@ -305,6 +306,7 @@ export function App() {
               language={view.look.language}
               messages={view.look.ui}
               photos={photos}
+              eyeTracking={eyeTrackingHost}
             />
             <Honeypot inputRef={signals.honeypot} />
             {waiting ? <p className="zx-media-wait">{view.look.ui.playToEnd}</p> : null}
