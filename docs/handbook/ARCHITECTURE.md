@@ -1,7 +1,7 @@
 # Architecture
 
 How ZAPX is put together and how a request travels through it. Code references are to branch
-`blueprint-p5-enterprise` (PR #34). For the reasons behind each decision, read the ADRs in
+`mobile-app` (PR #40, the top of the open stack). For the reasons behind each decision, read the ADRs in
 [docs/adr](../adr/README.md); this file describes what the code does.
 
 ## 1. Project overview
@@ -21,24 +21,28 @@ ZAPX is a survey programming, testing, hosting and fieldwork platform for market
 
 ### Main modules
 
-| Module                               | What it does                                                                                                                              | Main code                                                                                                            |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Accounts and organizations           | sign-up, sign-in, sessions, roles, team, project access, lockout                                                                          | `apps/api/src/auth`, `users`, `projects/members.controller.ts`, `common/access.service.ts`                           |
-| Survey studio                        | definition editing (visual, JSON, XML code view), logic check, preview, publish, versions                                                 | `apps/api/src/surveys`, `packages/survey-schema`, `packages/logic-engine`, `apps/studio/components/VisualEditor.tsx` |
-| AI architect and imports             | AI-drafted or file-imported changes as reviewable change sets                                                                             | `apps/api/src/ai`, `imports`, `changesets`                                                                           |
-| QA laboratory                        | simulated respondents, coverage, defects, saved test cases                                                                                | `apps/api/src/qa`, `packages/logic-engine/src/simulate.ts`                                                           |
-| Experience and languages             | themes, translations with human review, glossary, translation memory, devices                                                             | `packages/survey-schema` (presentation), `apps/api/src/surveys/translate*.ts`                                        |
-| Hosting (respondent interview)       | entry, routing, validation, terminations, quotas, completion                                                                              | `apps/api/src/interview`, `quotas`, `apps/runtime`                                                                   |
-| Redirect and vendor integration      | outcome redirects, callbacks outbox, PROJEXA adapter, vendor API, webhooks                                                                | `apps/api/src/integrations`, `packages/redirect-core`                                                                |
-| Data quality and fraud               | 0–100 score per complete, review queue, fraud signals, block list, network reputation                                                     | `apps/api/src/quality`, `packages/quality-core`                                                                      |
-| CAPI (face to face)                  | offline app, sync with server replay, GPS, recordings, evidence, back-checks, appeals                                                     | `apps/capi`, `apps/api/src/capi`, `captures`, `fieldwork`                                                            |
-| CATI (phone)                         | call lists, queue, dispositions, calling hours, do-not-call, Twilio dialer                                                                | `apps/api/src/cati`                                                                                                  |
-| Distribution                         | contacts, email (SendGrid) and SMS (Twilio) invitation waves, reminders, unsubscribe                                                      | `apps/api/src/distribution`                                                                                          |
-| Data, analysis and reports           | CSV/Excel export, frequencies, crosstabs with significance, weighting, saved reports, dashboards, MaxDiff/conjoint, AI research assistant | `apps/api/src/exports`, `analysis`, `packages/analysis-core`                                                         |
-| Background jobs and files            | job queue in PostgreSQL, worker process, local disk or S3 file store, housekeeping                                                        | `apps/api/src/jobs`, `apps/api/src/worker.ts`                                                                        |
-| Enterprise                           | API keys, audit log, SSO (OIDC and SAML), SCIM, plans and Stripe billing                                                                  | `apps/api/src/enterprise`, `auth/sso*`, `auth/saml.service.ts`, `scim`, `plans`                                      |
-| Automation and governance _(PR #34)_ | rules (trigger → conditions → actions), notifications, residency, retention erasure                                                       | `apps/api/src/automation`, `governance`                                                                              |
-| Design system _(PR #27/#29)_         | studio themes, appearance preferences, sidebar shell, dashboard                                                                           | `packages/quantum`, `apps/studio/components/quantum`, `components/Shell.tsx`, `apps/api/src/dashboard`               |
+| Module                               | What it does                                                                                                                              | Main code                                                                                                                                |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Accounts and organizations           | sign-up, sign-in, sessions, roles, team, project access, lockout                                                                          | `apps/api/src/auth`, `users`, `projects/members.controller.ts`, `common/access.service.ts`                                               |
+| Survey studio                        | definition editing (visual, JSON, XML code view), logic check, preview, publish, versions                                                 | `apps/api/src/surveys`, `packages/survey-schema`, `packages/logic-engine`, `apps/studio/components/VisualEditor.tsx`                     |
+| AI architect and imports             | AI-drafted or file-imported changes as reviewable change sets                                                                             | `apps/api/src/ai`, `imports`, `changesets`                                                                                               |
+| QA laboratory                        | simulated respondents, coverage, defects, saved test cases                                                                                | `apps/api/src/qa`, `packages/logic-engine/src/simulate.ts`                                                                               |
+| Experience and languages             | themes, translations with human review, glossary, translation memory, devices                                                             | `packages/survey-schema` (presentation), `apps/api/src/surveys/translate*.ts`                                                            |
+| Hosting (respondent interview)       | entry, routing, validation, terminations, quotas, completion                                                                              | `apps/api/src/interview`, `quotas`, `apps/runtime`                                                                                       |
+| Redirect and vendor integration      | outcome redirects, callbacks outbox, PROJEXA adapter, vendor API, webhooks                                                                | `apps/api/src/integrations`, `packages/redirect-core`                                                                                    |
+| Data quality and fraud               | 0–100 score per complete, review queue, fraud signals, block list, network reputation                                                     | `apps/api/src/quality`, `packages/quality-core`                                                                                          |
+| CAPI (face to face)                  | offline app, sync with server replay, GPS, recordings, evidence, back-checks, appeals                                                     | `apps/capi`, `apps/api/src/capi`, `captures`, `fieldwork`                                                                                |
+| CATI (phone)                         | call lists, queue, dispositions, calling hours, do-not-call, Twilio dialer                                                                | `apps/api/src/cati`                                                                                                                      |
+| Distribution                         | contacts, email (SendGrid) and SMS (Twilio) invitation waves, reminders, unsubscribe                                                      | `apps/api/src/distribution`                                                                                                              |
+| Data, analysis and reports           | CSV/Excel export, frequencies, crosstabs with significance, weighting, saved reports, dashboards, MaxDiff/conjoint, AI research assistant | `apps/api/src/exports`, `analysis`, `packages/analysis-core`                                                                             |
+| Background jobs and files            | job queue in PostgreSQL, worker process, local disk or S3 file store, housekeeping                                                        | `apps/api/src/jobs`, `apps/api/src/worker.ts`                                                                                            |
+| Enterprise                           | API keys, audit log, SSO (OIDC and SAML), SCIM, plans and Stripe billing                                                                  | `apps/api/src/enterprise`, `auth/sso*`, `auth/saml.service.ts`, `scim`, `plans`                                                          |
+| Automation and governance _(PR #34)_ | rules (trigger → conditions → actions), notifications, residency, retention erasure                                                       | `apps/api/src/automation`, `governance`                                                                                                  |
+| Design system _(PR #27/#29/#39)_     | studio themes, appearance preferences, sidebar shell, dashboard, neon `PageHeader` on every page, neon CAPI palette                       | `packages/quantum`, `apps/studio/components/quantum`, `components/Shell.tsx`, `apps/studio/app/neon-pages.css`, `apps/api/src/dashboard` |
+| Platform integrations _(PR #38)_     | Claude, IPinfo, Deepgram, Twilio, Stripe and S3 keys set in Settings → Integrations, sealed in the database, environment as fallback      | `apps/api/src/platform/integration-settings.service.ts`, `integrations.ts`, `apps/studio/app/settings/integrations`                      |
+| Super admin _(PR #41)_               | organizations, subscription plans, web and mobile features per organization and member, suspension, activity, platform automation         | `apps/api/src/super-admin`, `apps/studio/app/super-admin`                                                                                |
+| Mobile app _(PR #40)_                | Android and iOS app (Expo) with the CRM's screens, gated live by the mobile features; CAPI inside a WebView                               | `apps/mobile`, `apps/api/src/mobile`                                                                                                     |
+| Eye tracking _(PR #37)_              | experimental webcam eye-tracking question (`eyetrack`) and its heat map in analysis                                                       | `packages/survey-renderer`, `apps/api/src/analysis`                                                                                      |
 
 ### Technologies
 
@@ -50,6 +54,7 @@ ZAPX is a survey programming, testing, hosting and fieldwork platform for market
 | Database          | PostgreSQL 16 through Prisma 6.10 (`packages/db`)                                                                                                                              |
 | Studio            | Next.js 15.5 (App Router, all pages are client components), React 19.1, CodeMirror 6, lucide-react icons, Geist fonts, plain CSS with custom properties (no Tailwind)          |
 | Runtime, CAPI app | Vite 6 + React 19 (static files served by nginx in production); CAPI uses a service worker and IndexedDB                                                                       |
+| Mobile app        | Expo SDK 58 with Expo Router, React Native, `expo-secure-store` for the token; its own npm project and lockfile in `apps/mobile`, outside the pnpm workspace _(PR #40)_        |
 | Shared logic      | `@zapx/survey-schema`, `@zapx/logic-engine`, `@zapx/survey-renderer`, `@zapx/redirect-core`, `@zapx/quality-core`, `@zapx/analysis-core`, `@zapx/quantum` (all in `packages/`) |
 | Files             | local disk (`FILES_DIR`) or AWS S3 (`@aws-sdk/client-s3`)                                                                                                                      |
 | Excel, Word, SAML | exceljs, mammoth (Word to text), `@node-saml/node-saml`, `jose` (OIDC tokens)                                                                                                  |
@@ -57,6 +62,12 @@ ZAPX is a survey programming, testing, hosting and fieldwork platform for market
 | Infrastructure    | Docker (`Dockerfile`, `docker-compose.yml`), nginx, Terraform for AWS (`infra/terraform`)                                                                                      |
 
 ### Third-party services (all optional, all off by default)
+
+From PR #38 the provider keys (Claude, IPinfo, Deepgram, Twilio, Stripe, S3) can be set in the studio
+under **Settings → Integrations** (or the super admin console's Integrations page). A value saved there
+wins over the environment variable in the "Switch" column, which stays as a fallback. Each process
+re-reads the saved values every `INTEGRATIONS_REFRESH_MS` (15 s). SendGrid, SSO and PROJEXA are not
+part of it.
 
 | Service                    | Used for                                         | Switch                               | Code                                                  |
 | -------------------------- | ------------------------------------------------ | ------------------------------------ | ----------------------------------------------------- |
@@ -80,6 +91,7 @@ flowchart LR
     R[Respondent runtime<br/>Vite/React :5173]
     C[CAPI app<br/>offline PWA :5174]
   end
+  M[Mobile app<br/>Android / iOS, PR #40]
   subgraph API["API process (NestJS, apps/api) :4000"]
     G[Global guards:<br/>ThrottlerGuard + AuthGuard]
     CT[Controllers<br/>/api/...]
@@ -95,6 +107,7 @@ flowchart LR
   S -- "/api/* (Next.js rewrite)" --> G
   R -- "/api/* (Vite or nginx proxy)" --> G
   C -- "/api/* (Vite or nginx proxy)" --> G
+  M -- "https://studio/api/* (Bearer token)" --> G
   G --> CT --> SV --> DB
   SV --> FS
   SV --> EXT
@@ -110,9 +123,10 @@ Key points in plain language:
 - **One backend.** All business logic is in one NestJS process (`apps/api`), a "modular monolith":
   folders are separate modules but share one database and process
   ([ADR 0001](../adr/0001-modular-monolith.md)).
-- **Three front ends, no business rules in them.** The studio, runtime and CAPI app only display
+- **Three web front ends and a mobile app, no business rules in them.** The studio, runtime and CAPI app only display
   what the API returns and send what people type. The one exception is the CAPI app, which runs the
-  shared logic engine offline; the server then replays every interview to check it.
+  shared logic engine offline; the server then replays every interview to check it. The mobile app
+  _(PR #40)_ calls the same API with a Bearer token and opens the CAPI app in a WebView.
 - **Same origin.** Each front end calls `/api/...` on its own address, and a proxy forwards that to
   the API (`apps/studio/next.config.mjs`, `apps/runtime/vite.config.ts`, `apps/capi/vite.config.ts`,
   `infra/nginx/*.conf`). That is why there is **no CORS** set up
@@ -157,6 +171,14 @@ work is not done twice (the `docker-compose.yml` does this).
 - Studio: `next start -p 3000` (`apps/studio/package.json`). `app/layout.tsx` renders the default
   theme on the server and a boot script applies the member's saved theme before React loads.
 - Runtime and CAPI: `vite preview` locally, or nginx serving the built files in Docker/AWS.
+- Mobile app _(PR #40)_: `npm start` in `apps/mobile` (Expo dev server); store builds come from EAS
+  ([docs/operations/mobile-release.md](../operations/mobile-release.md)). It asks the server for
+  `GET /api/mobile/version` before sign-in and refuses to continue if it is older than
+  `MOBILE_MIN_VERSION`.
+
+`PlatformAutomationService` _(PR #41)_ also starts a timer in every API process when
+`PLATFORM_AUTOMATION=on`, and `IntegrationSettingsService` _(PR #38)_ re-reads the saved integrations
+every `INTEGRATIONS_REFRESH_MS`.
 
 ## 4. How the front ends talk to the API
 
@@ -180,6 +202,10 @@ sequenceDiagram
   `ApiError`, and redirect to `/login?next=…` on a 401.
 - **Runtime** calls `POST /api/public/s/:surveyId/start` then `/api/public/r/:token/...`
   (`apps/runtime/src/App.tsx`). No login; the token in the URL is the respondent's key.
+- **Mobile app** _(PR #40)_ calls `apiFetch` in `apps/mobile/src/lib/api.ts` with `Authorization:
+Bearer <session token>` (kept in `expo-secure-store`) and `X-ZAPX-Client: mobile`. It keeps the
+  member's mobile entitlements live from `GET /api/me/entitlements/stream` (server-sent events),
+  with an ETag poll as fallback (`src/lib/entitlements.ts`).
 - **CAPI app** calls `/api/auth/login`, `/api/capi/package`, `/api/capi/captures`, `/api/capi/sync`
   (`apps/capi/src/api.ts`) and stores everything in IndexedDB (`apps/capi/src/store.ts`).
 
@@ -189,26 +215,29 @@ sequenceDiagram
 
 Every route lives under `/api` (set in `bootstrap.ts`). Each controller declares a prefix with
 `@Controller('...')` and each method a path with `@Get`, `@Post`, `@Put`, `@Patch` or `@Delete`. The
-full list of 246 routes, with their files, is in [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
+full list of 283 routes, with their files, is in [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
 
 ### Studio routing (Next.js App Router, folder = URL)
 
-| URL                | File                                       | Shows                                                                                 |
-| ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `/login`           | `apps/studio/app/login/page.tsx`           | sign-in, sign-up, "Sign in with SSO"                                                  |
-| `/forgot-password` | `apps/studio/app/forgot-password/page.tsx` | ask for a reset link by email _(branch `security-fixes`)_                             |
-| `/reset-password`  | `apps/studio/app/reset-password/page.tsx`  | set a new password from a one-time link _(branch `security-fixes`)_                   |
-| `/account`         | `apps/studio/app/account/page.tsx`         | My account: change password _(branch `security-fixes`)_                               |
-| `/`                | `apps/studio/app/page.tsx`                 | dashboard _(PR #29)_: counts, charts, latest projects, create survey                  |
-| `/projects`        | `apps/studio/app/projects/page.tsx`        | project list _(PR #29 moved it here)_                                                 |
-| `/projects/[id]`   | `apps/studio/app/projects/[id]/page.tsx`   | a project's surveys, vendors, access                                                  |
-| `/surveys/[id]`    | `apps/studio/app/surveys/[id]/page.tsx`    | the survey workspace with tabs (below); `?tab=…` opens a tab                          |
-| `/library`         | `apps/studio/app/library/page.tsx`         | question bank and templates _(PR #30)_                                                |
-| `/calls`           | `apps/studio/app/calls/page.tsx`           | CATI calling screen                                                                   |
-| `/automation`      | `apps/studio/app/automation/page.tsx`      | automation rules and runs _(PR #34)_                                                  |
-| `/appearance`      | `apps/studio/app/appearance/page.tsx`      | themes _(PR #27)_                                                                     |
-| `/settings`        | `apps/studio/app/settings/page.tsx`        | team, AI, redirect defaults, SSO, SCIM, plan, billing, API keys, webhooks, governance |
-| `/settings/audit`  | `apps/studio/app/settings/audit/page.tsx`  | audit log viewer                                                                      |
+| URL                      | File                                                                                                           | Shows                                                                                 |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `/login`                 | `apps/studio/app/login/page.tsx`                                                                               | sign-in, sign-up, "Sign in with SSO"                                                  |
+| `/forgot-password`       | `apps/studio/app/forgot-password/page.tsx`                                                                     | ask for a reset link by email _(branch `security-fixes`)_                             |
+| `/reset-password`        | `apps/studio/app/reset-password/page.tsx`                                                                      | set a new password from a one-time link _(branch `security-fixes`)_                   |
+| `/account`               | `apps/studio/app/account/page.tsx`                                                                             | My account: change password _(branch `security-fixes`)_                               |
+| `/`                      | `apps/studio/app/page.tsx`                                                                                     | dashboard _(PR #29)_: counts, charts, latest projects, create survey                  |
+| `/projects`              | `apps/studio/app/projects/page.tsx`                                                                            | project list _(PR #29 moved it here)_                                                 |
+| `/projects/[id]`         | `apps/studio/app/projects/[id]/page.tsx`                                                                       | a project's surveys, vendors, access                                                  |
+| `/surveys/[id]`          | `apps/studio/app/surveys/[id]/page.tsx`                                                                        | the survey workspace with tabs (below); `?tab=…` opens a tab                          |
+| `/library`               | `apps/studio/app/library/page.tsx`                                                                             | question bank and templates _(PR #30)_                                                |
+| `/calls`                 | `apps/studio/app/calls/page.tsx`                                                                               | CATI calling screen                                                                   |
+| `/automation`            | `apps/studio/app/automation/page.tsx`                                                                          | automation rules and runs _(PR #34)_                                                  |
+| `/appearance`            | `apps/studio/app/appearance/page.tsx`                                                                          | themes _(PR #27)_                                                                     |
+| `/settings`              | `apps/studio/app/settings/page.tsx`                                                                            | team, AI, redirect defaults, SSO, SCIM, plan, billing, API keys, webhooks, governance |
+| `/settings/audit`        | `apps/studio/app/settings/audit/page.tsx`                                                                      | audit log viewer                                                                      |
+| `/settings/integrations` | `apps/studio/app/settings/integrations/page.tsx`                                                               | platform integrations _(PR #38)_                                                      |
+| `/super-admin/…`         | `apps/studio/app/super-admin/` (`organizations`, `plans`, `members`, `activity`, `integrations`, `automation`) | super admin console _(PR #41)_                                                        |
+| `/suspended`             | `apps/studio/app/suspended/page.tsx`                                                                           | shown when the organization is suspended _(PR #41)_                                   |
 
 Survey workspace tabs (`TABS` in `apps/studio/app/surveys/[id]/page.tsx`): `build`
 (`VisualEditor`), `json`, `code` (`Programmer`, XML view), `assist` (`Assist`, AI and import),
@@ -264,17 +293,18 @@ flowchart TD
 
 ### Ways to authenticate
 
-| Who                 | How                                                                                                                 | Code                                                          |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Studio member       | email + password at `POST /api/auth/login` → httpOnly cookie `zapx_token` (12 hours)                                | `auth/auth.controller.ts`, `auth/session.ts`                  |
-| Studio member (SSO) | `POST /api/auth/sso/start` → identity provider → `/api/auth/sso/callback` (OIDC) or `/api/auth/sso/saml/acs` (SAML) | `auth/sso.controller.ts`, `sso.service.ts`, `saml.service.ts` |
-| Script or partner   | `Authorization: Bearer zapx_<prefix>_<secret>` API key, acts as its creator with at most programmer rights          | `auth/api-keys.ts`, `auth.guard.ts` `fromApiKey`              |
-| API client          | `Authorization: Bearer <session token>` (the login response also returns the token)                                 | `auth.guard.ts` `fromSession`                                 |
-| Interviewer (CAPI)  | same login, role `INTERVIEWER`                                                                                      | `apps/capi/src/api.ts`                                        |
-| Respondent          | no account: unguessable session token in `/r/:token` (only its SHA-256 is stored)                                   | `interview/interview.service.ts`                              |
-| Vendor API          | HMAC signature headers checked against the vendor's secret                                                          | `integrations/vendor-api.controller.ts`                       |
-| SCIM client         | `Authorization: Bearer` SCIM token (hashed in `TenantScim`)                                                         | `scim/scim.guard.ts`                                          |
-| Twilio, Stripe      | provider signatures (`x-twilio-signature`, `stripe-signature`)                                                      | `cati/telephony.controller.ts`, `plans/billing.controller.ts` |
+| Who                   | How                                                                                                                 | Code                                                          |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Studio member         | email + password at `POST /api/auth/login` → httpOnly cookie `zapx_token` (12 hours)                                | `auth/auth.controller.ts`, `auth/session.ts`                  |
+| Studio member (SSO)   | `POST /api/auth/sso/start` → identity provider → `/api/auth/sso/callback` (OIDC) or `/api/auth/sso/saml/acs` (SAML) | `auth/sso.controller.ts`, `sso.service.ts`, `saml.service.ts` |
+| Script or partner     | `Authorization: Bearer zapx_<prefix>_<secret>` API key, acts as its creator with at most programmer rights          | `auth/api-keys.ts`, `auth.guard.ts` `fromApiKey`              |
+| API client            | `Authorization: Bearer <session token>` (the login response also returns the token)                                 | `auth.guard.ts` `fromSession`                                 |
+| Interviewer (CAPI)    | same login, role `INTERVIEWER`                                                                                      | `apps/capi/src/api.ts`                                        |
+| Mobile app _(PR #40)_ | same login; the session token is sent as `Bearer`, plus `X-ZAPX-Client: mobile`                                     | `apps/mobile/src/lib/api.ts`, `session.tsx`                   |
+| Respondent            | no account: unguessable session token in `/r/:token` (only its SHA-256 is stored)                                   | `interview/interview.service.ts`                              |
+| Vendor API            | HMAC signature headers checked against the vendor's secret                                                          | `integrations/vendor-api.controller.ts`                       |
+| SCIM client           | `Authorization: Bearer` SCIM token (hashed in `TenantScim`)                                                         | `scim/scim.guard.ts`                                          |
+| Twilio, Stripe        | provider signatures (`x-twilio-signature`, `stripe-signature`)                                                      | `cati/telephony.controller.ts`, `plans/billing.controller.ts` |
 
 ### What `AuthGuard` does on every request
 
@@ -293,11 +323,22 @@ flowchart TD
   K --> R
   S --> R{Role allowed by @Roles?<br/>INTERVIEWER only where named}
   R -- no --> F403b[403 Your role cannot do this]
-  R -- yes --> OK
+  R -- yes --> E{Entitlements, PR #41:<br/>/super route and not super admin?<br/>organization suspended?<br/>mobile client without mobile access?<br/>route's feature off?}
+  E -- "yes" --> F403c[403 SUPER_ADMIN_ONLY / ORG_SUSPENDED /<br/>MOBILE_DISABLED / FEATURE_DISABLED]
+  E -- no --> OK
 ```
 
 The member is **read from the database on every request**, so a role change, a disabled account or a
 removal from a project applies immediately.
+
+**Entitlements** _(PR #41, [ADR 0036](../adr/0036-super-admin.md))_: after the role check the guard
+works out the member's features for the surface (`web`, or `mobile` when the request carries
+`X-ZAPX-Client: mobile`) from the organization's plan (`SubscriptionPlan.webFeatures` /
+`mobileFeatures`), the organization's `featureOverrides` and the member's `featureOverrides`
+(`resolveEntitlements` in `apps/api/src/super-admin/features.ts`). `featureForRoute()` in the same
+file maps each API path to a feature; a route that is not in its `RULES` list is not gated. A few paths
+are always open (`auth/me`, `auth/logout`, `auth/logout-all`, `me/entitlements`, `features`). The
+guard also records `lastSeenAt` and `lastClient` at most once a minute.
 
 ### Roles
 
@@ -309,6 +350,12 @@ Defined in `packages/db/prisma/schema.prisma` (`enum Role`) and `apps/api/src/au
 | `PROGRAMMER`  | create and edit projects, surveys, vendors, quotas, translations, run QA, decide reviews (`CAN_EDIT`)              |
 | `VIEWER`      | read surveys, data, analysis and reports; no changes (the studio shows read-only screens)                          |
 | `INTERVIEWER` | **deny by default**: only routes that list `INTERVIEWER` (the CAPI app API, CATI calling, `/auth/me`, preferences) |
+
+**Super admin** _(PR #41)_ is not a role but a flag, `User.superAdmin`, on top of the member's role. It
+opens `/api/super/*` and the `/super-admin` console for the whole installation (every organization).
+It is set only from the command line: `node apps/api/dist/cli/set-super-admin.js <email>` (the member
+must belong to the operator organization, see `cli/set-operator.js`). A super admin is never limited by
+features. API keys never act as super admin.
 
 On top of roles, `User.projectScope` = `ASSIGNED` limits programmers and viewers to projects they are
 members of (`ProjectMember`). Plans (`apps/api/src/plans/plans.ts`) limit seats, interviewers, live
@@ -418,14 +465,16 @@ There is no central error-tracking service (such as Sentry) in the code. Logs go
 
 ## 10. Background processes and scheduled tasks
 
-There is no cron. Two polling loops do all background work. They run inside the API by default, or
+There is no cron. Two polling loops do most background work (two more timers were added by PRs #38 and #41, below). They run inside the API by default, or
 in the separate worker process (`apps/api/src/worker.ts`).
 
-| Loop                                                              | Interval                 | Does                                                                                                                                                                                                                                                         |
-| ----------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `JobWorker` (`apps/api/src/jobs/job.worker.ts`)                   | `JOB_POLL_MS` (2 s)      | claims up to 20 queued `Job` rows per pass with `FOR UPDATE SKIP LOCKED` and a lease; types `export`, `qa_run`, `ai_propose`, `transcribe`; then sends due email/SMS waves (`DistributionService.pass`), runs automation (`AutomationService.pass`)          |
-| `JobWorker.housekeeping`                                          | once an hour             | deletes expired files, old jobs, old webhook deliveries, expired captures, old automation runs and read notifications, expired SAML requests, old billing events; applies retention policies (`GovernanceService.applyRetention`); retries dialer recordings |
-| `CallbackWorker` (`apps/api/src/integrations/callback.worker.ts`) | `CALLBACK_POLL_MS` (5 s) | delivers vendor callbacks and webhooks from their outboxes with retries and dead-lettering; marks idle interviews as partial                                                                                                                                 |
+| Loop                                                                                                      | Interval                         | Does                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `JobWorker` (`apps/api/src/jobs/job.worker.ts`)                                                           | `JOB_POLL_MS` (2 s)              | claims up to 20 queued `Job` rows per pass with `FOR UPDATE SKIP LOCKED` and a lease; types `export`, `qa_run`, `ai_propose`, `transcribe`; then sends due email/SMS waves (`DistributionService.pass`), runs automation (`AutomationService.pass`)                                                                      |
+| `JobWorker.housekeeping`                                                                                  | once an hour                     | deletes expired files, old jobs, old webhook deliveries, expired captures, old automation runs and read notifications, expired SAML requests, old billing events; applies retention policies (`GovernanceService.applyRetention`); retries dialer recordings                                                             |
+| `CallbackWorker` (`apps/api/src/integrations/callback.worker.ts`)                                         | `CALLBACK_POLL_MS` (5 s)         | delivers vendor callbacks and webhooks from their outboxes with retries and dead-lettering; marks idle interviews as partial                                                                                                                                                                                             |
+| `PlatformAutomationService` (`apps/api/src/super-admin/platform-automation.service.ts`) _(PR #41)_        | `PLATFORM_AUTOMATION_MS` (60 s)  | checks the super admin's rules (`org_created`, `subscription_ending`, `subscription_ended`, `completes_used`, `seats_full`, `admins_inactive`) against every organization and runs their actions; each firing is a `PlatformAutomationRun` row with a unique `dedupeKey`, so it happens once even with several processes |
+| `IntegrationSettingsService` refresh (`apps/api/src/platform/integration-settings.service.ts`) _(PR #38)_ | `INTEGRATIONS_REFRESH_MS` (15 s) | re-reads `PlatformIntegration` rows so a key saved in the CRM reaches every process                                                                                                                                                                                                                                      |
 
 Jobs run as the member who created them, reloaded from the database, so their current role and
 project access apply ([ADR 0013](../adr/0013-background-jobs-and-file-storage.md)). Several workers
@@ -440,8 +489,10 @@ can run safely because rows are claimed with `SKIP LOCKED`.
 | `apps/api/src/interview/interview.service.ts`, `apps/api/src/quotas/quota-places.ts`  | respondent flow and atomic quota counting; mistakes overfill quotas or lose completes                                                        |
 | `packages/redirect-core/*`, `apps/api/src/integrations/*`                             | where respondents are sent and what vendors are paid for; status words must stay compatible ([sampledge-redirects](../modules/redirects.md)) |
 | `apps/api/src/auth/auth.guard.ts`, `common/access.service.ts`                         | every permission decision                                                                                                                    |
+| `apps/api/src/super-admin/features.ts` _(PR #41)_                                     | the route → feature map; a new route that is not added there is open to every plan, and a wrong pattern can lock a feature for everyone      |
+| `apps/mobile/src/lib/features.ts` _(PR #40)_                                          | must list the same feature keys as the server catalog (a test in `apps/mobile/test` checks it)                                               |
 | `apps/api/src/config.ts`                                                              | a new required variable stops every environment that lacks it                                                                                |
-| `apps/api/src/platform/secret-box.ts`, `JWT_SECRET`, `SECRETS_KEY`                    | changing the key makes stored vendor partner secrets, SSO secrets, webhook secrets and phone numbers unreadable                              |
+| `apps/api/src/platform/secret-box.ts`, `JWT_SECRET`, `SECRETS_KEY`                    | changing the key makes stored vendor partner secrets, SSO secrets, webhook secrets, phone numbers and CRM integration keys unreadable        |
 | `packages/db/prisma/schema.prisma` and `migrations/`                                  | never edit an applied migration; destructive changes need two releases                                                                       |
 | `apps/api/src/capi/capi.service.ts`                                                   | server replay of offline interviews; must accept data from older app versions still in the field                                             |
 | `apps/capi/public/sw.js`, `apps/capi/src/store.ts`                                    | offline cache and IndexedDB on interviewers' devices; a bad change can strand unsynced interviews                                            |

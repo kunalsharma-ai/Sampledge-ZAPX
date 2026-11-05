@@ -17,6 +17,34 @@ secret appears here; replace every `<…>` placeholder with your own value.
 If a value is invalid the API refuses to start with `Invalid configuration: NAME: message; …`.
 Start from `.env.example` (`cp .env.example .env`).
 
+## Integrations set in the CRM _(PR #38, unmerged)_
+
+From PR #38 the provider settings below no longer have to be environment variables. An administrator
+of the organization that runs the installation (or the super admin) enters them in the studio under
+**Settings → Integrations** (`/settings/integrations`), presses **Test**, and saves
+([ADR 0035](../adr/0035-integrations-in-the-crm.md)). They are stored in the `PlatformIntegration`
+table, secrets sealed with `SECRETS_KEY`.
+
+The on/off switch in the CRM replaces the environment switch once the integration has been saved
+there (`switchedOn = row ? row.enabled : envEnabled(config)` in `apps/api/src/platform/integrations.ts`).
+
+| Integration (key)       | Environment switch it replaces       | Fields, with the variable each falls back to                                                                                                                               |
+| ----------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude AI (`anthropic`) | `ANTHROPIC_API_KEY` + `AI_MODEL` set | `ANTHROPIC_API_KEY`, `AI_MODEL`, `AI_MODEL_ARCHITECT`, `AI_MODEL_TRANSLATE`, `AI_MODEL_INSIGHTS`, `AI_PRICING`                                                             |
+| IPinfo (`ipinfo`)       | `NETWORK_REPUTATION=ipinfo`          | `IPINFO_TOKEN`                                                                                                                                                             |
+| Deepgram (`deepgram`)   | `TRANSCRIPTION=deepgram`             | `DEEPGRAM_API_KEY`, `DEEPGRAM_MODEL`                                                                                                                                       |
+| Twilio (`twilio`)       | `TELEPHONY=twilio`                   | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_CALLER_ID`, `TELEPHONY_WEBHOOK_BASE` (SMS uses the same account; `SMS_PROVIDER` and `SMS_FROM` stay in the environment) |
+| Stripe (`stripe`)       | `BILLING=stripe`                     | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICES`, `STRIPE_API_VERSION`, `BILLING_FALLBACK_PLAN`                                                               |
+| File storage (`s3`)     | `FILE_STORE=s3`                      | `S3_BUCKET`, `S3_REGION`, `S3_PREFIX`, `S3_KMS_KEY_ID`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                                                       |
+
+Rules: a value saved in the CRM **wins**; a field left empty there falls back to the environment
+variable; **Reset** (`DELETE`) removes the saved row so the environment applies again. Each API and
+worker process re-reads the saved values every `INTEGRATIONS_REFRESH_MS` (default 15 000 ms). The
+field list comes from `INTEGRATIONS` in `apps/api/src/platform/integrations.ts`.
+SendGrid (`EMAIL_PROVIDER`, `SENDGRID_API_KEY`), SSO, `JWT_SECRET`, `SECRETS_KEY` and the database stay
+in the environment. The start-up checks in the next section still apply to whatever is set in the
+environment.
+
 ## Production safety checks
 
 With `NODE_ENV=production` the API also refuses to start when (`config.ts`, `superRefine`):
@@ -47,6 +75,8 @@ Provider switches are checked too: turning a provider on without its credentials
 | `COOKIE_SECURE`                                                                                | send the session cookie only over https                                                            | `true` in production            | `false`                    | `true`                                                    |
 | `ALLOW_SIGNUP`                                                                                 | allow self-service sign-up (creates a new organization)                                            | no                              | off unless `true`          | `false`                                                   |
 | `DEFAULT_PLAN`                                                                                 | plan for organizations created by sign-up                                                          | no                              | `enterprise`               | `free`                                                    |
+| `INTEGRATIONS_REFRESH_MS` _(PR #38)_                                                           | how often each process re-reads Settings → Integrations (1 000–600 000 ms)                         | no, default `15000`             |
+| `MOBILE_MIN_VERSION` _(PR #40)_                                                                | oldest mobile app version allowed to sign in, e.g. `1.2.0`; older apps are asked to update         | no, unset = any                 |
 | `DATA_REGION` _(PR #34)_                                                                       | region this deployment declares it keeps data in; compared with each organization's region         | no                              | empty                      | `eu`                                                      |
 
 ### Sign-in protection and proxies
@@ -157,10 +187,14 @@ S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS
 - **Fixed on branch `security-fixes`:** on AWS, `app_secret_keys` (`infra/terraform/variables.tf`)
   included `TWILIO_AUTH_TOKEN` but the example secret JSON in `infra/terraform/README.md` did not,
   and `SENDGRID_API_KEY` had no secret slot. Both now match (and a test checks it). Every key in
-  `app_secret_keys` must exist in the secret, empty if unused, or the tasks fail to start. PR #28
-  changes this area; re-check after it merges.
+  `app_secret_keys` must exist in the secret, empty if unused, or the tasks fail to start. With PR #38
+  the list itself is unchanged (`variables.tf` still lists all nine keys), but the Terraform README
+  now says provider keys can be entered in the CRM instead. **Needs Verification:** if you leave the
+  provider keys out of the secret, also remove them from `app_secret_keys`, or the tasks fail to start.
+- `ANTHROPIC_API_BASE` _(PR #38)_ exists only for tests (an Anthropic-compatible stand-in); leave it
+  at its default.
 
-## Super admin automation (ADR 0036)
+## Super admin automation _(PR #41, unmerged; [ADR 0036](../adr/0036-super-admin.md))_
 
 | Variable                 | Default | What it does                                                                 |
 | ------------------------ | ------- | ---------------------------------------------------------------------------- |
@@ -169,3 +203,11 @@ S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS
 
 The first super admin is made with `node apps/api/dist/cli/set-super-admin.js <email>` (the member must
 belong to the organization that runs the installation; see `set-operator.js`). Remove with `--remove`.
+
+## Mobile app settings _(PR #40, unmerged)_
+
+The mobile app has no environment file. The member types the server address (the studio address)
+on the sign-in screen. Build settings are in `apps/mobile/app.json` (name, icons, bundle id
+`com.sampledge.zapx`) and `apps/mobile/eas.json` (EAS build profiles). Store accounts and signing keys
+are not in the repository; see [docs/operations/mobile-release.md](../operations/mobile-release.md).
+On the server, `MOBILE_MIN_VERSION` sets the oldest app version allowed.
