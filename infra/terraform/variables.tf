@@ -93,7 +93,7 @@ variable "app_environment" {
 }
 
 variable "app_secret_keys" {
-  description = "Keys of the app secret (Secrets Manager JSON) passed to the API and worker. Values are set outside Terraform."
+  description = "Keys of the app secret (Secrets Manager JSON) passed to the API and worker. Values are set outside Terraform. Provider keys (Claude, Stripe, IPinfo, Deepgram, Twilio) are entered in the CRM under Settings > Integrations instead; add them here only to keep them in Secrets Manager."
   type        = list(string)
   default     = ["JWT_SECRET", "SECRETS_KEY", "ANTHROPIC_API_KEY", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "IPINFO_TOKEN", "DEEPGRAM_API_KEY", "TWILIO_AUTH_TOKEN", "SENDGRID_API_KEY"]
 }

@@ -18,6 +18,7 @@ import { z } from 'zod';
 import type { Prisma } from '@zapx/db';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
+import { integration } from '../platform/integrations';
 import type { AuthUser } from '../auth/auth.types';
 import { config } from '../config';
 import { CaptureService } from '../captures/capture.service';
@@ -52,13 +53,18 @@ export function readRetention(raw: unknown): Retention {
 export function externalProcessors() {
   const c = config();
   return [
-    { id: 'ai', name: 'AI (Anthropic Claude)', on: c.AI_PROVIDER === 'anthropic' && !!c.ANTHROPIC_API_KEY, blockable: true },
-    { id: 'transcription', name: 'Transcription (Deepgram)', on: c.TRANSCRIPTION === 'deepgram', blockable: true },
-    { id: 'network_reputation', name: 'Network reputation (IPinfo)', on: c.NETWORK_REPUTATION === 'ipinfo', blockable: true },
+    { id: 'ai', name: 'AI (Anthropic Claude)', on: integration('anthropic').enabled, blockable: true },
+    { id: 'transcription', name: 'Transcription (Deepgram)', on: integration('deepgram').enabled, blockable: true },
+    { id: 'network_reputation', name: 'Network reputation (IPinfo)', on: integration('ipinfo').enabled, blockable: true },
     { id: 'email', name: 'Email (SendGrid)', on: c.EMAIL_PROVIDER === 'sendgrid', blockable: false },
     { id: 'sms', name: 'SMS (Twilio)', on: c.SMS_PROVIDER === 'twilio', blockable: false },
-    { id: 'telephony', name: 'Phone dialer (Twilio)', on: c.TELEPHONY === 'twilio', blockable: false },
-    { id: 'file_store', name: `File storage (S3, ${c.S3_REGION})`, on: c.FILE_STORE === 's3', blockable: false },
+    { id: 'telephony', name: 'Phone dialer (Twilio)', on: integration('twilio').enabled, blockable: false },
+    {
+      id: 'file_store',
+      name: `File storage (S3, ${integration('s3').values.region ?? c.S3_REGION})`,
+      on: integration('s3').enabled,
+      blockable: false,
+    },
   ];
 }
 

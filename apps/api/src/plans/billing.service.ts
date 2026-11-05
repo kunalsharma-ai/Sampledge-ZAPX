@@ -15,6 +15,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../auth/auth.types';
@@ -65,13 +66,18 @@ export class BillingService {
     private readonly audit: AuditService,
   ) {}
 
+  /** On in Settings > Integrations (or BILLING=stripe until Stripe is saved there). */
   enabled() {
-    return config().BILLING === 'stripe';
+    return integration('stripe').enabled;
   }
 
   /** Plan code -> Stripe price ID, for the plans that can be bought. */
   private prices(): Partial<Record<PlanCode, string>> {
-    return config().STRIPE_PRICES;
+    try {
+      return JSON.parse(integration('stripe').values.prices || '{}') as Partial<Record<PlanCode, string>>;
+    } catch {
+      return {};
+    }
   }
 
   private planForPrice(priceId: string | undefined): PlanCode | null {
@@ -80,14 +86,14 @@ export class BillingService {
   }
 
   private async stripe<T>(method: 'GET' | 'POST', path: string, form?: Record<string, string>): Promise<T> {
-    const c = config();
-    if (!c.STRIPE_SECRET_KEY) throw new ServiceUnavailableException('Billing is not configured');
-    const res = await fetch(`${c.STRIPE_API_BASE.replace(/\/$/, '')}${path}`, {
+    const s = integration('stripe').values;
+    if (!s.secretKey) throw new ServiceUnavailableException('Billing is not configured');
+    const res = await fetch(`${config().STRIPE_API_BASE.replace(/\/$/, '')}${path}`, {
       method,
       headers: {
-        Authorization: `Bearer ${c.STRIPE_SECRET_KEY}`,
+        Authorization: `Bearer ${s.secretKey}`,
         ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
-        ...(c.STRIPE_API_VERSION ? { 'Stripe-Version': c.STRIPE_API_VERSION } : {}),
+        ...(s.apiVersion ? { 'Stripe-Version': s.apiVersion } : {}),
       },
       body: form ? new URLSearchParams(form) : undefined,
       signal: AbortSignal.timeout(15_000),
@@ -164,10 +170,10 @@ export class BillingService {
 
   /** A webhook from Stripe. Returns what was done, for the log and the tests. */
   async webhook(raw: Buffer | undefined, signature: string | undefined) {
-    const c = config();
-    if (!this.enabled() || !c.STRIPE_WEBHOOK_SECRET) throw new NotFoundException();
+    const secret = integration('stripe').values.webhookSecret;
+    if (!this.enabled() || !secret) throw new NotFoundException();
     if (!raw) throw new StripeSignatureError('no body');
-    verifyStripeSignature(raw, signature, c.STRIPE_WEBHOOK_SECRET);
+    verifyStripeSignature(raw, signature, secret);
     const event = JSON.parse(raw.toString('utf8')) as StripeEvent;
     if (!event?.id || !event.type) throw new BadRequestException('Not a Stripe event');
     const seen = await this.prisma.billingEvent.findUnique({ where: { id: event.id } });
@@ -221,7 +227,7 @@ export class BillingService {
     const item = sub.items?.data?.[0];
     const paidPlan = this.planForPrice(item?.price?.id);
     const before = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
-    const fallback = config().BILLING_FALLBACK_PLAN;
+    const fallback = (integration('stripe').values.fallbackPlan || config().BILLING_FALLBACK_PLAN) as PlanCode;
     const plan = PAID_STATUSES.has(sub.status) ? (paidPlan ?? before.plan) : fallback;
     const periodEnd = sub.current_period_end ?? item?.current_period_end;
     await this.prisma.tenant.update({
@@ -234,7 +240,9 @@ export class BillingService {
         to: plan,
         status: sub.status,
         subscription: sub.id,
-        ...(paidPlan || !PAID_STATUSES.has(sub.status) ? {} : { warning: `price ${item?.price?.id} is not in STRIPE_PRICES` }),
+        ...(paidPlan || !PAID_STATUSES.has(sub.status)
+          ? {}
+          : { warning: `price ${item?.price?.id} is not one of the plan prices in Settings > Integrations` }),
       });
     }
     return `${sub.status}: plan ${before.plan} -> ${plan}`;

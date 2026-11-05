@@ -12,6 +12,7 @@
  */
 import { Injectable, Logger } from '@nestjs/common';
 import { config } from '../config';
+import { integration } from '../platform/integrations';
 import { PrismaService } from '../common/prisma.service';
 import { FileStore } from '../jobs/file-store';
 
@@ -86,11 +87,18 @@ export class TranscriptionService {
     this.provider = p;
   }
 
+  /** Built from Settings > Integrations (or TRANSCRIPTION and DEEPGRAM_*), rebuilt when they change. */
+  private built?: { fingerprint: string; provider: SpeechToTextProvider | null };
+
   current(): SpeechToTextProvider | null {
     if (this.provider !== undefined) return this.provider;
-    const c = config();
-    this.provider = c.TRANSCRIPTION === 'deepgram' ? new DeepgramProvider(c.DEEPGRAM_API_KEY, c.DEEPGRAM_MODEL, c.DEEPGRAM_API_BASE) : null;
-    return this.provider;
+    const s = integration('deepgram');
+    if (this.built?.fingerprint !== s.fingerprint)
+      this.built = {
+        fingerprint: s.fingerprint,
+        provider: s.enabled ? new DeepgramProvider(s.values.apiKey!, s.values.model!, config().DEEPGRAM_API_BASE) : null,
+      };
+    return this.built.provider;
   }
 
   /** Transcribe one recording and store the text. Throws TranscriptionError with a readable reason. */
