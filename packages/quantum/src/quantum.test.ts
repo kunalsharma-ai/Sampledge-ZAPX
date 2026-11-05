@@ -11,6 +11,7 @@ import {
   resolveTheme,
   sanitizeAppearance,
   validateAppearance,
+  appearanceFor,
   type Appearance,
 } from './index';
 
@@ -118,5 +119,17 @@ describe('appearance settings', () => {
     expect(validateAppearance({ preset: 'neon' })).toEqual(['preset is not a known theme']);
     expect(validateAppearance({ glass: -1, accent: 'blue', hack: true })).toHaveLength(3);
     expect(validateAppearance([])).toHaveLength(1);
+  });
+
+  it('keeps per-area theme families (blueprint phase 5)', () => {
+    const a = sanitizeAppearance({ preset: 'neon-ai', modules: { analysis: 'arctic-glass', settings: 'nope', bogus: 'cyber-pulse' } });
+    expect(a.modules).toEqual({ analysis: 'arctic-glass' });
+    expect(appearanceFor(a, 'analysis').preset).toBe('arctic-glass');
+    expect(appearanceFor(a, 'analysis').mode).toBe(a.mode);
+    expect(appearanceFor(a, 'build')).toBe(a);
+    expect(appearanceFor(a, null)).toBe(a);
+    expect(sanitizeAppearance({ preset: 'neon-ai' })).not.toHaveProperty('modules');
+    expect(validateAppearance({ modules: { analysis: 'arctic-glass' } })).toEqual([]);
+    expect(validateAppearance({ modules: { analysis: 'x', y: 'neon-ai' } })).toHaveLength(2);
   });
 });

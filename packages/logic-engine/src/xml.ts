@@ -258,6 +258,8 @@ export function toZapxXml(def: SurveyDefinition): string {
     if (r.otherwise) out += `    <otherwise${attr('code', r.otherwise.code)}${attr('label', r.otherwise.label)}/>\n`;
     out += `  </recode>\n`;
   }
+  for (const c of def.cleaning ?? [])
+    out += `  <clean${attr('id', c.id)}${attr('label', c.label)}${attr('question', c.target)}${attr('action', c.action)}${attr('value', c.value)}${attr('method', c.method)}>${c.when ? esc(c.when) : ''}</clean>\n`;
   for (const p of def.pages) {
     out += `  <page${attr('id', p.id)}${attr('title', p.title)}${attr('cond', p.condition)}>\n`;
     for (const q of p.questions) out += questionXml(q, '    ');
@@ -414,6 +416,7 @@ export function fromZapxXml(src: string): XmlReadResult {
   def.variables = [];
   def.urlVariables = [];
   def.recodes = [];
+  def.cleaning = [];
   for (const el of elements(root)) {
     switch (el.name) {
       case 'welcome':
@@ -479,6 +482,18 @@ export function fromZapxXml(src: string): XmlReadResult {
           else unexpected(g, '<recode>');
         }
         (def.recodes as unknown[]).push(rc);
+        break;
+      }
+      case 'clean': {
+        // The target question is written as question="..." (target="" is a quota's number elsewhere).
+        const { question, ...rest } = el.attrs;
+        const c = attrsTo({ ...el, attrs: rest }, new Set(['id', 'label', 'action', 'value', 'method']));
+        if (question !== undefined) c.target = question;
+        const when = textOf(el).trim();
+        if (when) c.when = when;
+        // A number-looking value is a number (a code or an amount); quote-free text stays text.
+        if (typeof c.value === 'string' && /^-?\d+(\.\d+)?$/.test(c.value)) c.value = Number(c.value);
+        (def.cleaning as unknown[]).push(c);
         break;
       }
       case 'variable':

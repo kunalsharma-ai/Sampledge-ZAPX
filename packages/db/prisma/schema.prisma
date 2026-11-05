@@ -119,26 +119,36 @@ enum CallbackState {
 }
 
 model Tenant {
-  id                    String          @id @default(cuid())
-  name                  String
+  id                      String          @id @default(cuid())
+  name                    String
   /// Organization-level redirect defaults: {urls, words, countries} (lowest precedence).
-  redirectDefaults      Json            @default("{}")
+  redirectDefaults        Json            @default("{}")
   /// Plan code (Milestone 8): free, team, business or enterprise. Limits live in code (plans.ts).
-  plan                  String          @default("enterprise")
+  plan                    String          @default("enterprise")
   /// Billing (Milestone 13): the Stripe customer and subscription behind the plan, when billing is on.
-  billingCustomerId     String?         @unique
-  billingSubscriptionId String?
+  billingCustomerId       String?         @unique
+  billingSubscriptionId   String?
   /// Stripe subscription status (active, trialing, past_due, canceled, ...).
-  billingStatus         String?
-  billingPeriodEnd      DateTime?
+  billingStatus           String?
+  billingPeriodEnd        DateTime?
   /// Quantum Design System: the organization's default appearance for members who have not chosen their own.
-  appearanceDefaults    Json            @default("{}")
-  createdAt             DateTime        @default(now())
-  users                 User[]
-  projects              Project[]
-  aiPolicy              TenantAiPolicy?
-  sso                   TenantSso?
-  scim                  TenantScim?
+  appearanceDefaults      Json            @default("{}")
+  /// Blueprint phase 5: saved workspace presets, [{id, name, appearance, modules}], shared with members.
+  appearancePresets       Json            @default("[]")
+  /// Blueprint phase 5: the region the organization's data must stay in (e.g. "eu"), checked
+  /// against the deployment's DATA_REGION; null when the organization has not set one.
+  dataRegion              String?
+  /// Blueprint phase 5: when on, features that send data to a processor outside the deployment
+  /// (AI, transcription) are refused for this organization.
+  blockExternalProcessors Boolean         @default(false)
+  /// Blueprint phase 5: retention policy {responsesDays?, capturesDays?, contactsDays?} (null: keep).
+  retention               Json            @default("{}")
+  createdAt               DateTime        @default(now())
+  users                   User[]
+  projects                Project[]
+  aiPolicy                TenantAiPolicy?
+  sso                     TenantSso?
+  scim                    TenantScim?
 }
 
 /// Single sign-on for one organization: OpenID Connect (Milestone 8) or SAML 2.0 (Milestone 13).
@@ -442,7 +452,10 @@ model Response {
   /// Blueprint phase 3, CAPI: {pageTimes: [{pageId, shownAt, ms}], interruptions: {count, totalMs, log}, geofence}.
   evidence     Json?
   /// Blueprint phase 4: the quotas this complete was counted toward (least-fill groups pick one), released on reject.
-  quotaCells   String[]     @default([])
+  quotaCells   String[]  @default([])
+  /// Blueprint phase 5: when the retention policy erased this interview's answers and identifiers.
+  /// The row stays (status, timings, counts), but analyses and exports leave it out.
+  erasedAt     DateTime?
 
   @@unique([surveyId, vendorId, uid])
   @@index([surveyId, reviewState])
@@ -1161,7 +1174,10 @@ model Contact {
   id             String    @id @default(cuid())
   tenantId       String
   surveyId       String
-  email          String
+  /// Email or phone (or both); blueprint phase 5 adds phone for SMS invitations.
+  email          String?
+  /// E.164, e.g. +447700900123.
+  phone          String?
   name           String?
   language       String?
   /// Extra columns from the import, passed to the survey as link parameters (e.g. region, panel id).
@@ -1170,6 +1186,7 @@ model Contact {
   createdAt      DateTime  @default(now())
 
   @@unique([surveyId, email])
+  @@unique([surveyId, phone])
   @@index([tenantId])
 }
 
@@ -1181,23 +1198,30 @@ enum DistributionState {
 }
 
 /// One email invitation wave: who, when, the message, and reminders to people who have not finished.
+enum DistributionChannel {
+  EMAIL
+  SMS
+}
+
 model Distribution {
-  id              String            @id @default(cuid())
+  id              String              @id @default(cuid())
   tenantId        String
   surveyId        String
   name            String
+  /// Blueprint phase 5: email (subject + body) or SMS (body only).
+  channel         DistributionChannel @default(EMAIL)
   subject         String
   /// Plain text; [link] becomes the person's own survey link, [name] their name, [unsubscribe] the opt-out link.
   body            String
   sendAt          DateTime
   /// Remind people who have not completed this many days after the last email (0 = no reminders).
-  reminderDays    Int               @default(0)
-  maxReminders    Int               @default(0)
+  reminderDays    Int                 @default(0)
+  maxReminders    Int                 @default(0)
   reminderSubject String?
-  state           DistributionState @default(SCHEDULED)
+  state           DistributionState   @default(SCHEDULED)
   createdById     String
   sentAt          DateTime?
-  createdAt       DateTime          @default(now())
+  createdAt       DateTime            @default(now())
   invitations     Invitation[]
 
   @@index([surveyId])
@@ -1229,4 +1253,85 @@ model Invitation {
 
   @@unique([distributionId, contactId])
   @@index([nextReminderAt])
+}
+
+// ---- Blueprint phase 5: automation, notifications, retention -------------------------------------
+
+/// An automation rule: when the trigger happens (a survey event or a schedule) and every condition
+/// holds, run the actions, or hold them for an administrator's approval first.
+model AutomationRule {
+  id               String          @id @default(cuid())
+  tenantId         String
+  name             String
+  enabled          Boolean         @default(true)
+  /// Only events of this survey (required for schedules). Null: every survey in the organization.
+  surveyId         String?
+  /// A webhook event name (response.finished, quota.full, ...) or "schedule".
+  trigger          String
+  /// For schedules: {every: "hour" | "day" | "week", at?: "HH:MM" (UTC), weekday?: 0-6}.
+  schedule         Json?
+  /// [{field, op, value}], all must hold. Fields: event.<key> or metrics.<name>.
+  conditions       Json            @default("[]")
+  /// [{type: "notify" | "email" | "webhook" | "set_survey_status", ...}]
+  actions          Json
+  requiresApproval Boolean         @default(false)
+  /// The rule fires at most once in this many minutes (0: every time).
+  cooldownMinutes  Int             @default(0)
+  nextRunAt        DateTime?
+  lastFiredAt      DateTime?
+  createdById      String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  runs             AutomationRun[]
+
+  @@index([tenantId, trigger])
+  @@index([nextRunAt])
+}
+
+enum AutomationRunState {
+  PENDING
+  AWAITING_APPROVAL
+  RUNNING
+  DONE
+  SKIPPED
+  REJECTED
+  FAILED
+}
+
+/// One firing of a rule: the event it saw, whether its conditions held, and what each action did.
+model AutomationRun {
+  id          String             @id @default(cuid())
+  tenantId    String
+  ruleId      String
+  rule        AutomationRule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  event       String
+  data        Json
+  state       AutomationRunState @default(PENDING)
+  /// Why it was skipped, or the condition values seen.
+  note        String?
+  /// [{type, ok, detail}] per action.
+  results     Json?
+  decidedById String?
+  decidedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([state, createdAt])
+  @@index([ruleId, createdAt])
+  @@index([tenantId, state])
+}
+
+/// An in-app notification for one member.
+model Notification {
+  id        String    @id @default(cuid())
+  tenantId  String
+  userId    String
+  title     String
+  body      String
+  /// A studio path to open, e.g. /surveys/abc?tab=automation.
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
 }

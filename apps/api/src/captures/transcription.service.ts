@@ -97,6 +97,9 @@ export class TranscriptionService {
   async transcribe(tenantId: string, captureId: string): Promise<Transcript> {
     const provider = this.current();
     if (!provider) throw new TranscriptionError('Transcription is not turned on for this installation.');
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { blockExternalProcessors: true } });
+    if (tenant?.blockExternalProcessors)
+      throw new TranscriptionError('Your organization keeps data inside this deployment, so transcription (an outside service) is off.');
     const c = await this.prisma.capture.findFirst({
       where: { id: captureId, tenantId, kind: 'audio', deletedAt: null },
       include: { response: { select: { language: true } } },

@@ -3,11 +3,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   DEFAULT_APPEARANCE,
   THEME_CACHE_KEY,
+  appearanceFor,
   buildThemeCache,
   resolveTheme,
   sanitizeAppearance,
   type Appearance,
   type Environment,
+  type ModuleId,
   type ResolvedTheme,
   type ThemeCache,
 } from '@zapx/quantum';
@@ -28,6 +30,9 @@ interface ThemeContextValue {
   resetToOrganization: () => Promise<void>;
   /** Admins: make `a` the organization default, or clear it with null. */
   setOrganizationDefault: (a: Appearance | null) => Promise<void>;
+  /** Blueprint phase 5: the studio area on screen (its own theme family applies when one is set). */
+  module: ModuleId | null;
+  setModule: (m: ModuleId | null) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -50,14 +55,15 @@ function readCache(): Appearance | null {
   }
 }
 
-function apply(a: Appearance, env: Environment): ResolvedTheme {
+/** Paints `a`; caches `base` for the boot script, so a reload starts from the member's main theme. */
+function apply(a: Appearance, env: Environment, base: Appearance = a): ResolvedTheme {
   const t = resolveTheme(a, env);
   const root = document.documentElement;
   for (const [k, v] of Object.entries(t.vars)) root.style.setProperty(k, v);
   for (const [k, v] of Object.entries(t.attrs)) root.setAttribute(k, v);
   root.style.colorScheme = t.scheme;
   try {
-    localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(buildThemeCache(a, env.prefersReducedMotion)));
+    localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(buildThemeCache(base, env.prefersReducedMotion)));
   } catch {
     // Private browsing or storage full: the theme still applies for this page.
   }
@@ -80,6 +86,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [source, setSource] = useState<AppearanceSource>('default');
   const [organizationDefault, setOrgDefault] = useState<Appearance | null>(null);
   const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [module, setModule] = useState<ModuleId | null>(null);
   const signedIn = useRef(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -125,10 +132,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const resolved = useMemo(() => resolveTheme(appearance, env), [appearance, env]);
+  const effective = useMemo(() => appearanceFor(appearance, module), [appearance, module]);
+  const resolved = useMemo(() => resolveTheme(effective, env), [effective, env]);
   useEffect(() => {
-    apply(appearance, env);
-  }, [appearance, env]);
+    apply(effective, env, appearance);
+  }, [effective, appearance, env]);
 
   const current = useRef(appearance);
   current.current = appearance;
@@ -172,8 +180,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<ThemeContextValue>(
-    () => ({ appearance, resolved, source, organizationDefault, saveState, update, resetToOrganization, setOrganizationDefault }),
-    [appearance, resolved, source, organizationDefault, saveState, update, resetToOrganization, setOrganizationDefault],
+    () => ({
+      appearance,
+      resolved,
+      source,
+      organizationDefault,
+      saveState,
+      update,
+      resetToOrganization,
+      setOrganizationDefault,
+      module,
+      setModule,
+    }),
+    [appearance, resolved, source, organizationDefault, saveState, update, resetToOrganization, setOrganizationDefault, module],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -188,4 +207,15 @@ export function useTheme(): ThemeContextValue {
 export function useFullMotion(): boolean {
   const ctx = useContext(ThemeContext);
   return ctx ? ctx.resolved.attrs['data-q-motion'] === 'full' : false;
+}
+
+/** Blueprint phase 5: mark the studio area this page shows, so its own theme family (if any) applies. */
+export function useThemeModule(m: ModuleId | null) {
+  const ctx = useContext(ThemeContext);
+  const set = ctx?.setModule;
+  useEffect(() => {
+    if (!set) return;
+    set(m);
+    return () => set(null);
+  }, [set, m]);
 }

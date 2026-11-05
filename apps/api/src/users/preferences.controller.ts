@@ -1,4 +1,17 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Put } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@zapx/db';
 import { sanitizeAppearance, validateAppearance, type Appearance } from '@zapx/quantum';
 import { PrismaService } from '../common/prisma.service';
@@ -86,4 +99,62 @@ export class PreferencesController {
     await this.prisma.tenant.update({ where: { id: user.tenantId }, data: { appearanceDefaults: {} } });
     await this.audit.record(user, 'tenant.appearance_default_cleared', 'tenant', user.tenantId);
   }
+
+  // ---- Blueprint phase 5: workspace presets ------------------------------------------------------
+  // Named appearances (theme, mode, per-area families...) an administrator saves for everyone to pick.
+
+  private async presets(tenantId: string): Promise<WorkspacePreset[]> {
+    const t = await this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { appearancePresets: true } });
+    return (Array.isArray(t.appearancePresets) ? t.appearancePresets : []).flatMap((p) => {
+      const o = p as Partial<WorkspacePreset> | null;
+      return o && typeof o.id === 'string' && typeof o.name === 'string'
+        ? [{ id: o.id, name: o.name, appearance: sanitizeAppearance(o.appearance), createdAt: String(o.createdAt ?? '') }]
+        : [];
+    });
+  }
+
+  @Get('tenant/appearance-presets')
+  list(@CurrentUser() user: AuthUser) {
+    return this.presets(user.tenantId);
+  }
+
+  @Post('tenant/appearance-presets')
+  @Roles('ADMIN')
+  async addPreset(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const name = typeof (body as { name?: unknown })?.name === 'string' ? (body as { name: string }).name.trim() : '';
+    if (!name || name.length > 60) throw new BadRequestException('Give the preset a name (up to 60 characters)');
+    const appearance = checked(body);
+    const list = await this.presets(user.tenantId);
+    if (list.length >= MAX_PRESETS) throw new BadRequestException(`An organization can keep ${MAX_PRESETS} presets; delete one first`);
+    if (list.some((p) => p.name.toLowerCase() === name.toLowerCase())) throw new BadRequestException('A preset with this name exists');
+    const preset: WorkspacePreset = { id: randomUUID(), name, appearance, createdAt: new Date().toISOString() };
+    await this.prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: { appearancePresets: [...list, preset] as unknown as Prisma.InputJsonValue },
+    });
+    await this.audit.record(user, 'tenant.appearance_preset_add', 'tenant', user.tenantId, { name, preset: appearance.preset });
+    return preset;
+  }
+
+  @Delete('tenant/appearance-presets/:id')
+  @Roles('ADMIN')
+  @HttpCode(204)
+  async deletePreset(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    const list = await this.presets(user.tenantId);
+    const gone = list.find((p) => p.id === id);
+    if (!gone) throw new NotFoundException('Preset not found');
+    await this.prisma.tenant.update({
+      where: { id: user.tenantId },
+      data: { appearancePresets: list.filter((p) => p.id !== id) as unknown as Prisma.InputJsonValue },
+    });
+    await this.audit.record(user, 'tenant.appearance_preset_delete', 'tenant', user.tenantId, { name: gone.name });
+  }
+}
+
+const MAX_PRESETS = 20;
+interface WorkspacePreset {
+  id: string;
+  name: string;
+  appearance: Appearance;
+  createdAt: string;
 }

@@ -13,8 +13,8 @@ export interface OutgoingEmail {
   to: { email: string; name?: string | null };
   subject: string;
   text: string;
-  /** One-click unsubscribe (RFC 8058): the List-Unsubscribe URL that accepts a POST. */
-  unsubscribeUrl: string;
+  /** One-click unsubscribe (RFC 8058): the List-Unsubscribe URL that accepts a POST. Not set for emails to members. */
+  unsubscribeUrl?: string;
 }
 
 export class EmailError extends Error {}
@@ -41,7 +41,9 @@ export class SendGridProvider implements EmailProvider {
         from: this.from,
         subject: mail.subject,
         content: [{ type: 'text/plain', value: mail.text }],
-        headers: { 'List-Unsubscribe': `<${mail.unsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' },
+        ...(mail.unsubscribeUrl
+          ? { headers: { 'List-Unsubscribe': `<${mail.unsubscribeUrl}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } }
+          : {}),
       }),
       signal,
     }).catch((e: Error) => {

@@ -1,8 +1,9 @@
 'use client';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { Crosstab, Frequency, RakeResult, Variable } from '@zapx/analysis-core';
+import type { AnswerFilter, Crosstab, Frequency, RakeResult, Variable } from '@zapx/analysis-core';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { Donut, ShareBars } from './neon/Charts';
 
 type Status = 'COMPLETE' | 'TERMINATE' | 'QUOTA_FULL' | 'QUALITY_FAIL' | 'PARTIAL' | 'IN_PROGRESS';
 type Mode = 'CAWI' | 'CAPI' | 'CATI';
@@ -13,6 +14,13 @@ interface Filters {
   modes?: Mode[];
   from?: string;
   to?: string;
+  /** Blueprint phase 5: segment on answers. */
+  answers?: AnswerFilter[];
+}
+type Chart = 'bar' | 'column' | 'donut' | 'kpi';
+interface Tile {
+  variable: string;
+  chart: Chart;
 }
 interface Weighting {
   dimensions: Array<{ variable: string; targets: Array<{ code: number | string; pct: number }> }>;
@@ -22,16 +30,24 @@ interface Weighting {
 type WeightingSummary = Omit<RakeResult, 'weights'>;
 type ReportConfig =
   | { type: 'frequencies'; filters: Filters; weighting?: Weighting; variables?: string[] }
-  | { type: 'crosstab'; filters: Filters; weighting?: Weighting; banner: string; stubs: string[]; confidence: 0.9 | 0.95 | 0.99 };
+  | { type: 'crosstab'; filters: Filters; weighting?: Weighting; banner: string; stubs: string[]; confidence: 0.9 | 0.95 | 0.99 }
+  | { type: 'dashboard'; filters: Filters; weighting?: Weighting; tiles: Tile[] };
 interface Report {
   id: string;
   name: string;
   config: ReportConfig;
   updatedAt: string;
 }
+interface ResultMeta {
+  total: number;
+  weighting: WeightingSummary | null;
+  segment?: string | null;
+  cleaning?: { changed: Record<string, number>; imputed: Record<string, number | string | null> } | null;
+}
 type Result =
-  | { total: number; weighting: WeightingSummary | null; frequencies: Frequency[] }
-  | { total: number; weighting: WeightingSummary | null; tables: Crosstab[] };
+  | (ResultMeta & { frequencies: Frequency[] })
+  | (ResultMeta & { tables: Crosstab[] })
+  | (ResultMeta & { tiles: Array<{ variable: string; label: string; chart: Chart; frequency: Frequency }> });
 const NO_WEIGHTING: Weighting = { dimensions: [], minWeight: 0.2, maxWeight: 5 };
 
 const STATUS_OPTIONS: Array<[Status, string]> = [
@@ -56,7 +72,15 @@ function cleanFilters(f: Filters): Filters {
     ...(f.modes?.length ? { modes: f.modes } : {}),
     ...(f.from ? { from: f.from } : {}),
     ...(f.to ? { to: `${f.to}${f.to.length === 10 ? 'T23:59:59.999Z' : ''}` } : {}),
+    ...(f.answers?.length ? { answers: f.answers } : {}),
   };
+}
+
+/** A sensible first chart for a variable on a dashboard. */
+function defaultChart(v: Variable): Chart {
+  if (v.kind === 'numeric') return 'kpi';
+  if (v.kind === 'single' && v.categories.length <= 6) return 'donut';
+  return v.kind === 'scale' ? 'column' : 'bar';
 }
 
 /**
@@ -66,7 +90,8 @@ function cleanFilters(f: Filters): Filters {
 export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: boolean }) {
   const [vars, setVars] = useState<Variable[] | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
-  const [kind, setKind] = useState<'frequencies' | 'crosstab'>('frequencies');
+  const [kind, setKind] = useState<'frequencies' | 'crosstab' | 'dashboard'>('frequencies');
+  const [charts, setCharts] = useState<Record<string, Chart>>({});
   const [picked, setPicked] = useState<string[]>([]);
   const [banner, setBanner] = useState('');
   const [confidence, setConfidence] = useState<0.9 | 0.95 | 0.99>(0.95);
@@ -95,29 +120,39 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
 
   const bannerOptions = useMemo(() => (vars ?? []).filter((v) => v.kind === 'single' || v.kind === 'multi' || v.kind === 'scale'), [vars]);
   const stubOptions = useMemo(
-    () => (vars ?? []).filter((v) => (kind === 'crosstab' ? v.kind !== 'open' && v.id !== banner : true)),
+    () =>
+      (vars ?? []).filter((v) =>
+        kind === 'crosstab' ? v.kind !== 'open' && v.id !== banner : kind === 'dashboard' ? v.kind !== 'open' : true,
+      ),
     [vars, kind, banner],
   );
 
   const activeWeighting = weighting.dimensions.length ? { weighting } : {};
+  const tiles = (): Tile[] =>
+    (picked.length ? picked : stubOptions.filter((v) => v.source === 'question').map((v) => v.id)).slice(0, 24).map((id) => {
+      const v = vars?.find((x) => x.id === id);
+      return { variable: id, chart: charts[id] ?? (v ? defaultChart(v) : 'bar') };
+    });
   const config = (): ReportConfig =>
-    kind === 'crosstab'
-      ? {
-          type: 'crosstab',
-          filters: cleanFilters(filters),
-          ...activeWeighting,
-          banner,
-          stubs: picked.length ? picked.filter((p) => p !== banner) : stubOptions.filter((v) => v.source !== 'system').map((v) => v.id),
-          confidence,
-        }
-      : { type: 'frequencies', filters: cleanFilters(filters), ...activeWeighting, ...(picked.length ? { variables: picked } : {}) };
+    kind === 'dashboard'
+      ? { type: 'dashboard', filters: cleanFilters(filters), ...activeWeighting, tiles: tiles() }
+      : kind === 'crosstab'
+        ? {
+            type: 'crosstab',
+            filters: cleanFilters(filters),
+            ...activeWeighting,
+            banner,
+            stubs: picked.length ? picked.filter((p) => p !== banner) : stubOptions.filter((v) => v.source !== 'system').map((v) => v.id),
+            confidence,
+          }
+        : { type: 'frequencies', filters: cleanFilters(filters), ...activeWeighting, ...(picked.length ? { variables: picked } : {}) };
 
   const run = async (cfg = config()) => {
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const path = cfg.type === 'crosstab' ? 'crosstab' : 'frequencies';
+      const path = cfg.type === 'crosstab' ? 'crosstab' : cfg.type === 'dashboard' ? 'dashboard' : 'frequencies';
       const { type: _t, ...body } = cfg;
       setResult(await api<Result>(`/surveys/${surveyId}/analysis/${path}`, { body }));
     } catch (e) {
@@ -143,6 +178,9 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
       setBanner(c.banner);
       setPicked(c.stubs);
       setConfidence(c.confidence);
+    } else if (c.type === 'dashboard') {
+      setPicked(c.tiles.map((t) => t.variable));
+      setCharts(Object.fromEntries(c.tiles.map((t) => [t.variable, t.chart])));
     } else setPicked(c.variables ?? []);
     void run(c);
   };
@@ -190,7 +228,9 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
                   <button className="link" onClick={() => apply(r)}>
                     {r.name}
                   </button>
-                  <span className="small muted">{r.config.type === 'crosstab' ? 'Crosstab' : 'Frequencies'}</span>
+                  <span className="small muted">
+                    {r.config.type === 'crosstab' ? 'Crosstab' : r.config.type === 'dashboard' ? 'Dashboard' : 'Frequencies'}
+                  </span>
                   <span className="row" style={{ gap: 4 }}>
                     <a className="small" href={`/api/reports/${r.id}/export.xlsx`} aria-label={`Download ${r.name} as Excel`}>
                       Excel
@@ -272,6 +312,7 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
             />
             Include interviews rejected in quality review
           </label>
+          <SegmentBuilder vars={vars} value={filters.answers ?? []} onChange={(answers) => setFilters((f) => ({ ...f, answers }))} />
         </section>
 
         <WeightingPanel surveyId={surveyId} vars={vars} filters={filters} weighting={weighting} onChange={setWeighting} />
@@ -285,6 +326,7 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
                 [
                   ['frequencies', 'Frequencies'],
                   ['crosstab', 'Crosstab'],
+                  ['dashboard', 'Dashboard'],
                 ] as const
               ).map(([k, label]) => (
                 <button key={k} role="radio" aria-checked={kind === k} onClick={() => setKind(k)}>
@@ -317,7 +359,8 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
           </div>
           <fieldset className="plain">
             <legend className="small muted">
-              {kind === 'crosstab' ? 'Rows (stubs)' : 'Questions'}: {picked.length ? `${picked.length} chosen` : 'all questions'}
+              {kind === 'crosstab' ? 'Rows (stubs)' : kind === 'dashboard' ? 'Charts' : 'Questions'}:{' '}
+              {picked.length ? `${picked.length} chosen` : 'all questions'}
               {picked.length ? (
                 <button className="link small" onClick={() => setPicked([])}>
                   Clear
@@ -331,6 +374,21 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
                   <span className="mono small">{v.id}</span>
                   <span className="ellipsis">{v.label}</span>
                   {v.source === 'derived' ? <span className="badge small">derived</span> : null}
+                  {v.cleanedBy?.length ? <span className="badge small">cleaned</span> : null}
+                  {kind === 'dashboard' && picked.includes(v.id) ? (
+                    <select
+                      aria-label={`Chart for ${v.id}`}
+                      className="small"
+                      value={charts[v.id] ?? defaultChart(v)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setCharts((c) => ({ ...c, [v.id]: e.target.value as Chart }))}
+                    >
+                      <option value="bar">Bars</option>
+                      <option value="column">Columns</option>
+                      <option value="donut">Donut</option>
+                      <option value="kpi">Number</option>
+                    </select>
+                  ) : null}
                 </label>
               ))}
             </div>
@@ -384,6 +442,21 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
               ) : (
                 'unweighted'
               )}
+              {result.segment ? (
+                <>
+                  {' '}
+                  · <strong data-testid="segment-note">segment: {result.segment}</strong>
+                </>
+              ) : null}
+              {result.cleaning ? (
+                <span data-testid="cleaning-note">
+                  {' '}
+                  · cleaning rules applied:{' '}
+                  {Object.entries(result.cleaning.changed)
+                    .map(([id, n]) => `${id} (${n} changed)`)
+                    .join(', ')}
+                </span>
+              ) : null}
               {'tables' in result && result.tables[0]
                 ? ` · letters mark a column significantly higher than the column with that letter, at ${Math.round(result.tables[0].confidence * 100)}% confidence; columns with a base under ${result.tables[0].minBase} are not tested`
                 : ''}
@@ -393,6 +466,13 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
               ? result.frequencies.map((f) => <FrequencyCard key={f.variable.id} f={f} />)
               : null}
             {result.total > 0 && 'tables' in result ? result.tables.map((t) => <CrosstabTable key={t.stub.id} t={t} />) : null}
+            {result.total > 0 && 'tiles' in result ? (
+              <div className="nx-dash-grid" data-testid="dashboard-tiles">
+                {result.tiles.map((t) => (
+                  <DashboardTile key={t.variable} tile={t} />
+                ))}
+              </div>
+            ) : null}
           </section>
         ) : null}
       </div>
@@ -402,6 +482,12 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
 
 /** Where a derived variable comes from: recode source or formula, then what that uses. */
 function Lineage({ v }: { v: Variable }) {
+  if (v.cleanedBy?.length && v.source !== 'derived')
+    return (
+      <p className="small muted" data-testid={`cleaned-${v.id}`}>
+        Cleaned by {v.cleanedBy.join(', ')} (the stored answers are unchanged)
+      </p>
+    );
   if (v.source !== 'derived' || !v.derivation) return null;
   return (
     <p className="small muted" data-testid={`lineage-${v.id}`}>
@@ -759,5 +845,169 @@ function WeightingPanel({
       ) : null}
       <ErrorNote error={error} />
     </section>
+  );
+}
+
+const VIZ = ['var(--viz-1)', 'var(--viz-2)', 'var(--viz-3)', 'var(--viz-4)'];
+
+/** Blueprint phase 5: one dashboard chart. Shares are of people who answered (weighted when weighting is on). */
+function DashboardTile({ tile }: { tile: { variable: string; label: string; chart: Chart; frequency: Frequency } }) {
+  const f = tile.frequency;
+  const rows = f.rows.map((r) => ({ key: String(r.code), label: r.label, value: r.count, pct: r.pct }));
+  const base = f.base;
+  return (
+    <article className="panel nx-dash-tile" data-testid={`tile-${tile.variable}`}>
+      <h3 className="small">
+        <span className="mono">{tile.variable}</span> {tile.label}
+      </h3>
+      {tile.chart === 'kpi' ? (
+        <div className="nx-kpi-big">
+          {f.stats ? (
+            <>
+              <b>{fmt(f.stats.mean, 1)}</b>
+              <span className="muted small">mean of {f.unweightedBase.toLocaleString()} answers</span>
+            </>
+          ) : rows.length ? (
+            <>
+              <b>{fmt([...rows].sort((a, b) => b.pct - a.pct)[0]!.pct, 0)}%</b>
+              <span className="muted small">{[...rows].sort((a, b) => b.pct - a.pct)[0]!.label}</span>
+            </>
+          ) : (
+            <span className="muted">No answers</span>
+          )}
+        </div>
+      ) : tile.chart === 'donut' && rows.length ? (
+        <Donut
+          slices={rows.map((r, i) => ({ key: r.key, label: r.label, value: r.value, color: VIZ[i % VIZ.length]! }))}
+          total={rows.reduce((s, r) => s + r.value, 0)}
+          centerLabel="answers"
+          caption={`${tile.variable}: ${rows.map((r) => `${r.label} ${fmt(r.pct, 0)}%`).join(', ')}`}
+        />
+      ) : tile.chart === 'column' && rows.length ? (
+        <div
+          className="nx-columns"
+          role="img"
+          aria-label={`${tile.variable}: ${rows.map((r) => `${r.label} ${fmt(r.pct, 0)}%`).join(', ')}`}
+        >
+          {rows.map((r) => (
+            <div key={r.key} className="nx-column" title={`${r.label}: ${fmt(r.pct)}%`}>
+              <span className="small">{fmt(r.pct, 0)}%</span>
+              <i style={{ height: `${Math.max(2, r.pct)}%` }} />
+              <span className="small ellipsis">{r.label}</span>
+            </div>
+          ))}
+        </div>
+      ) : rows.length ? (
+        <ShareBars
+          rows={rows}
+          total={f.variable.kind === 'multi' ? Math.max(1, f.unweightedBase) : rows.reduce((s, r) => s + r.value, 0)}
+        />
+      ) : (
+        <p className="muted small">No answers yet.</p>
+      )}
+      <p className="small muted" style={{ margin: 0 }}>
+        Base {Number.isInteger(base) ? base.toLocaleString() : fmt(base)}
+      </p>
+    </article>
+  );
+}
+
+/** Blueprint phase 5: filters on answers (a segment). All filters apply together. */
+function SegmentBuilder({ vars, value, onChange }: { vars: Variable[]; value: AnswerFilter[]; onChange: (v: AnswerFilter[]) => void }) {
+  const usable = vars.filter((v) => v.kind !== 'open');
+  const [adding, setAdding] = useState('');
+  const set = (i: number, f: AnswerFilter) => onChange(value.map((x, k) => (k === i ? f : x)));
+  return (
+    <fieldset className="plain nx-segment-builder" data-testid="segment-builder">
+      <legend className="small muted">Segment (answers)</legend>
+      {value.map((f, i) => {
+        const v = vars.find((x) => x.id === f.variable);
+        if (!v) return null;
+        return (
+          <div key={i} className="nx-segment">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <span className="small">
+                <span className="mono">{v.id}</span>{' '}
+                <select
+                  aria-label={`Filter ${v.id} mode`}
+                  className="small"
+                  value={f.exclude ? 'not' : 'is'}
+                  onChange={(e) => set(i, { ...f, exclude: e.target.value === 'not' || undefined })}
+                >
+                  <option value="is">is</option>
+                  <option value="not">is not</option>
+                </select>
+              </span>
+              <button
+                className="link small"
+                aria-label={`Remove filter on ${v.id}`}
+                onClick={() => onChange(value.filter((_, k) => k !== i))}
+              >
+                Remove
+              </button>
+            </div>
+            {v.kind === 'numeric' ? (
+              <div className="row">
+                <input
+                  type="number"
+                  aria-label={`${v.id} from`}
+                  placeholder="from"
+                  value={f.min ?? ''}
+                  onChange={(e) => set(i, { ...f, min: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  style={{ width: 80 }}
+                />
+                <input
+                  type="number"
+                  aria-label={`${v.id} to`}
+                  placeholder="to"
+                  value={f.max ?? ''}
+                  onChange={(e) => set(i, { ...f, max: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  style={{ width: 80 }}
+                />
+              </div>
+            ) : (
+              <div className="nx-segment-codes">
+                {v.categories.map((c) => (
+                  <label key={String(c.code)} className="check small">
+                    <input
+                      type="checkbox"
+                      checked={!!f.values?.some((x) => String(x) === String(c.code))}
+                      onChange={(e) =>
+                        set(i, {
+                          ...f,
+                          values: e.target.checked
+                            ? [...(f.values ?? []), c.code]
+                            : (f.values ?? []).filter((x) => String(x) !== String(c.code)),
+                        })
+                      }
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      <div className="row">
+        <select aria-label="Add a segment filter" value={adding} onChange={(e) => setAdding(e.target.value)}>
+          <option value="">Filter on an answer…</option>
+          {usable.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.id}: {v.label.slice(0, 50)}
+            </option>
+          ))}
+        </select>
+        <button
+          disabled={!adding}
+          onClick={() => {
+            onChange([...value, { variable: adding }]);
+            setAdding('');
+          }}
+        >
+          Add
+        </button>
+      </div>
+    </fieldset>
   );
 }

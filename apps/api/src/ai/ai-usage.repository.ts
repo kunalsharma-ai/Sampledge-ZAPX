@@ -10,6 +10,12 @@ export const BILLABLE_OUTCOMES = ['ok', 'error', 'refused'];
 export class AiUsageRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Blueprint phase 5: the organization refuses processors outside the deployment (data residency). */
+  async blocksExternal(tenantId: string): Promise<boolean> {
+    const t = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { blockExternalProcessors: true } });
+    return !!t?.blockExternalProcessors;
+  }
+
   policy(tenantId: string): Promise<TenantAiPolicy | null> {
     return this.prisma.tenantAiPolicy.findUnique({ where: { tenantId } });
   }

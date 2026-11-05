@@ -40,6 +40,8 @@ export interface Variable {
   excludeFromStats?: Array<number | string>;
   /** Scale: report the Net Promoter Score. */
   nps?: boolean;
+  /** Blueprint phase 5: cleaning rules that edit or fill this question's answers in analysis. */
+  cleanedBy?: string[];
 }
 
 export interface AnalysisRecord {
@@ -217,6 +219,11 @@ export function variables(def: SurveyDefinition, records: AnalysisRecord[] = [],
     out.push(v);
     byId.set(v.id, v);
   }
+  // Blueprint phase 5: say which cleaning rules edit a question's answers.
+  for (const c of def.cleaning ?? []) {
+    const v = byId.get(c.target);
+    if (v && v.source === 'question') (v.cleanedBy ??= []).push(c.id);
+  }
   return out;
 }
 
@@ -301,6 +308,55 @@ function numberOf(v: Variable, r: AnalysisRecord): number | null {
   return Number.isFinite(n) ? n : null;
 }
 const same = (a: number | string, b: number | string) => String(a) === String(b);
+
+/**
+ * Blueprint phase 5, segmentation: keep the records whose answer to `variable` is one of `values`
+ * (any of them, for a multiple choice) and, for numbers, within min..max (inclusive). Filters on
+ * different variables all apply (AND); `exclude` keeps everyone else instead.
+ */
+export interface AnswerFilter {
+  variable: string;
+  values?: Array<number | string>;
+  min?: number;
+  max?: number;
+  exclude?: boolean;
+}
+
+export function segment(vars: Variable[], records: AnalysisRecord[], filters: AnswerFilter[]): AnalysisRecord[] {
+  if (!filters.length) return records;
+  const checks = filters.map((f) => {
+    const v = vars.find((x) => x.id === f.variable);
+    if (!v) throw new Error(`Unknown variable in filter: ${f.variable}`);
+    return { f, v };
+  });
+  return records.filter((r) =>
+    checks.every(({ f, v }) => {
+      let hit = true;
+      if (f.values?.length) hit = codes(v, r).some((c) => f.values!.some((x) => same(c, x)));
+      if (hit && (f.min !== undefined || f.max !== undefined)) {
+        const n = numberOf(v, r);
+        hit = n !== null && (f.min === undefined || n >= f.min) && (f.max === undefined || n <= f.max);
+      }
+      return f.exclude ? !hit : hit;
+    }),
+  );
+}
+
+/** Plain-language description of a segment, printed with tables (e.g. "Q1 is 1 or 2; AGE 18 to 34"). */
+export function describeSegment(vars: Variable[], filters: AnswerFilter[]): string {
+  return filters
+    .map((f) => {
+      const v = vars.find((x) => x.id === f.variable);
+      const name = v?.id ?? f.variable;
+      const parts: string[] = [];
+      if (f.values?.length) parts.push(f.values.map((x) => v?.categories.find((c) => same(c.code, x))?.label ?? String(x)).join(' or '));
+      if (f.min !== undefined && f.max !== undefined) parts.push(`${f.min} to ${f.max}`);
+      else if (f.min !== undefined) parts.push(`at least ${f.min}`);
+      else if (f.max !== undefined) parts.push(`at most ${f.max}`);
+      return `${name} ${f.exclude ? 'is not' : 'is'} ${parts.join(', ')}`;
+    })
+    .join('; ');
+}
 
 export interface NumericStats {
   /** Interviews with a value (unweighted). */

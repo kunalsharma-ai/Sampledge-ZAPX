@@ -1,7 +1,8 @@
 'use client';
 /**
  * Blueprint phase 3: email distribution. Contacts (CSV), invitation waves sent at a scheduled time
- * with personal links, reminders to people who have not finished, and opt-outs.
+ * with personal links, reminders to people who have not finished, and opt-outs. Blueprint phase 5
+ * adds SMS: contacts can have a phone number, and a wave can be a text message.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -11,9 +12,11 @@ interface Contacts {
   total: number;
   unsubscribed: number;
   emailEnabled: boolean;
+  smsEnabled: boolean;
   items: Array<{
     id: string;
-    email: string;
+    email: string | null;
+    phone: string | null;
     name: string | null;
     language: string | null;
     fields: Record<string, string>;
@@ -23,6 +26,7 @@ interface Contacts {
 interface Wave {
   id: string;
   name: string;
+  channel: 'email' | 'sms';
   subject: string;
   sendAt: string;
   sentAt: string | null;
@@ -38,6 +42,7 @@ interface Wave {
   completed: number;
 }
 
+const DEFAULT_SMS = 'Hi [name], please share your views in a short survey: [link]';
 const DEFAULT_BODY = `Hello [name],
 
 We would value your opinion. The survey takes about 10 minutes:
@@ -59,6 +64,7 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
   const [importNote, setImportNote] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: 'Wave 1',
+    channel: 'EMAIL' as 'EMAIL' | 'SMS',
     subject: 'Your opinion matters',
     body: DEFAULT_BODY,
     sendAt: inAnHour(),
@@ -132,7 +138,7 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
 
   return (
     <section className="panel stack" data-testid="email-invitations">
-      <h2 style={{ margin: 0 }}>Email invitations</h2>
+      <h2 style={{ margin: 0 }}>Email and SMS invitations</h2>
       <p className="muted small" style={{ margin: 0 }}>
         Each contact gets a personal link. Columns of the contact list other than email, name and language are added to the link as
         parameters (use them as URL variables). Every email has a one-click unsubscribe link, and people who opt out are never emailed again
@@ -142,6 +148,11 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
         <p className="note small" role="status" data-testid="email-off">
           Email sending is off on this server, so scheduled waves wait and nothing is sent. An administrator can turn it on with
           EMAIL_PROVIDER=sendgrid. Meanwhile, download a wave&apos;s personal links and send them with your own email tool.
+        </p>
+      ) : null}
+      {contacts && !contacts.smsEnabled ? (
+        <p className="note small" role="status" data-testid="sms-off">
+          SMS sending is off on this server, so SMS waves wait. An administrator can turn it on with SMS_PROVIDER=twilio and SMS_FROM.
         </p>
       ) : null}
       <ErrorNote error={error} />
@@ -159,6 +170,7 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
             <thead>
               <tr>
                 <th>Email</th>
+                <th>Phone</th>
                 <th>Contact name</th>
                 <th>Link parameters</th>
                 <th />
@@ -167,7 +179,8 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
             <tbody>
               {contacts.items.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.email}</td>
+                  <td>{c.email ?? ''}</td>
+                  <td className="mono small">{c.phone ?? ''}</td>
                   <td>{c.name ?? ''}</td>
                   <td className="mono small">
                     {Object.entries(c.fields)
@@ -184,7 +197,8 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
       {!readOnly ? (
         <div className="stack" style={{ gap: 6 }}>
           <label className="field">
-            Paste contacts as CSV (header row with an email column; name, language and other columns optional)
+            Paste contacts as CSV (header row with an email or phone column, phones with the country code such as +44; name, language and
+            other columns optional)
             <textarea
               rows={4}
               className="mono"
@@ -240,7 +254,7 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
                 <td>
                   {w.name}{' '}
                   <span className={`badge ${w.state === 'sent' ? 'good' : w.state === 'cancelled' ? 'bad' : 'warn'}`}>{w.state}</span>
-                  <div className="muted small">{w.subject}</div>
+                  <div className="muted small">{w.channel === 'sms' ? 'SMS' : w.subject}</div>
                 </td>
                 <td className="small">{new Date(w.sendAt).toLocaleString()}</td>
                 <td>
@@ -284,6 +298,30 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             </label>
             <label className="field">
+              Send by
+              <select
+                aria-label="Channel"
+                data-testid="wave-channel"
+                value={form.channel}
+                onChange={(e) => {
+                  const channel = e.target.value as 'EMAIL' | 'SMS';
+                  setForm({
+                    ...form,
+                    channel,
+                    body:
+                      channel === 'SMS' && form.body === DEFAULT_BODY
+                        ? DEFAULT_SMS
+                        : channel === 'EMAIL' && form.body === DEFAULT_SMS
+                          ? DEFAULT_BODY
+                          : form.body,
+                  });
+                }}
+              >
+                <option value="EMAIL">Email</option>
+                <option value="SMS">SMS (text message)</option>
+              </select>
+            </label>
+            <label className="field">
               Send at
               <input type="datetime-local" value={form.sendAt} onChange={(e) => setForm({ ...form, sendAt: e.target.value })} />
             </label>
@@ -308,13 +346,22 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
               />
             </label>
           </div>
-          <label className="field">
-            Subject
-            <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
-          </label>
+          {form.channel === 'EMAIL' ? (
+            <label className="field">
+              Subject
+              <input value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} />
+            </label>
+          ) : null}
           <label className="field">
             Message ([link] = personal survey link, [name] = contact name, [unsubscribe] = opt-out link, added at the end if missing)
-            <textarea rows={7} value={form.body} onChange={(e) => setForm({ ...form, body: e.target.value })} />
+            <textarea
+              rows={form.channel === 'SMS' ? 3 : 7}
+              value={form.body}
+              onChange={(e) => setForm({ ...form, body: e.target.value })}
+            />
+            {form.channel === 'SMS' ? (
+              <span className="small muted">{form.body.length} of 600 characters. Only contacts with a phone number are texted.</span>
+            ) : null}
           </label>
           <div>
             <button type="button" onClick={() => void schedule()} disabled={!form.body.includes('[link]')}>

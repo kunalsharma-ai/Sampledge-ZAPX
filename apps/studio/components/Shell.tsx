@@ -14,6 +14,7 @@ import {
   ScrollText,
   Settings,
   Sparkles,
+  Workflow,
   X,
   Zap,
   type LucideIcon,
@@ -22,6 +23,7 @@ import { api, type Me } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ThemeMenu } from '@/components/quantum/ThemeMenu';
 import { GlobalSearch } from '@/components/neon/GlobalSearch';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface NavItem {
   href: string;
@@ -44,6 +46,7 @@ function navFor(me: Me | null): NavItem[] {
     { href: '/library', label: 'Question bank', icon: Library },
   ];
   if (me.role !== 'VIEWER') items.push({ href: '/calls', label: 'Fieldwork calls', icon: PhoneCall });
+  items.push({ href: '/automation', label: 'Automation', icon: Workflow });
   items.push({ href: '/appearance', label: 'Themes & appearance', icon: Palette });
   if (me.role === 'ADMIN') {
     items.push({ href: '/settings', label: 'Settings', icon: Settings });
@@ -188,6 +191,7 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
           {me && me.role !== 'INTERVIEWER' ? <GlobalSearch /> : null}
           {crumbs ? <nav className="muted small nx-crumbs">{crumbs}</nav> : null}
           <div className="spacer" />
+          {me && me.role !== 'INTERVIEWER' ? <NotificationBell /> : null}
           <ThemeMenu />
           {me ? (
             <div className="nx-user" title={`${me.name} · ${me.email}`}>

@@ -90,7 +90,8 @@ export class AiError extends Error {
       | 'UNAVAILABLE'
       | 'CIRCUIT_OPEN'
       | 'BAD_OUTPUT'
-      | 'TOO_LONG',
+      | 'TOO_LONG'
+      | 'BLOCKED_BY_RESIDENCY',
   ) {
     super(message);
   }

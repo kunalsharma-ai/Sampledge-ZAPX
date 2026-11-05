@@ -1,9 +1,11 @@
 'use client';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Accessibility,
+  Bookmark,
   Building2,
+  Layers,
   Check,
   CloudOff,
   LayoutGrid,
@@ -15,19 +17,24 @@ import {
   TriangleAlert,
 } from 'lucide-react';
 import {
+  MODULE_IDS,
+  MODULE_NAMES,
   PRESET_LIST,
   PRESETS,
   contrastReport,
   resolveTheme,
   type Appearance,
   type Density,
+  type ModuleId,
   type MotionLevel,
+  type PresetId,
   type ThemeMode,
 } from '@zapx/quantum';
 import { Shell } from '@/components/Shell';
 import { Badge, Button, ColorField, SegmentedControl, SelectionCards, Slider, Surface, Switch } from '@/components/quantum';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { useMe } from '@/lib/useMe';
+import { api } from '@/lib/api';
 import { ComponentPreview } from './ComponentPreview';
 
 /** Miniature of a preset in the active scheme: page, light, a panel, a primary action and text. */
@@ -307,6 +314,9 @@ export default function AppearancePage() {
             </details>
           </Surface>
 
+          <AreaThemes appearance={appearance} update={update} />
+          <WorkspacePresets appearance={appearance} update={update} isAdmin={isAdmin} />
+
           <Surface>
             <h2 className="q-section-title">
               <Building2 size={18} aria-hidden /> Organization default
@@ -314,7 +324,7 @@ export default function AppearancePage() {
             <p className="muted small" style={{ marginTop: 0 }}>
               {organizationDefault
                 ? `${me?.tenant.name ?? 'Your organization'} uses ${PRESETS[organizationDefault.preset].name} (${organizationDefault.mode}) for members who have not chosen their own.`
-                : 'No organization default is set, so members start with Quantum Midnight.'}
+                : 'No organization default is set, so members start with Neon AI.'}
             </p>
             <div className="row">
               {source === 'personal' ? (
@@ -348,5 +358,152 @@ export default function AppearancePage() {
         </div>
       </div>
     </Shell>
+  );
+}
+
+/** Blueprint phase 5: a different theme family in some studio areas (mode, accent and the rest stay). */
+function AreaThemes({ appearance, update }: { appearance: Appearance; update: (p: Partial<Appearance>) => void }) {
+  const modules = appearance.modules ?? {};
+  const setArea = (m: ModuleId, preset: PresetId | '') => {
+    const next = { ...modules };
+    if (preset) next[m] = preset;
+    else delete next[m];
+    update({ modules: next });
+  };
+  return (
+    <Surface>
+      <h2 className="q-section-title">
+        <Layers size={18} aria-hidden /> Theme by area
+      </h2>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Give an area of the studio its own theme family, for example a calm light theme for Analysis. Light or dark mode, accent, density
+        and motion stay as set above.
+      </p>
+      <div className="q-area-grid" data-testid="area-themes">
+        {MODULE_IDS.map((m) => (
+          <label key={m} className="field">
+            {MODULE_NAMES[m]}
+            <select
+              aria-label={`Theme for ${MODULE_NAMES[m]}`}
+              value={modules[m] ?? ''}
+              onChange={(e) => setArea(m, e.target.value as PresetId | '')}
+            >
+              <option value="">Same as my theme ({PRESETS[appearance.preset].name})</option>
+              {PRESET_LIST.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+    </Surface>
+  );
+}
+
+interface Preset {
+  id: string;
+  name: string;
+  appearance: Appearance;
+  createdAt: string;
+}
+
+/** Blueprint phase 5: named appearances an administrator saves for everyone to pick. */
+function WorkspacePresets({
+  appearance,
+  update,
+  isAdmin,
+}: {
+  appearance: Appearance;
+  update: (p: Partial<Appearance>) => void;
+  isAdmin: boolean;
+}) {
+  const [list, setList] = useState<Preset[]>([]);
+  const [name, setName] = useState('');
+  const [message, setMessage] = useState<string | null>(null);
+  const load = useCallback(() => api<Preset[]>('/tenant/appearance-presets').then(setList, () => undefined), []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  return (
+    <Surface>
+      <h2 className="q-section-title">
+        <Bookmark size={18} aria-hidden /> Workspace presets
+      </h2>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Saved looks for your organization (theme, mode, area themes and the rest). Picking one replaces your current appearance.
+      </p>
+      {list.length ? (
+        <ul className="q-preset-list" data-testid="workspace-presets">
+          {list.map((p) => (
+            <li key={p.id}>
+              <span>
+                <strong>{p.name}</strong>
+                <span className="muted small">
+                  {' '}
+                  · {PRESETS[p.appearance.preset].name}, {p.appearance.mode}
+                  {p.appearance.modules && Object.keys(p.appearance.modules).length
+                    ? `, ${Object.keys(p.appearance.modules).length} area theme(s)`
+                    : ''}
+                </span>
+              </span>
+              <span className="row" style={{ gap: 6 }}>
+                <Button
+                  onClick={() => {
+                    update({ ...p.appearance, modules: p.appearance.modules ?? {} });
+                    setMessage(`Using ${p.name}.`);
+                  }}
+                >
+                  Use
+                </Button>
+                {isAdmin ? (
+                  <Button
+                    variant="ghost"
+                    aria-label={`Delete preset ${p.name}`}
+                    onClick={async () => {
+                      await api(`/tenant/appearance-presets/${p.id}`, { method: 'DELETE' }).catch(() => undefined);
+                      void load();
+                    }}
+                  >
+                    Delete
+                  </Button>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted small">No presets yet.</p>
+      )}
+      {isAdmin ? (
+        <div className="row" style={{ gap: 8 }}>
+          <input aria-label="Preset name" placeholder="Preset name" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} />
+          <Button
+            variant="primary"
+            disabled={!name.trim()}
+            data-testid="save-preset"
+            onClick={async () => {
+              setMessage(null);
+              try {
+                await api('/tenant/appearance-presets', { body: { name: name.trim(), appearance } });
+                setName('');
+                setMessage('Saved for everyone in your organization.');
+                void load();
+              } catch (e) {
+                setMessage((e as Error).message);
+              }
+            }}
+          >
+            Save my appearance as a preset
+          </Button>
+        </div>
+      ) : null}
+      {message ? (
+        <p className="small" role="status" style={{ marginBottom: 0 }}>
+          {message}
+        </p>
+      ) : null}
+    </Surface>
   );
 }

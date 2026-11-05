@@ -11,6 +11,7 @@ import {
 } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
+import { useThemeModule } from '@/lib/theme/ThemeProvider';
 import { CopyField, ErrorNote, Shell } from '@/components/Shell';
 import { VisualEditor } from '@/components/VisualEditor';
 import { Preview } from '@/components/Preview';
@@ -77,6 +78,8 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [presDirty, setPresDirty] = useState(false);
   const [aiConfigured, setAiConfigured] = useState(false);
   const [tab, setTab] = useState<Tab>('build');
+  // Blueprint phase 5: each studio area can have its own theme family.
+  useThemeModule(tab === 'analysis' ? 'analysis' : ['distribute', 'capi', 'quality', 'results'].includes(tab) ? 'fieldwork' : 'build');
   // An edit spoken as a voice command, handed to the AI architect.
   const [voiceInstruction, setVoiceInstruction] = useState<{ text: string; n: number } | null>(null);
   // Deep links from the dashboard: ?tab=assist&prompt=… or ?tab=qa.

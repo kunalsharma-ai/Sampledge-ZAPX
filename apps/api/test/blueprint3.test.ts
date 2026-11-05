@@ -363,8 +363,8 @@ describe('email distribution', () => {
 
   it('downloads personal links and unsubscribes with one click', async () => {
     const csv = (await http.get(`/api/surveys/${surveyId}/distributions/${waveId}/links.csv`).set(admin).expect(200)).text;
-    expect(csv.split('\r\n')[0]).toBe('email,name,link,unsubscribed');
-    expect(csv).toContain('chen@example.com,Chen,http');
+    expect(csv.split('\r\n')[0]).toBe('email,phone,name,link,unsubscribed');
+    expect(csv).toContain('chen@example.com,,Chen,http');
     const chen = linkOf('chen@example.com').searchParams.get('uid')!;
     const form = await http.get(`/api/public/unsubscribe/${chen}`).expect(200);
     expect(form.text).toContain('<form method="post">');

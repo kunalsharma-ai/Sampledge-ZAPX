@@ -3,9 +3,11 @@ import ExcelJS from 'exceljs';
 import type { Prisma } from '@zapx/db';
 import {
   crosstab,
+  describeSegment,
   frequency,
   rake,
   recodeProblems,
+  segment,
   variables,
   type AnalysisRecord,
   type Crosstab,
@@ -15,6 +17,7 @@ import {
 } from '@zapx/analysis-core';
 import { parseSurveyDefinition, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
 import {
+  applyCleaning,
   computeVariables,
   conjointAnalysis,
   conjointDesign,
@@ -55,6 +58,22 @@ export const filtersSchema = z
     modes: z.array(z.enum(['CAWI', 'CAPI', 'CATI'])).optional(),
     from: z.coerce.date().optional(),
     to: z.coerce.date().optional(),
+    /** Blueprint phase 5, segmentation: filters on answers (and derived variables), all must hold. */
+    answers: z
+      .array(
+        z.object({
+          variable: z.string().min(1).max(100),
+          values: z
+            .array(z.union([z.number(), z.string().max(100)]))
+            .max(100)
+            .optional(),
+          min: z.number().optional(),
+          max: z.number().optional(),
+          exclude: z.boolean().optional(),
+        }),
+      )
+      .max(20)
+      .optional(),
   })
   .prefault({});
 export type Filters = z.infer<typeof filtersSchema>;
@@ -95,6 +114,16 @@ export const reportConfigSchema = z.discriminatedUnion('type', [
     stubs: z.array(z.string().max(100)).min(1).max(200),
     confidence: z.union([z.literal(0.9), z.literal(0.95), z.literal(0.99)]).default(0.95),
   }),
+  /** Blueprint phase 5: a dashboard of chart tiles, one variable each. */
+  z.object({
+    type: z.literal('dashboard'),
+    filters: filtersSchema,
+    weighting: weightingSchema,
+    tiles: z
+      .array(z.object({ variable: z.string().max(100), chart: z.enum(['bar', 'column', 'donut', 'kpi']).default('bar') }))
+      .min(1)
+      .max(24),
+  }),
 ]);
 export type ReportConfig = z.infer<typeof reportConfigSchema>;
 
@@ -124,6 +153,8 @@ export class AnalysisService {
   private where(surveyId: string, f: Filters): Prisma.ResponseWhereInput {
     return {
       surveyId,
+      // Blueprint phase 5: interviews erased by the retention policy are left out.
+      erasedAt: null,
       status: { in: [...f.statuses] },
       ...(f.includeTest ? {} : { isTest: false }),
       ...(f.includeRejected ? {} : { reviewState: { not: 'REJECTED' } }),
@@ -144,7 +175,7 @@ export class AnalysisService {
         `This selection has ${total} interviews; analyses handle up to ${MAX_ANALYSIS_RECORDS}. Narrow the filters or export the data.`,
       );
     }
-    const records: AnalysisRecord[] = [];
+    const rows: Array<{ answers: Record<string, unknown>; system: AnalysisRecord['system'] }> = [];
     const calculated = (def.variables ?? []).length > 0;
     let cursor: string | undefined;
     for (;;) {
@@ -156,10 +187,8 @@ export class AnalysisService {
         select: { id: true, answers: true, status: true, mode: true, language: true, device: true, vendor: { select: { code: true } } },
       });
       for (const r of page) {
-        const answers = (r.answers ?? {}) as Record<string, unknown>;
-        records.push({
-          answers,
-          ...(calculated ? { derived: computeVariables(def, answers as Answers) } : {}),
+        rows.push({
+          answers: (r.answers ?? {}) as Record<string, unknown>,
           system: {
             status: r.status.toLowerCase(),
             vendor: r.vendor?.code ?? null,
@@ -172,7 +201,31 @@ export class AnalysisService {
       if (page.length < PAGE) break;
       cursor = page[page.length - 1]!.id;
     }
-    return { survey, def, records, vars: variables(def, records, { lineage: variableLineage(def) }) };
+    // Blueprint phase 5: cleaning rules edit copies of the answers (stored answers never change),
+    // before calculated variables are worked out from them.
+    const cleaned = def.cleaning?.length
+      ? applyCleaning(
+          def,
+          rows.map((r) => r.answers as Answers),
+        )
+      : null;
+    const all: AnalysisRecord[] = rows.map((r, i) => {
+      const answers = (cleaned ? cleaned.answers[i] : r.answers) as Record<string, unknown>;
+      return { answers, system: r.system, ...(calculated ? { derived: computeVariables(def, answers as Answers) } : {}) };
+    });
+    const vars = variables(def, all, { lineage: variableLineage(def) });
+    let records = all;
+    let segmentText: string | null = null;
+    if (filters.answers?.length) {
+      try {
+        records = segment(vars, all, filters.answers);
+      } catch (e) {
+        throw new BadRequestException((e as Error).message);
+      }
+      segmentText = describeSegment(vars, filters.answers);
+    }
+    const cleaning = cleaned ? { changed: cleaned.changed, imputed: cleaned.imputed } : null;
+    return { survey, def, records, vars, segment: segmentText, cleaning };
   }
 
   /** Rake the records to the targets and attach the weights. Returns the diagnostics. */
@@ -207,10 +260,22 @@ export class AnalysisService {
   }
 
   async frequencies(user: AuthUser, surveyId: string, filters: Filters, ids?: string[], weighting?: Weighting) {
-    const { vars, records } = await this.load(user, surveyId, filters);
+    const { vars, records, segment, cleaning } = await this.load(user, surveyId, filters);
     const w = weighting ? this.applyWeights(vars, records, weighting) : null;
     const chosen = ids?.length ? ids.map((id) => this.pick(vars, id)) : vars.filter((v) => v.source !== 'system');
-    return { total: records.length, weighting: w, frequencies: chosen.map((v) => frequency(v, records)) };
+    return { total: records.length, segment, cleaning, weighting: w, frequencies: chosen.map((v) => frequency(v, records)) };
+  }
+
+  /** Blueprint phase 5: a dashboard's tiles, each a frequency drawn as the chosen chart. */
+  async dashboard(user: AuthUser, surveyId: string, cfg: Extract<ReportConfig, { type: 'dashboard' }>) {
+    const { vars, records, segment, cleaning } = await this.load(user, surveyId, cfg.filters);
+    const w = cfg.weighting ? this.applyWeights(vars, records, cfg.weighting) : null;
+    const tiles = cfg.tiles.map((t) => {
+      const v = this.pick(vars, t.variable);
+      if (v.kind === 'open') throw new BadRequestException(`${v.id} is an open answer; chart a closed question`);
+      return { variable: v.id, label: v.label, chart: t.chart, frequency: frequency(v, records) };
+    });
+    return { type: 'dashboard' as const, total: records.length, segment, cleaning, weighting: w, tiles };
   }
 
   async crosstabs(
@@ -218,7 +283,7 @@ export class AnalysisService {
     surveyId: string,
     cfg: { filters: Filters; banner: string; stubs: string[]; confidence: number; weighting?: Weighting },
   ) {
-    const { vars, records } = await this.load(user, surveyId, cfg.filters);
+    const { vars, records, segment, cleaning } = await this.load(user, surveyId, cfg.filters);
     const w = cfg.weighting ? this.applyWeights(vars, records, cfg.weighting) : null;
     const banner = this.pick(vars, cfg.banner);
     if (banner.kind !== 'single' && banner.kind !== 'multi')
@@ -229,7 +294,7 @@ export class AnalysisService {
       if (stub.kind === 'open' || stub.id === banner.id) continue;
       tables.push(crosstab(banner, stub, records, { confidence: cfg.confidence }));
     }
-    return { total: records.length, weighting: w, tables };
+    return { total: records.length, segment, cleaning, weighting: w, tables };
   }
 
   /** Blueprint phase 4: MaxDiff counting scores or conjoint part-worths for one question. */
@@ -264,6 +329,7 @@ export class AnalysisService {
   }
 
   run(user: AuthUser, surveyId: string, cfg: ReportConfig) {
+    if (cfg.type === 'dashboard') return this.dashboard(user, surveyId, cfg);
     return cfg.type === 'crosstab'
       ? this.crosstabs(user, surveyId, cfg)
       : this.frequencies(user, surveyId, cfg.filters, cfg.variables, cfg.weighting);
@@ -319,8 +385,17 @@ export class AnalysisService {
         w.converged ? 'Targets met' : 'Targets NOT fully met',
       ]).font = { italic: true };
     } else ws.addRow(['Unweighted']).font = { italic: true };
+    if (result.segment) ws.addRow([`Segment: ${result.segment}`]).font = { italic: true };
+    if (result.cleaning)
+      ws.addRow([
+        `Cleaning rules applied: ${Object.entries(result.cleaning.changed)
+          .map(([id, n]) => `${id} (${n})`)
+          .join(', ')}`,
+      ]).font = { italic: true };
     ws.addRow([]);
-    if ('tables' in result) {
+    if ('tiles' in result) {
+      for (const t of result.tiles) writeFrequency(ws, t.frequency);
+    } else if ('tables' in result) {
       ws.addRow([
         `Column proportions and means tested at ${Math.round(cfg.type === 'crosstab' ? cfg.confidence * 100 : 95)}%; letters show columns a value is significantly higher than.`,
       ]);

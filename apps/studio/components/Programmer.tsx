@@ -36,7 +36,7 @@ const XML_ELEMENTS: ElementSpec[] = [
     name: 'survey',
     top: true,
     attributes: ['schemaVersion', 'title', 'language'],
-    children: ['welcome', 'thankYou', 'settings', 'variable', 'recode', 'page', 'loop', 'block', 'termination', 'quota'],
+    children: ['welcome', 'thankYou', 'settings', 'variable', 'recode', 'clean', 'page', 'loop', 'block', 'termination', 'quota'],
   },
   {
     name: 'page',
@@ -108,6 +108,8 @@ const XML_ELEMENTS: ElementSpec[] = [
   { name: 'validate', attributes: ['message'] },
   { name: 'variable', attributes: ['id', 'label'] },
   { name: 'recode', attributes: ['id', 'label', 'source'], children: ['group', 'otherwise'] },
+  // Blueprint phase 5: cleaning rule; the condition (when) is the element text.
+  { name: 'clean', attributes: ['id', 'label', 'question', 'action', 'value', 'method'], children: [] },
   { name: 'otherwise', attributes: ['code', 'label'] },
   { name: 'loop', attributes: ['id', 'label', 'pages', 'source'], children: ['item'] },
   { name: 'item', attributes: ['code'] },

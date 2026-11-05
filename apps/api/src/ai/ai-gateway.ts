@@ -128,6 +128,16 @@ export class AiGateway {
       await this.ledger(task, actor, model, outcome, err.code, undefined, 0, surveyId, 0);
       throw err;
     };
+    if (await this.usage.blocksExternal(actor.tenantId)) {
+      await deny(
+        'not_permitted',
+        new AiError(
+          'Your organization keeps data inside this deployment, so AI (an outside service) is turned off. An administrator can change this in Data governance.',
+          403,
+          'BLOCKED_BY_RESIDENCY',
+        ),
+      );
+    }
     if (!policy.enabled || !policy.allowedTasks.includes(task)) {
       await deny(
         'not_permitted',

@@ -13,9 +13,18 @@ import { DEFAULT_RETRY_POLICY, retryDelayMs, type RedirectStatus } from '@zapx/r
 import { PrismaService } from '../common/prisma.service';
 import { SecretBox } from '../platform/secret-box';
 import { HttpDelivery } from './http-delivery';
+import { AutomationQueue } from '../automation/automation.queue';
 import { SIGNATURE_HEADER, signWebhook } from './webhook-signing';
 
-export const WEBHOOK_EVENTS = ['response.finished', 'response.review_decided', 'survey.published', 'survey.status_changed'] as const;
+export const WEBHOOK_EVENTS = [
+  'response.finished',
+  'response.review_decided',
+  'survey.published',
+  'survey.status_changed',
+  // Blueprint phase 5.
+  'quota.full',
+  'automation.fired',
+] as const;
 export type WebhookEvent = (typeof WEBHOOK_EVENTS)[number];
 /** Sent only by "Send test event"; not subscribable. */
 export const TEST_EVENT = 'webhook.test';
@@ -38,10 +47,13 @@ export class WebhookService {
     private readonly prisma: PrismaService,
     private readonly http: HttpDelivery,
     private readonly box: SecretBox,
+    private readonly automation: AutomationQueue,
   ) {}
 
   /** Queue an event for every active webhook of the tenant subscribed to it. */
   async emit(tenantId: string, event: WebhookEvent, data: Record<string, unknown>): Promise<number> {
+    // Blueprint phase 5: automation rules see the same events (never throws either).
+    await this.automation.enqueue(tenantId, event, data);
     try {
       const hooks = await this.prisma.webhook.findMany({ where: { tenantId, active: true, events: { has: event } }, select: { id: true } });
       if (hooks.length === 0) return 0;
@@ -91,6 +103,8 @@ export class WebhookService {
           qualityScore: true,
           reviewState: true,
           completedAt: true,
+          quotaCells: true,
+          versionId: true,
           survey: { select: { projectId: true } },
           vendor: { select: { code: true } },
         },
@@ -108,8 +122,38 @@ export class WebhookService {
         reviewState: r.reviewState,
         finishedAt: (r.completedAt ?? new Date()).toISOString(),
       });
+      if (status === 'complete' && r.quotaCells.length) await this.quotasFilled(r);
     } catch (e) {
       this.log.error(`Could not queue response.finished for ${responseId}: ${(e as Error).message}`);
+    }
+  }
+
+  /** Blueprint phase 5: quota.full when this complete took the last place of a quota cell. */
+  private async quotasFilled(r: {
+    tenantId: string;
+    surveyId: string;
+    versionId: string;
+    quotaCells: string[];
+    survey: { projectId: string };
+  }) {
+    const counts = await this.prisma.quotaCount.findMany({ where: { surveyId: r.surveyId, quotaId: { in: r.quotaCells } } });
+    const version = await this.prisma.surveyVersion.findUnique({ where: { id: r.versionId }, select: { definition: true } });
+    const quotas = (
+      (version?.definition as { quotas?: Array<{ id: string; label?: string; target: number }> } | null)?.quotas ?? []
+    ).filter((q) => r.quotaCells.includes(q.id));
+    for (const q of quotas) {
+      const c = counts.find((x) => x.quotaId === q.id);
+      const target = c?.targetOverride ?? q.target;
+      // Exactly at target: the complete that filled it (later completes are refused by the quota).
+      if (c && target > 0 && c.count === target)
+        await this.emit(r.tenantId, 'quota.full', {
+          surveyId: r.surveyId,
+          projectId: r.survey.projectId,
+          quotaId: q.id,
+          label: q.label ?? q.id,
+          count: c.count,
+          target,
+        });
     }
   }
 

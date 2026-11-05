@@ -34,7 +34,8 @@ export interface LogicIssue {
     | 'MEDIA'
     | 'FLOW'
     | 'BLOCK_ORDER'
-    | 'DYNAMIC_LIST';
+    | 'DYNAMIC_LIST'
+    | 'CLEANING';
   message: string;
   /** Where the problem is, e.g. "pages.P2.questions.Q5.condition". */
   location: string;
@@ -403,6 +404,36 @@ export function analyzeSurvey(source: SurveyDefinition): AnalysisReport {
   (def.variables ?? []).forEach((v) => checkExpr(v.expr, { kind: 'global' }, `variables.${v.id}.expr`));
   // Recodes are analysis variables: their names must not clash with questions or calculated variables.
   (def.recodes ?? []).forEach((r) => claim(r.id, `recodes.${r.id}`));
+
+  // Cleaning rules (blueprint phase 5): a single-value question as target, a valid value, a checked condition.
+  const cleaningIds = new Set<string>();
+  (def.cleaning ?? []).forEach((r) => {
+    const loc = `cleaning.${r.id}`;
+    if (cleaningIds.has(r.id)) add('error', 'DUPLICATE_ID', `Cleaning rule id "${r.id}" is used twice.`, loc);
+    cleaningIds.add(r.id);
+    if (r.when) checkExpr(r.when, { kind: 'global' }, `${loc}.when`);
+    const q = symbols.get(r.target)?.question;
+    if (!q || !(['single', 'numeric', 'scale', 'open'] as string[]).includes(q.type)) {
+      add(
+        'error',
+        'CLEANING',
+        `Cleaning rule ${r.id} targets "${r.target}", which is not a single choice, number, scale or text question.`,
+        loc,
+      );
+      return;
+    }
+    if (r.action === 'impute' && r.method !== 'mode' && q.type !== 'numeric' && q.type !== 'scale')
+      add(
+        'error',
+        'CLEANING',
+        `Cleaning rule ${r.id}: a ${r.method} needs a number or scale question; use mode for ${q.type} questions.`,
+        loc,
+      );
+    if (r.action === 'set' && q.type === 'single' && !q.options.some((o) => o.code === r.value))
+      add('error', 'CLEANING', `Cleaning rule ${r.id} sets ${q.id} to ${String(r.value)}, which is not one of its answer codes.`, loc);
+    if (r.action === 'set' && (q.type === 'numeric' || q.type === 'scale') && typeof r.value !== 'number')
+      add('error', 'CLEANING', `Cleaning rule ${r.id} sets ${q.id} to text; ${q.id} takes a number.`, loc);
+  });
 
   // Dynamic answer lists need an earlier choice question that shares answer codes.
   def.pages.forEach((page, pi) =>

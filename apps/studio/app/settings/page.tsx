@@ -7,11 +7,13 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
+import { useThemeModule } from '@/lib/theme/ThemeProvider';
 import { ErrorNote, Shell } from '@/components/Shell';
 import { LayerEditor, emptyLayer, type Layer } from '@/components/RedirectRules';
 import { Team } from '@/components/Team';
 import { ApiKeys } from '@/components/ApiKeys';
 import { Webhooks } from '@/components/Webhooks';
+import { DataGovernance } from '@/components/DataGovernance';
 import { Billing, PlanUsage, ScimSettings, SsoSettings } from '@/components/Identity';
 
 type Task = 'architect' | 'translate' | 'insights';
@@ -65,6 +67,7 @@ const money = (n: number) => `$${n.toFixed(n < 1 ? 4 : 2)}`;
 
 export default function SettingsPage() {
   const me = useMe();
+  useThemeModule('settings');
   const [ai, setAi] = useState<AiSettings | null>(null);
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
@@ -267,6 +270,7 @@ export default function SettingsPage() {
           ) : null}
         </section>
 
+        <DataGovernance />
         <PlanUsage />
         <Billing />
         <Team />
