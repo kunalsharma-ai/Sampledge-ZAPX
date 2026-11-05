@@ -39,25 +39,30 @@ export function DataGovernance() {
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
 
-  const show = (x: Governance) => {
+  // Only the fields a save touched are refreshed, so a save never wipes what is being typed elsewhere.
+  const show = (x: Governance, only?: Record<string, unknown>) => {
     setG(x);
-    setRegion(x.dataRegion ?? '');
-    setDays(Object.fromEntries(FIELDS.map((f) => [f.key, x.retention[f.key] ? String(x.retention[f.key]) : ''])));
+    if (!only || 'dataRegion' in only) setRegion(x.dataRegion ?? '');
+    if (!only || 'retention' in only)
+      setDays(Object.fromEntries(FIELDS.map((f) => [f.key, x.retention[f.key] ? String(x.retention[f.key]) : ''])));
   };
   useEffect(() => {
-    void api<Governance>('/organization/governance').then(show, setError);
+    void api<Governance>('/organization/governance').then((x) => show(x), setError);
   }, []);
 
   const save = async (patch: Record<string, unknown>) => {
     setError(null);
     setSaved(false);
     try {
-      show(await api<Governance>('/organization/governance', { method: 'PUT', body: patch }));
+      show(await api<Governance>('/organization/governance', { method: 'PUT', body: patch }), patch);
       setSaved(true);
     } catch (e) {
       setError(e);
       // Put back what the server holds.
-      void api<Governance>('/organization/governance').then(show, () => undefined);
+      void api<Governance>('/organization/governance').then(
+        (x) => show(x, patch),
+        () => undefined,
+      );
     }
   };
 

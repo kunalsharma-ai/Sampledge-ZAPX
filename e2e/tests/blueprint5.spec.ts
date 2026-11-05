@@ -169,9 +169,11 @@ test('cleaning, segments, dashboards, automation, governance, SMS channel and ar
   const gov = page.getByTestId('data-governance');
   await gov.getByLabel('Data region').fill('eu');
   await gov.getByRole('button', { name: 'Save region' }).click();
-  await gov.getByLabel('Erase interviews after (days)').fill('365');
-  await gov.getByTestId('save-retention').click();
   await expect(gov).toContainText('Saved. The policy is applied once an hour.');
+  await gov.getByLabel('Erase interviews after (days)').fill('365');
+  const retentionSaved = page.waitForResponse((r) => r.url().endsWith('/api/organization/governance') && r.request().method() === 'PUT');
+  await gov.getByTestId('save-retention').click();
+  expect((await (await retentionSaved).json()).retention).toEqual({ responsesDays: 365 });
   await gov.getByTestId('block-external').check();
   await expect(gov.getByRole('row', { name: /Transcription/ })).toContainText('Turned off');
   await shot(page, 'p5-governance', gov);
