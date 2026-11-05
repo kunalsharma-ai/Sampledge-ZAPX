@@ -96,7 +96,7 @@ the question bank (#30); multilingual tools, URL variables, least-fill and test 
 fieldwork evidence, supervision, appeals and email distribution (#32); MaxDiff, conjoint, recodes and
 the AI research assistant (#33); automation, data residency and retention, cleaning, dashboards and
 SMS (#34). Then the maintainer handbook (#35) and the security fixes from its review: the vendor
-shared secret only for admins and programmers, password change, administrator reset links and
+shared secret only for admins, password change, administrator reset links and
 "forgot password", and the AWS secret list (branch `security-fixes`). Setting up integrations in the
 CRM (#28) is a separate pull request on `main`. The handbook's
 [changelog](docs/handbook/CHANGELOG.md) lists them all.

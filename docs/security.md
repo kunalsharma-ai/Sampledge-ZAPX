@@ -29,7 +29,7 @@ in `pnpm-workspace.yaml`.
 - Required in production: `JWT_SECRET`, `SECRETS_KEY` (the API refuses to start without it).
 - Partner secrets that ZAPX must read back (PROJEXA client secret) are encrypted at rest with
   AES-256-GCM (`SecretBox`); the next step is KMS envelope encryption. Vendor shared secrets are
-  stored as generated, returned only to admins and programmers (viewers see that one exists), and
+  stored as generated, returned only to admins (programmers and viewers do not receive it), and
   can be rotated from the studio.
 - Passwords: members change their own (current password required, other sessions signed out);
   administrators create one-time reset links; "forgot password" emails one when email is set up.

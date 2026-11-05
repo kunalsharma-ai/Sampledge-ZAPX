@@ -258,7 +258,7 @@ Each is an interface with one first provider, off by default, tested against a l
   emails one when `EMAIL_PROVIDER` is set and always answers 204; `POST /api/auth/reset-password`
   uses it. Only a SHA-256 hash of the token is stored (`PasswordReset`); a link works once, for
   `PASSWORD_RESET_HOURS`, and a newer link voids older ones. Code: `apps/api/src/auth/password-reset.service.ts`.
-- The vendor shared secret is returned only to admins and programmers (`presentVendor`).
+- The vendor shared secret is returned only to admins (`presentVendor`, `SEES_VENDOR_SECRET`); ZAPX has no separate super admin role.
 
 ## On open pull requests (not yet on `main`)
 
