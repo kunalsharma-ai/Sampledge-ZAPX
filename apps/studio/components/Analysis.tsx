@@ -4,6 +4,7 @@ import type { AnswerFilter, Crosstab, Frequency, RakeResult, Variable } from '@z
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { Donut, ShareBars } from './neon/Charts';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 type Status = 'COMPLETE' | 'TERMINATE' | 'QUOTA_FULL' | 'QUALITY_FAIL' | 'PARTIAL' | 'IN_PROGRESS';
 type Mode = 'CAWI' | 'CAPI' | 'CATI';
@@ -88,6 +89,7 @@ function defaultChart(v: Variable): Chart {
  * letters, plus saved reports that anyone on the team can rerun or download as Excel.
  */
 export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: boolean }) {
+  const confirm = useConfirm();
   const [vars, setVars] = useState<Variable[] | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [kind, setKind] = useState<'frequencies' | 'crosstab' | 'dashboard'>('frequencies');
@@ -202,7 +204,7 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
   };
 
   const remove = async (r: Report) => {
-    if (!window.confirm(`Delete the report “${r.name}”?`)) return;
+    if (!(await confirm({ title: `Delete the report “${r.name}”?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
     try {
       await api(`/reports/${r.id}`, { method: 'DELETE' });
       if (openReport?.id === r.id) setOpenReport(null);

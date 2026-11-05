@@ -10,6 +10,7 @@ import { LANGUAGE_TAG, textDirection, type Language, type Presentation, type Sur
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { GlossaryEditor, useGlossary } from './Glossary';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 type RowState = 'missing' | 'outdated' | 'machine' | 'reviewed';
 
@@ -34,6 +35,7 @@ export function Languages({
   /** Called with the server's saved draft after AI translation. */
   onServerUpdate: (version: { updatedAt: string; presentation: unknown }) => void;
 }) {
+  const confirm = useConfirm();
   const [selected, setSelected] = useState<string | null>(presentation.languages[0]?.tag ?? null);
   const [newTag, setNewTag] = useState('');
   const [newName, setNewName] = useState('');
@@ -220,8 +222,16 @@ export function Languages({
                   </label>
                   <button
                     className="danger"
-                    onClick={() => {
-                      if (!window.confirm(`Remove ${lang.name} and all its translations?`)) return;
+                    onClick={async () => {
+                      if (
+                        !(await confirm({
+                          title: `Remove ${lang.name}?`,
+                          message: 'All its translations are removed with it.',
+                          confirmLabel: 'Remove',
+                          tone: 'danger',
+                        }))
+                      )
+                        return;
                       onChange({ ...presentation, languages: presentation.languages.filter((l) => l.tag !== lang.tag) });
                       setSelected(null);
                     }}

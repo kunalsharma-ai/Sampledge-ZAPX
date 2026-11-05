@@ -18,6 +18,7 @@ import {
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Summary {
   starts: number;
@@ -215,6 +216,7 @@ function Tile({ label, value, note }: { label: string; value: string | number; n
 }
 
 function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boolean }) {
+  const confirm = useConfirm();
   const [filter, setFilter] = useState<Filter>('pending');
   const [data, setData] = useState<{ counts: Record<string, number>; items: Item[] } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -239,9 +241,12 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
   const decide = async (decision: 'accept' | 'reject') => {
     if (
       decision === 'reject' &&
-      !window.confirm(
-        `Reject ${selected.size} complete(s)? Their quota places are released and vendors are told quality fail. This cannot be undone.`,
-      )
+      !(await confirm({
+        title: `Reject ${selected.size} complete(s)?`,
+        message: 'Their quota places are released and vendors are told quality fail. This cannot be undone.',
+        confirmLabel: 'Reject',
+        tone: 'danger',
+      }))
     )
       return;
     setBusy(true);
@@ -654,6 +659,7 @@ interface JobState {
 }
 
 function CapturesPanel({ surveyId, onTranscribed }: { surveyId: string; onTranscribed: () => void }) {
+  const confirm = useConfirm();
   const me = useMe();
   const [s, setS] = useState<CaptureSummary | null>(null);
   const [job, setJob] = useState<JobState | null>(null);
@@ -689,9 +695,11 @@ function CapturesPanel({ surveyId, onTranscribed }: { surveyId: string; onTransc
   const untranscribed = s.recordings - s.transcription.transcribed;
   const transcribe = async () => {
     if (
-      !window.confirm(
-        `Send ${untranscribed} recording${untranscribed === 1 ? '' : 's'} to the transcription service? The recordings leave ZAPX for this.`,
-      )
+      !(await confirm({
+        title: `Send ${untranscribed} recording${untranscribed === 1 ? '' : 's'} to the transcription service?`,
+        message: 'The recordings leave ZAPX for this.',
+        confirmLabel: 'Send',
+      }))
     )
       return;
     setError(null);
@@ -703,7 +711,15 @@ function CapturesPanel({ surveyId, onTranscribed }: { surveyId: string; onTransc
   };
   const running = job && (job.status === 'QUEUED' || job.status === 'RUNNING');
   const erase = async () => {
-    if (!window.confirm(`Erase all ${s.photos} photos and ${s.recordings} recordings of this survey? This cannot be undone.`)) return;
+    if (
+      !(await confirm({
+        title: `Erase all ${s.photos} photos and ${s.recordings} recordings of this survey?`,
+        message: 'This cannot be undone.',
+        confirmLabel: 'Erase',
+        tone: 'danger',
+      }))
+    )
+      return;
     try {
       const r = await api<{ erased: number }>(`/surveys/${surveyId}/captures/erase`, { method: 'POST' });
       window.alert(`Erased ${r.erased} files.`);

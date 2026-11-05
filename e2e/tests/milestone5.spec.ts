@@ -7,13 +7,14 @@
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { autoConfirm } from './confirm-helper';
 
 const demo = readFileSync(join(__dirname, '../../docs/examples/demo-screener.json'), 'utf8');
 const run = `m5${Date.now().toString(36)}`;
 const interviewerEmail = `field-${run}@test.zapx`;
 
 test('quality review, fieldwork and an offline CAPI interview', async ({ page, browser }) => {
-  page.on('dialog', (d) => void d.accept());
+  await autoConfirm(page);
 
   await page.goto('/login');
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
@@ -104,6 +105,7 @@ test('quality review, fieldwork and an offline CAPI interview', async ({ page, b
   const field = await browser.newContext();
   const app = await field.newPage();
   app.on('dialog', (d) => void d.accept());
+  await autoConfirm(app);
   await app.goto('http://localhost:5174/');
   await app.getByLabel('Email').fill(interviewerEmail);
   await app.getByLabel('Password').fill('field-password-1');

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 type Role = 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
 
@@ -287,6 +288,7 @@ interface ScimState {
 }
 
 export function ScimSettings() {
+  const confirm = useConfirm();
   const [state, setState] = useState<ScimState | null>(null);
   const [created, setCreated] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -303,7 +305,16 @@ export function ScimSettings() {
   }, [load]);
 
   const create = async () => {
-    if (state?.token && !window.confirm('Replace the SCIM token? The current one stops working at once.')) return;
+    if (
+      state?.token &&
+      !(await confirm({
+        title: 'Replace the SCIM token?',
+        message: 'The current one stops working at once.',
+        confirmLabel: 'Replace token',
+        tone: 'danger',
+      }))
+    )
+      return;
     setError(null);
     try {
       setCreated((await api<{ token: string }>('/scim/token', { method: 'POST' })).token);
@@ -313,7 +324,15 @@ export function ScimSettings() {
     }
   };
   const revoke = async () => {
-    if (!window.confirm('Revoke the SCIM token? Your identity provider stops provisioning at once.')) return;
+    if (
+      !(await confirm({
+        title: 'Revoke the SCIM token?',
+        message: 'Your identity provider stops provisioning at once.',
+        confirmLabel: 'Revoke',
+        tone: 'danger',
+      }))
+    )
+      return;
     setError(null);
     try {
       await api('/scim/token', { method: 'DELETE' });

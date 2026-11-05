@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
 import { DEFAULT_APPEARANCE, THEME_BOOT_SCRIPT, resolveTheme } from '@zapx/quantum';
+import { ConfirmProvider } from '@/components/neon/ConfirmDialog';
 import { ThemeProvider } from '@/lib/theme/ThemeProvider';
 import './globals.css';
 import './quantum.css';
@@ -35,7 +36,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

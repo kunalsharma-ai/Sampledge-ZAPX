@@ -38,12 +38,14 @@ import {
   type Answers,
 } from '@zapx/survey-schema';
 import { InterviewRecorder, locate, savePhoto } from './capture';
+import { useConfirm } from './Confirm';
 import { captures, interviews, type LocalInterview, type PackagedSurvey } from './store';
 
 /** A page left open longer than this counts as this long (the interviewer stepped away). */
 const MAX_PAGE_MS = 30 * 60 * 1000;
 
 export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; record: LocalInterview; onExit: () => void }) {
+  const confirm = useConfirm();
   const source = useMemo(() => {
     const p = parseSurveyDefinition(survey.version.definition);
     return p.ok ? p.definition : null;
@@ -225,7 +227,15 @@ export function Interview({ survey, record, onExit }: { survey: PackagedSurvey; 
   };
 
   const breakOff = async () => {
-    if (!window.confirm('End this interview now? It is kept and synced as unfinished (partial).')) return;
+    if (
+      !(await confirm({
+        title: 'End this interview now?',
+        message: 'It is kept and synced as unfinished (partial).',
+        confirmLabel: 'End interview',
+        tone: 'danger',
+      }))
+    )
+      return;
     await finish(leavePage(current), 'partial', true);
   };
 

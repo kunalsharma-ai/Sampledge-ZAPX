@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
 import { SuperAdminFrame } from '@/components/super-admin/SuperAdminFrame';
 import { FeatureMatrix, type FeatureDef, type Surface } from '@/components/super-admin/FeatureMatrix';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Limits {
   seats: number | null;
@@ -57,6 +58,7 @@ const blank = (features: FeatureDef[]): Plan => ({
 });
 
 function PlanEditor({ initial, features, isNew, onDone }: { initial: Plan; features: FeatureDef[]; isNew: boolean; onDone: () => void }) {
+  const confirm = useConfirm();
   const [p, setP] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
@@ -97,7 +99,7 @@ function PlanEditor({ initial, features, isNew, onDone }: { initial: Plan; featu
     }
   };
   const remove = async () => {
-    if (!window.confirm(`Delete the ${p.name} plan?`)) return;
+    if (!(await confirm({ title: `Delete the ${p.name} plan?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
     await api(`/super/plans/${p.code}`, { method: 'DELETE' }).then(onDone, setError);
   };
 

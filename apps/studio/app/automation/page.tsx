@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { useThemeModule } from '@/lib/theme/ThemeProvider';
 import { PageHeader } from '@/components/neon/PageHeader';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 type Op = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
 interface Condition {
@@ -115,6 +116,7 @@ const blank = (): Omit<Rule, 'id' | 'description' | 'nextRunAt' | 'lastFiredAt' 
  * status, optionally only after an administrator approves. Every run is logged here.
  */
 export default function AutomationPage() {
+  const confirm = useConfirm();
   const me = useMe();
   useThemeModule('settings');
   const canEdit = me?.role === 'ADMIN' || me?.role === 'PROGRAMMER';
@@ -314,7 +316,7 @@ export default function AutomationPage() {
                   <button
                     aria-label={`Delete rule ${r.name}`}
                     onClick={async () => {
-                      if (!window.confirm(`Delete the rule "${r.name}"?`)) return;
+                      if (!(await confirm({ title: `Delete the rule "${r.name}"?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
                       await api(`/automation/rules/${r.id}`, { method: 'DELETE' }).catch(setError);
                       await load();
                     }}

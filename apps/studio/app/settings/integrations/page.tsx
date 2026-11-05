@@ -11,6 +11,7 @@ import { useMe } from '@/lib/useMe';
 import { CopyField, ErrorNote, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/neon/PageHeader';
 import { Plug } from 'lucide-react';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Field {
   name: string;
@@ -76,6 +77,7 @@ function status(i: Integration): { text: string; cls: string } {
 }
 
 function IntegrationCard({ initial }: { initial: Integration }) {
+  const confirm = useConfirm();
   const [it, setIt] = useState(initial);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -123,7 +125,15 @@ function IntegrationCard({ initial }: { initial: Integration }) {
 
   const reset = () =>
     run(async () => {
-      if (!window.confirm(`Forget everything saved here for ${it.name}? It will use the server environment again.`)) return;
+      if (
+        !(await confirm({
+          title: `Forget everything saved here for ${it.name}?`,
+          message: 'It will use the server environment again.',
+          confirmLabel: 'Forget settings',
+          tone: 'danger',
+        }))
+      )
+        return;
       const next = await api<Integration>(`/platform/integrations/${it.key}`, { method: 'DELETE' });
       setIt(next);
       setOpen(false);

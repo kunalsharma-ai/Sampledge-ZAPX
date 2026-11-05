@@ -9,6 +9,7 @@
 import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { autoConfirm } from './confirm-helper';
 
 let deepgram: Server;
 const transcriptions: string[] = [];
@@ -44,7 +45,7 @@ const definition = {
 
 test('fraud signals, photo answers and face-to-face capture', async ({ page, browser }) => {
   test.setTimeout(150_000);
-  page.on('dialog', (d) => void d.accept());
+  await autoConfirm(page);
   await page.goto('/login');
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
   await page.getByLabel('Organization').fill(`E2E M12 ${run}`);
@@ -125,6 +126,7 @@ test('fraud signals, photo answers and face-to-face capture', async ({ page, bro
   const field = await browser.newContext({ geolocation: home, permissions: ['geolocation', 'microphone'] });
   const app = await field.newPage();
   app.on('dialog', (d) => void d.accept());
+  await autoConfirm(app);
   await app.goto('http://localhost:5174/');
   await app.getByLabel('Email').fill(interviewerEmail);
   await app.getByLabel('Password').fill('field-password-1');

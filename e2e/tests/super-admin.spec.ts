@@ -7,6 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { autoConfirm } from './confirm-helper';
 
 const run = `sa${Date.now().toString(36)}`;
 const password = 'e2e-password-123';
@@ -33,6 +34,7 @@ test.afterAll(() => {
 
 test('the super admin controls an organization’s features live', async ({ page, browser }) => {
   page.on('dialog', (d) => void d.accept('Unpaid'));
+  await autoConfirm(page);
   await signUp(page, 'super');
   previous = /previous=(.*)/.exec(execFileSync('node', [operatorCli, superEmail]).toString())?.[1]?.trim() ?? '';
   execFileSync('node', [superCli, superEmail]);

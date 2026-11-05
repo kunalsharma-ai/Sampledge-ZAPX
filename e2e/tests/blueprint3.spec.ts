@@ -5,6 +5,7 @@
  * imported and a wave scheduled (sending is off in tests, which the page says).
  */
 import { expect, test } from '@playwright/test';
+import { autoConfirm } from './confirm-helper';
 
 const run = `p3${Date.now().toString(36)}`;
 /** Set SHOTS to a folder to keep screenshots of the new screens (used for the pull request). */
@@ -39,6 +40,7 @@ test('fieldwork evidence, back-checks, appeals and email invitations', async ({ 
     'Why is the interview reinstated?': 'Son confirmed the visit by phone',
   };
   page.on('dialog', (d) => void d.accept(d.type() === 'prompt' ? (answers[d.message()] ?? 'ok') : undefined));
+  await autoConfirm(page);
   await page.goto('/login');
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
   await page.getByLabel('Organization').fill(`E2E P3 ${run}`);
@@ -78,7 +80,9 @@ test('fieldwork evidence, back-checks, appeals and email invitations', async ({ 
   await app.getByRole('button', { name: 'Sign in' }).click();
   const card = app.getByTestId('capi-survey').filter({ hasText: 'Retail audit' });
   await card.getByRole('button', { name: 'Start interview' }).click();
-  await expect.poll(() => appDialogs.join('|')).toContain('outside the interview areas of this survey (nearest: Ward 4)');
+  const outside = app.getByRole('alertdialog', { name: 'Outside the interview areas' });
+  await expect(outside).toContainText('outside the interview areas of this survey (nearest: Ward 4)');
+  await outside.getByRole('button', { name: 'Start anyway' }).click();
   await app.getByRole('textbox', { name: 'Which shop are you in?' }).fill('Sharma General Store');
   await app.getByRole('textbox', { name: 'Scan the pack barcode' }).fill('ABC');
   await app.getByRole('button', { name: 'Next' }).click();

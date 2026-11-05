@@ -9,6 +9,7 @@ import { ProjectAccess } from '@/components/ProjectAccess';
 import { useMe } from '@/lib/useMe';
 import { PageHeader } from '@/components/neon/PageHeader';
 import { FolderOpen } from 'lucide-react';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Project {
   id: string;
@@ -18,6 +19,7 @@ interface Project {
 }
 
 export default function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+  const confirm = useConfirm();
   const { id } = use(params);
   const me = useMe();
   const [project, setProject] = useState<Project | null>(null);
@@ -120,7 +122,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <button
                           className="link"
                           onClick={async () => {
-                            if (!window.confirm(`Delete vendor ${v.name}? Its links stop working; its history is kept.`)) return;
+                            if (
+                              !(await confirm({
+                                title: `Delete vendor ${v.name}?`,
+                                message: 'Its links stop working; its history is kept.',
+                                confirmLabel: 'Delete',
+                                tone: 'danger',
+                              }))
+                            )
+                              return;
                             try {
                               await api(`/vendors/${v.id}`, { method: 'DELETE' });
                               if (editing?.id === v.id) setEditing(null);

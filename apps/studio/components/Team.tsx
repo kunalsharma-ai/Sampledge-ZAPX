@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 type Role = 'ADMIN' | 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
 type Scope = 'ALL' | 'ASSIGNED';
@@ -34,6 +35,7 @@ const ROLE_HELP: Record<Role, string> = {
 const scoped = (role: Role) => role === 'PROGRAMMER' || role === 'VIEWER';
 
 export function Team() {
+  const confirm = useConfirm();
   const me = useMe();
   const [members, setMembers] = useState<Member[]>([]);
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'PROGRAMMER' as Role, projectScope: 'ALL' as Scope });
@@ -71,7 +73,14 @@ export function Team() {
   };
 
   const reset = async (m: Member) => {
-    if (!window.confirm(`Create a password reset link for ${m.name}? Older links for them stop working.`)) return;
+    if (
+      !(await confirm({
+        title: `Create a password reset link for ${m.name}?`,
+        message: 'Older reset links for them stop working.',
+        confirmLabel: 'Create link',
+      }))
+    )
+      return;
     setError(null);
     setNote(null);
     try {

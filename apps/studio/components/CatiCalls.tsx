@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, upload } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Summary {
   cases: Partial<Record<'PENDING' | 'CALLBACK' | 'IN_CALL' | 'DONE' | 'CLOSED', number>>;
@@ -64,6 +65,7 @@ const STATUS_LABEL: Record<string, string> = {
 const label = (s: string) => s.replace(/_/g, ' ');
 
 export function CatiCalls({ surveyId, readOnly }: { surveyId: string; readOnly: boolean }) {
+  const confirm = useConfirm();
   const me = useMe();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [cases, setCases] = useState<CaseRow[]>([]);
@@ -117,7 +119,14 @@ export function CatiCalls({ surveyId, readOnly }: { surveyId: string; readOnly: 
   };
 
   const erase = async () => {
-    if (!window.confirm('Erase the phone numbers of every interviewed or closed case? This cannot be undone. Call history is kept.'))
+    if (
+      !(await confirm({
+        title: 'Erase the phone numbers of every interviewed or closed case?',
+        message: 'This cannot be undone. Call history is kept.',
+        confirmLabel: 'Erase numbers',
+        tone: 'danger',
+      }))
+    )
       return;
     setError(null);
     try {
@@ -470,6 +479,7 @@ const DNC_SOURCE: Record<string, string> = { respondent: 'asked on a call', uplo
 
 /** The organization's do-not-call list (Milestone 18): numbers are kept as keyed hashes only. */
 export function DoNotCallList() {
+  const confirm = useConfirm();
   const me = useMe();
   const [list, setList] = useState<DncList | null>(null);
   const [phones, setPhones] = useState('');
@@ -513,7 +523,15 @@ export function DoNotCallList() {
     }
   };
   const remove = async (id: string, hint: string) => {
-    if (!window.confirm(`Take the number ending ${hint} off the do-not-call list? It may be called again.`)) return;
+    if (
+      !(await confirm({
+        title: `Take the number ending ${hint} off the do-not-call list?`,
+        message: 'It may be called again.',
+        confirmLabel: 'Remove from list',
+        tone: 'danger',
+      }))
+    )
+      return;
     try {
       await api(`/cati/do-not-call/${id}`, { method: 'DELETE' });
       await load();
