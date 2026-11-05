@@ -26,9 +26,27 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   }
   if (res.status === 204) return undefined as T;
   const data = await res.json().catch(() => ({}));
+  // The super admin suspended the organization: show why instead of a broken page.
+  if (res.status === 403 && (data as { code?: string }).code === 'ORG_SUSPENDED' && typeof window !== 'undefined') {
+    if (!window.location.pathname.startsWith('/suspended')) window.location.href = '/suspended';
+  }
   if (!res.ok) throw new ApiError(res.status, data);
   return data as T;
 }
+
+/** The member's features right now (super admin control), from GET /api/me/entitlements. */
+export interface Entitlements {
+  version: string;
+  plan: string | null;
+  surface: 'web' | 'mobile';
+  suspended: boolean;
+  surfaceAllowed: boolean;
+  features: Record<string, boolean>;
+}
+
+/** Whether a feature is on. Before entitlements are known (older API), everything shows. */
+export const hasFeature = (me: Pick<Me, 'entitlements'> | null | undefined, key: string) =>
+  !me?.entitlements || me.entitlements.features[key] === true;
 
 export interface Me {
   id: string;
@@ -39,6 +57,10 @@ export interface Me {
   tenant: { id: string; name: string };
   /** Administrator of the organization that runs this installation: may open Settings > Integrations. */
   canManageIntegrations?: boolean;
+  /** Super admin of the whole installation: may open the super admin console. */
+  superAdmin?: boolean;
+  /** Features of this member in the web CRM; kept up to date live by useMe. */
+  entitlements?: Entitlements;
 }
 
 /** Multipart upload (files) with the same session and CSRF handling as `api`. */

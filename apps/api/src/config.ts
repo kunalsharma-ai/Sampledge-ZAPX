@@ -172,6 +172,9 @@ const schema = z
     /** Background jobs (Milestone 7): run the job worker in this process. Turn off in the API when a separate worker runs. */
     JOB_WORKER: z.enum(['on', 'off']).default('on'),
     JOB_POLL_MS: z.coerce.number().int().min(100).max(600_000).default(2_000),
+    /** Super admin automation: check the platform automation rules in this process, every PLATFORM_AUTOMATION_MS. */
+    PLATFORM_AUTOMATION: z.enum(['on', 'off']).default('on'),
+    PLATFORM_AUTOMATION_MS: z.coerce.number().int().min(5_000).max(3_600_000).default(60_000),
     /** Where the local file store keeps files (exports, uploads for AI jobs). */
     FILES_DIR: z.string().default('.data/files'),
     /** Where file bytes live (Milestone 13): the local FILES_DIR, or a private S3 bucket. */

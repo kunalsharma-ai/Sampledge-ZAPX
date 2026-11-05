@@ -739,3 +739,28 @@ Backend: `apps/api/src/governance` · Frontend: `apps/studio/components/DataGove
 | ------ | ------------------------------ | --------------- | ------------------------------------------------------------------------------------------- |
 | GET    | `/api/organization/governance` | ADMIN           | [`GovernanceController.get`](../../apps/api/src/governance/governance.controller.ts#L13)    |
 | PUT    | `/api/organization/governance` | ADMIN           | [`GovernanceController.update`](../../apps/api/src/governance/governance.controller.ts#L18) |
+
+## Super admin and entitlements (ADR 0036)
+
+Every signed-in member, including a suspended organization's:
+
+| Method | Path                                       | What it does                                                                                                           |
+| ------ | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/features`                            | The feature catalog: `[{ key, label, group, description, surfaces }]`                                                  |
+| GET    | `/api/me/entitlements?surface=web\|mobile` | `{ version, plan, surface, suspended, surfaceAllowed, features, updatedAt }`; `ETag` = version, 304 on `If-None-Match` |
+| GET    | `/api/me/entitlements/stream?surface=…`    | Server-sent events: `entitlements` with the same body, whenever it changes                                             |
+
+Without `surface`, the `X-ZAPX-Client: mobile` header selects the mobile set. Gated routes answer
+403 with `code` `FEATURE_DISABLED` (and `feature`), `ORG_SUSPENDED`, or `MOBILE_DISABLED`. The route
+to feature map is in `apps/api/src/super-admin/features.ts`.
+
+Super admin only (signed in, never an API key; otherwise 403 `SUPER_ADMIN_ONLY`), under `/api/super`:
+`GET overview`; `GET|POST plans`, `PUT|DELETE plans/:code`; `GET|POST organizations`,
+`GET|PATCH organizations/:id`, `PUT organizations/:id/features` (all overrides),
+`PATCH organizations/:id/features` (`{ feature, surface: web|mobile|both, on: true|false|null }`),
+`POST organizations/:id/suspend|reactivate`, `POST organizations/:id/members`; `GET users`,
+`PATCH users/:id` (`role`, `disabled`, `superAdmin`, `mobileAccess`, `featureOverrides`),
+`POST users/:id/password-reset`; `GET activity?tenantId&userId&action&before&limit`;
+`GET integrations`; `GET automation/vocabulary`, `GET|POST automation/rules`,
+`PATCH|DELETE automation/rules/:id`, `GET automation/rules/:id/preview`, `POST automation/run?rule=`,
+`GET automation/runs?rule=`.

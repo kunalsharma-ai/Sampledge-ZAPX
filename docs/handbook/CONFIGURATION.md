@@ -159,3 +159,13 @@ S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS
   and `SENDGRID_API_KEY` had no secret slot. Both now match (and a test checks it). Every key in
   `app_secret_keys` must exist in the secret, empty if unused, or the tasks fail to start. PR #28
   changes this area; re-check after it merges.
+
+## Super admin automation (ADR 0036)
+
+| Variable                 | Default | What it does                                                                 |
+| ------------------------ | ------- | ---------------------------------------------------------------------------- |
+| `PLATFORM_AUTOMATION`    | `on`    | Check the super admin's automation rules in this API process                 |
+| `PLATFORM_AUTOMATION_MS` | `60000` | How often (ms). Several processes are safe: each firing is claimed only once |
+
+The first super admin is made with `node apps/api/dist/cli/set-super-admin.js <email>` (the member must
+belong to the organization that runs the installation; see `set-operator.js`). Remove with `--remove`.

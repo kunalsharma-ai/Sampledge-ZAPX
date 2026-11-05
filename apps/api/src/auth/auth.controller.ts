@@ -27,6 +27,7 @@ import { verifySession } from './auth.guard';
 import { isCommonPassword } from './password-policy';
 import { SsoService } from './sso.service';
 import { PasswordResetService, newPasswordSchema } from './password-reset.service';
+import { EntitlementsService } from '../super-admin/entitlements.service';
 import { IntegrationSettingsService } from '../platform/integration-settings.service';
 import { ALL_ROLES, CurrentUser, Public, Roles } from './decorators';
 
@@ -58,6 +59,7 @@ export class AuthController {
     private readonly sso: SsoService,
     private readonly resets: PasswordResetService,
     private readonly integrations: IntegrationSettingsService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   private issue(res: Response, user: { id: string; tenantId: string; role: AuthUser['role']; email: string }) {
@@ -90,6 +92,11 @@ export class AuthController {
       await this.prisma.user.update({ where: { id: user.id }, data: { failedLogins: 0, lockedUntil: null } });
     }
     if (user.disabledAt) throw new UnauthorizedException('Your account is disabled. Ask your administrator.');
+    if (!user.superAdmin) {
+      const t = await this.prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { suspendedAt: true } });
+      if (t?.suspendedAt)
+        throw new ForbiddenException({ message: 'Your organization is suspended. Contact the ZAPX administrator.', code: 'ORG_SUSPENDED' });
+    }
     if (await this.sso.passwordBlocked(user.tenantId, user.role)) {
       throw new ForbiddenException({
         message: 'Your organization signs in with single sign-on. Use "Sign in with SSO".',
@@ -252,6 +259,7 @@ export class AuthController {
         name: true,
         role: true,
         projectScope: true,
+        superAdmin: true,
         tenant: { select: { id: true, name: true, platformOperator: true } },
       },
     });
@@ -264,7 +272,12 @@ export class AuthController {
       viaApiKey: user.apiKeyId ?? null,
       // Administrators of the organization that runs the installation manage Settings > Integrations.
       canManageIntegrations:
-        user.role === 'ADMIN' && !user.apiKeyId && (platformOperator || (await this.integrations.isOperator(tenant.id))),
+        !user.apiKeyId &&
+        (u.superAdmin || (user.role === 'ADMIN' && (platformOperator || (await this.integrations.isOperator(tenant.id))))),
+      // Super admin of the whole installation (never through an API key).
+      superAdmin: u.superAdmin && !user.apiKeyId,
+      // The member's features for the client that asked (web CRM, or the mobile app with X-ZAPX-Client: mobile).
+      entitlements: await this.entitlements.forUser(user.id, user.client ?? 'web'),
     };
   }
 }
