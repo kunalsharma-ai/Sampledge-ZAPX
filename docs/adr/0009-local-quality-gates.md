@@ -12,7 +12,7 @@ maintainer decided to continue without a paid plan.
 
 - `pnpm check` (`scripts/check.sh`) is the quality gate: install with the frozen lockfile, format,
   lint, build, typecheck, migrations, unit and API tests, dependency audit, end-to-end tests and the
-  Docker image build. It runs on any machine with Node 22, pnpm 10, PostgreSQL and (for images) Docker.
+  Docker image build. It runs on any machine with Node 26, pnpm 10, PostgreSQL and (for images) Docker.
 - A pull request is merged only after `pnpm check` passes on its head commit, and the pull request
   says so. Merging stays a deliberate human action; nobody pushes to `main` directly by convention
   instead of by enforcement.

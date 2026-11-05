@@ -100,7 +100,7 @@ API code change, stop it and run it again (or run `pnpm --filter @zapx/api build
 
 ### 1d. Wrong Node or pnpm version
 
-- **Cause:** the repo needs Node 22+ (`package.json` `engines`) and pnpm 10.28
+- **Cause:** the repo needs Node 26+ (`package.json` `engines`) and pnpm 10.28
   (`packageManager`). Older versions fail at install with syntax or lockfile errors.
 - **Commands:** `node -v`, `pnpm -v`; `corepack enable && corepack prepare pnpm@10.28.0 --activate`.
 - **Confirm:** `pnpm install --frozen-lockfile` finishes without errors.

@@ -40,7 +40,7 @@ organization and member may use on the web and in the **mobile app** for Android
 
 ## Quick start (local machine)
 
-Needs Node 22, pnpm 10.28 and PostgreSQL 16. Full detail and alternatives (Docker) are in
+Needs Node 26 (LTS, see `.nvmrc`), pnpm 10.28 and PostgreSQL 16. Full detail and alternatives (Docker) are in
 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md#1-set-up-a-development-machine).
 
 ```bash
