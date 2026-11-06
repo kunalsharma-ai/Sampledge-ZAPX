@@ -26,7 +26,7 @@ in `pnpm-workspace.yaml`.
 ## Secrets
 
 - Never in code or in the repository. Locally `.env` (git-ignored); on AWS Secrets Manager.
-- Required in production: `JWT_SECRET`, `SECRETS_KEY` (the API refuses to start without it).
+- Required in production: `JWT_SECRET`, `SECRETS_KEY`, `SIGNING_KEYS_SECRET` (the API refuses to start without them).
 - Partner secrets that ZAPX must read back (PROJEXA client secret) are encrypted at rest with
   AES-256-GCM (`SecretBox`); the next step is KMS envelope encryption. Vendor shared secrets are
   stored as generated, returned only to admins (programmers and viewers do not receive it), and

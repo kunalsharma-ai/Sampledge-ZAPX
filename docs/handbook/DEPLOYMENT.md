@@ -244,6 +244,7 @@ The API refuses to start in production without these (enforced in `apps/api/src/
 
 - `NODE_ENV=production`, `COOKIE_SECURE=true`
 - `JWT_SECRET` (32+ characters, not the example) and its own `SECRETS_KEY` (32+, not `JWT_SECRET`)
+- `SIGNING_KEYS_SECRET` (32+, not `JWT_SECRET` or `SECRETS_KEY`)
 - `CALLBACK_ALLOW_PRIVATE_HOSTS` and `SSO_ALLOW_INSECURE_ISSUER` false
 - `S3_BUCKET` when `FILE_STORE=s3`
 
@@ -283,12 +284,26 @@ keys you use. Full list: [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 9. Maintenance recommendations
 
+### Rotating secrets
+
+Each secret has one job (security review S5), so a rotation has a known effect:
+
+| Secret                | Effect of rotating it                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `JWT_SECRET`          | Everyone is signed out (sign in again). Nothing else changes                                                  |
+| `SIGNING_KEYS_SECRET` | Test links already shared stop working; duplicate checks no longer match respondents from before the rotation |
+| `SECRETS_KEY`         | Stored secrets can no longer be decrypted: re-enter them (vendor partner and SSO client secrets, webhooks)    |
+
+After a leak of `JWT_SECRET` alone, rotate only `JWT_SECRET`. Before PR "security hardening"
+(`SIGNING_KEYS_SECRET` unset) `JWT_SECRET` also keyed test links and hashes; setting
+`SIGNING_KEYS_SECRET` the first time has the effect of rotating it.
+
 Regular tasks:
 
 | How often     | Task                                                                                                      |
 | ------------- | --------------------------------------------------------------------------------------------------------- |
 | Every change  | `pnpm check --quick`; one PR per change; update the module guide or ADR when behaviour changes            |
-| Weekly        | Review open Dependabot PRs (#20–#25 are open now); `pnpm audit --prod`                                    |
+| Weekly        | Review open Dependabot PRs; `pnpm audit --prod`                                                           |
 | Weekly        | Look at `DEAD` callbacks, `FAILED` jobs and the WAF counts during fieldwork                               |
 | Monthly       | Restore drill; review members and API keys (revoke unused); check AI spend against budgets                |
 | Quarterly     | Rotate `EDGE_SHARED_SECRET`, vendor and webhook secrets; review accepted advisories in `docs/security.md` |

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { headers } from 'next/headers';
 import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
 import { DEFAULT_APPEARANCE, THEME_BOOT_SCRIPT, resolveTheme } from '@zapx/quantum';
@@ -26,13 +27,15 @@ const DEFAULT_THEME_CSS =
   `@media (prefers-color-scheme: dark){:root{${declarations(dark.vars)}color-scheme:dark;}}` +
   `@media (prefers-reduced-motion: reduce){:root{${declarations(motionVars(reduced))}}}`;
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Per-request nonce from middleware.ts (content security policy, security review S6).
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     // The head script sets the saved theme on <html> before hydration, hence suppressHydrationWarning.
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <head>
         <style id="q-default-theme" dangerouslySetInnerHTML={{ __html: DEFAULT_THEME_CSS }} />
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       </head>
       <body>
         <ThemeProvider>{children}</ThemeProvider>

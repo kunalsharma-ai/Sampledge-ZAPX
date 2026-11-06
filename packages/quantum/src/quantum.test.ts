@@ -94,6 +94,8 @@ describe('theme engine', () => {
     expect(cache.light.attrs['data-q-scheme']).toBe('light');
     expect(cache.dark.attrs['data-q-scheme']).toBe('dark');
     expect(THEME_BOOT_SCRIPT).toContain('zapx.quantum.theme.v1');
+    // Only parses the constant boot script to prove it is valid JavaScript; it is never run.
+    // eslint-disable-next-line no-new-func
     expect(() => new Function(THEME_BOOT_SCRIPT)).not.toThrow();
   });
 });

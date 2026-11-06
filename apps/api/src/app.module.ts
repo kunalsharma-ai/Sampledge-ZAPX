@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { DbThrottlerStorage, throttleStore } from './common/db-throttler-storage';
+import { PrismaService } from './common/prisma.service';
 import { config } from './config';
 import { CommonModule } from './common/common.module';
 import { AuthController } from './auth/auth.controller';
@@ -94,7 +96,14 @@ import { PlatformAutomationService } from './super-admin/platform-automation.ser
     CommonModule,
     IntegrationsModule,
     JwtModule.register({ global: true, secret: config().JWT_SECRET }),
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 600 }]),
+    // Security review S4: in production the counters are shared by every API process (database store).
+    ThrottlerModule.forRootAsync({
+      inject: [PrismaService],
+      useFactory: (prisma: PrismaService) => ({
+        throttlers: [{ ttl: 60_000, limit: 600 }],
+        ...(throttleStore() === 'database' ? { storage: new DbThrottlerStorage(prisma) } : {}),
+      }),
+    }),
   ],
   controllers: [
     HealthController,

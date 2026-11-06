@@ -25,7 +25,6 @@ import {
   type QualityResult,
 } from '@zapx/quality-core';
 import { allQuestions, qualitySettingsOf, type Answers, type SurveyDefinition } from '@zapx/survey-schema';
-import { config } from '../config';
 import { PrismaService } from '../common/prisma.service';
 import { AuditService } from '../common/audit.service';
 import { AccessService } from '../common/access.service';
@@ -33,6 +32,7 @@ import { WebhookService } from '../integrations/webhook.service';
 import { RedirectService } from '../integrations/redirect.service';
 import type { AuthUser } from '../auth/auth.types';
 import { CaptureService } from '../captures/capture.service';
+import { signingKey } from '../common/signing-keys';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -68,12 +68,12 @@ export class QualityService {
    */
   networkHash(tenantId: string, ip: string | undefined): string | null {
     if (!ip) return null;
-    const key = createHmac('sha256', config().JWT_SECRET).update('zapx:network-hash').digest();
+    const key = signingKey('network-hash', (legacy) => createHmac('sha256', legacy).update('zapx:network-hash').digest());
     return createHmac('sha256', key).update(`${tenantId}:${ip}`).digest('hex').slice(0, 32);
   }
 
-  private key(purpose: string) {
-    return createHmac('sha256', config().JWT_SECRET).update(purpose).digest();
+  private key(purpose: 'zapx:device-hash') {
+    return signingKey('device-hash', (legacy) => createHmac('sha256', legacy).update(purpose).digest());
   }
 
   /**
