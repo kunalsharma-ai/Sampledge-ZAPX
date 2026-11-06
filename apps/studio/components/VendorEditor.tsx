@@ -14,7 +14,7 @@ export interface Vendor {
   id: string;
   name: string;
   code: string;
-  integration: 'DIRECT' | 'PROJEXA';
+  integration: 'DIRECT' | 'PROJEXA' | 'SAMPLEON';
   redirectMode: 'STATIC' | 'DYNAMIC' | 'HYBRID';
   staticUrls: StatusMap;
   statusWords: StatusMap;
@@ -176,6 +176,9 @@ export function VendorEditor({
           <select value={v.integration} onChange={(e) => setV({ ...v, integration: e.target.value as Vendor['integration'] })}>
             <option value="DIRECT">Direct: ZAPX redirects and calls back</option>
             <option value="PROJEXA">PROJEXA: traffic comes through PROJEXA</option>
+            {v.integration === 'SAMPLEON' ? (
+              <option value="SAMPLEON">SampAudience: set up from the survey&apos;s Distribute tab</option>
+            ) : null}
           </select>
         </label>
         {!projexa ? (

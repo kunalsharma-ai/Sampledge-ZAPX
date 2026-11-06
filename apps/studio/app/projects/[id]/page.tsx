@@ -109,6 +109,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       <td>
                         {v.integration === 'PROJEXA' ? (
                           <span className="badge">projexa</span>
+                        ) : v.integration === 'SAMPLEON' ? (
+                          <span className="badge">SampAudience</span>
                         ) : (
                           <span className="badge">{v.redirectMode.toLowerCase()}</span>
                         )}
