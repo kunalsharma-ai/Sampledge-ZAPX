@@ -5,7 +5,7 @@
 #   pnpm check --no-docker      skip the Docker image build (e.g. no Docker installed)
 #   pnpm check --no-e2e         skip the browser end-to-end tests
 #
-# Needs: Node 22, pnpm 10, a PostgreSQL database reachable at DATABASE_URL (from .env), and for the
+# Needs: Node 26, pnpm 10, a PostgreSQL database reachable at DATABASE_URL (from .env), and for the
 # last step Docker. The same steps run in .github/workflows/ci.yml when GitHub Actions is available.
 set -euo pipefail
 cd "$(dirname "$0")/.."

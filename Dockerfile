@@ -6,7 +6,7 @@
 #   docker build --target capi -t zapx-capi .
 # The same images run locally under docker compose and on AWS ECS/Fargate.
 
-FROM node:22-bookworm-slim AS base
+FROM node:26-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
 RUN corepack enable
@@ -53,14 +53,14 @@ EXPOSE 3000
 CMD ["node_modules/.bin/next", "start", "-p", "3000"]
 
 # ---- Respondent runtime: static files plus an /api proxy (CloudFront + S3 + ALB on AWS) -------
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.31-alpine AS runtime
 COPY infra/nginx/runtime.conf /etc/nginx/conf.d/default.conf
 COPY infra/nginx/runtime-headers.conf /etc/nginx/snippets/runtime-headers.conf
 COPY --from=build /app/apps/runtime/dist /usr/share/nginx/html
 EXPOSE 80
 
 # ---- Offline interviewer app (CAPI): static files plus an /api proxy --------------------------
-FROM nginx:1.27-alpine AS capi
+FROM nginx:1.31-alpine AS capi
 COPY infra/nginx/capi.conf /etc/nginx/conf.d/default.conf
 COPY infra/nginx/capi-headers.conf /etc/nginx/snippets/capi-headers.conf
 COPY --from=build /app/apps/capi/dist /usr/share/nginx/html

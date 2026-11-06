@@ -66,7 +66,7 @@ your machine is the gate.
 | Docker images            | `docker compose build`                    | images for every service in `docker-compose.yml`                                               |
 | One image                | `docker build --target api -t zapx-api .` | targets: `api`, `migrate`, `worker`, `studio`, `runtime`, `capi`                               |
 
-`Dockerfile` facts: base `node:22-bookworm-slim`; `api`, `migrate`, `worker` and `studio` run as
+`Dockerfile` facts: base `node:26-bookworm-slim` (nginx `1.31-alpine` for runtime and CAPI); `api`, `migrate`, `worker` and `studio` run as
 the unprivileged `node` user; `api` has a health check on `/api/health`; `migrate` runs
 `apps/api/dist/cli/migrate.js` and exits; `worker` runs `apps/api/dist/worker.js`; `runtime` and
 `capi` are static builds served by `nginx:1.27-alpine` with the headers in `infra/nginx/`.
@@ -307,8 +307,7 @@ Improvements worth planning (details in [SECURITY_REVIEW.md](SECURITY_REVIEW.md)
 4. **Shared rate limiting**: the throttler is per process; with two or more API tasks the limits
    multiply. A shared store (database or Valkey) would make them exact.
 5. **Studio unit tests** and a coverage report (section 1).
-6. **Node 22 → newer LTS** when Dependabot PR #20 is reviewed; test with `pnpm check` and the Docker
-   build.
+6. ~~Node 22 → newer LTS~~: done on branch `dependency-updates` (Node 26 LTS, with Dependabot #20–#25).
 7. **Decide where provider keys live** now that PR #38 lets them be set in the CRM: either keep them
    in Secrets Manager (`app_secret_keys`) or remove them there and enter them in Settings →
    Integrations, but not half of each ([CONFIGURATION.md](CONFIGURATION.md)).

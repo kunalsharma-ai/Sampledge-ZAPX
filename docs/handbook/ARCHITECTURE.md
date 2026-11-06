@@ -48,7 +48,7 @@ ZAPX is a survey programming, testing, hosting and fieldwork platform for market
 
 | Layer             | Technology (version from `package.json`)                                                                                                                                       |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Language          | TypeScript 5.8 everywhere (strict), Node.js 22                                                                                                                                 |
+| Language          | TypeScript 5.8 everywhere (strict), Node.js 26 LTS                                                                                                                             |
 | Monorepo          | pnpm 10.28 workspaces (`pnpm-workspace.yaml`) and Turborepo 2.5 (`turbo.json`)                                                                                                 |
 | Backend           | NestJS 11 on Express (`apps/api`), Zod 4 for validation, `@nestjs/throttler` for rate limits, `@nestjs/jwt` for sessions                                                       |
 | Database          | PostgreSQL 16 through Prisma 6.10 (`packages/db`)                                                                                                                              |

@@ -189,7 +189,7 @@ infra/        nginx config, backup and restore scripts
 
 ## Running locally
 
-Requirements: Node 22, pnpm 10, PostgreSQL 16 (or Docker).
+Requirements: Node 26 (LTS; `.nvmrc`), pnpm 10, PostgreSQL 16 (or Docker).
 
 **Everything in containers** (no Node needed): `docker compose up --build`, then open
 http://localhost:3000 (studio), http://localhost:5173 (respondent runtime) and
