@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Contacts {
   total: number;
@@ -58,6 +59,7 @@ function inAnHour() {
 }
 
 export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: string; readOnly: boolean; live: boolean }) {
+  const confirm = useConfirm();
   const [contacts, setContacts] = useState<Contacts | null>(null);
   const [waves, setWaves] = useState<Wave[]>([]);
   const [csv, setCsv] = useState('');
@@ -127,7 +129,16 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
   };
 
   const cancel = async (w: Wave) => {
-    if (!window.confirm(`Cancel "${w.name}"? Emails not sent yet and all reminders are stopped.`)) return;
+    if (
+      !(await confirm({
+        title: `Cancel "${w.name}"?`,
+        message: 'Emails not sent yet and all reminders are stopped.',
+        confirmLabel: 'Cancel wave',
+        cancelLabel: 'Keep it',
+        tone: 'danger',
+      }))
+    )
+      return;
     try {
       await api(`/surveys/${surveyId}/distributions/${w.id}/cancel`, { method: 'POST' });
       await load();

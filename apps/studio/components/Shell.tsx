@@ -25,6 +25,7 @@ import { useMe } from '@/lib/useMe';
 import { ThemeMenu } from '@/components/quantum/ThemeMenu';
 import { GlobalSearch } from '@/components/neon/GlobalSearch';
 import { NotificationBell } from '@/components/NotificationBell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface NavItem {
   href: string;
@@ -113,6 +114,7 @@ const initials = (name: string) =>
 
 /** `forInterviewers`: the page is also for the interviewer role (the phone calling screen). */
 export function Shell({ children, crumbs, forInterviewers }: { children: ReactNode; crumbs?: ReactNode; forInterviewers?: boolean }) {
+  const confirm = useConfirm();
   const me = useMe();
   const path = usePathname() ?? '/';
   const [navOpen, setNavOpen] = useState(false);
@@ -172,7 +174,15 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
                   title="Ends your sessions on every computer and phone"
                   data-testid="sign-out-everywhere"
                   onClick={async () => {
-                    if (!window.confirm('Sign out on every device, including this one?')) return;
+                    if (
+                      !(await confirm({
+                        title: 'Sign out on every device?',
+                        message: 'This includes this one.',
+                        confirmLabel: 'Sign out everywhere',
+                        tone: 'danger',
+                      }))
+                    )
+                      return;
                     await api('/auth/logout-all', { method: 'POST' });
                     window.location.href = '/login';
                   }}

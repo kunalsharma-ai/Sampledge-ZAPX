@@ -368,3 +368,72 @@ textarea:focus {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* Confirm dialog (components/neon/ConfirmDialog.tsx), the replacement for window.confirm. */
+.nx-confirm-backdrop {
+  z-index: 80;
+}
+.nx-confirm {
+  width: min(460px, 100%);
+  gap: 14px;
+  animation: nx-confirm-in var(--q-dur-base, 160ms) var(--q-ease, ease-out);
+}
+.nx-confirm-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.nx-confirm-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.35;
+}
+.nx-confirm-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--q-accent-text);
+  background: color-mix(in srgb, var(--q-accent-text) 14%, transparent);
+  box-shadow: 0 0 22px -6px var(--nx-glow-a);
+}
+.nx-confirm-danger .nx-confirm-icon {
+  color: var(--q-bad);
+  background: var(--q-bad-soft);
+  box-shadow: 0 0 22px -6px var(--q-bad);
+}
+.nx-confirm-body {
+  color: var(--q-text-muted, inherit);
+  line-height: 1.5;
+}
+.nx-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+button.nx-confirm-danger-btn {
+  background: var(--q-bad);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 0 24px -8px var(--q-bad);
+}
+button.nx-confirm-danger-btn:hover:not(:disabled) {
+  background: var(--q-bad);
+  border-color: transparent;
+  filter: brightness(1.08);
+}
+@keyframes nx-confirm-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(6px * var(--q-move, 1))) scale(0.98);
+  }
+}
+@media (max-width: 520px) {
+  .nx-confirm-actions > button {
+    flex: 1 1 auto;
+  }
+}

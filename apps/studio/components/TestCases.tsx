@@ -16,6 +16,7 @@ import {
 import type { Answers, QaTestCaseInput, SurveyDefinition } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface StoredCase {
   id: string;
@@ -75,6 +76,7 @@ interface RunResult {
 }
 
 export function TestCases({ surveyId, readOnly, dirty }: { surveyId: string; readOnly: boolean; dirty: boolean }) {
+  const confirm = useConfirm();
   const [cases, setCases] = useState<StoredCase[] | null>(null);
   const [run, setRun] = useState<RunResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -103,7 +105,7 @@ export function TestCases({ surveyId, readOnly, dirty }: { surveyId: string; rea
     }
   };
   const remove = async (c: StoredCase) => {
-    if (!window.confirm(`Delete the test case "${c.name}"?`)) return;
+    if (!(await confirm({ title: `Delete the test case "${c.name}"?`, confirmLabel: 'Delete', tone: 'danger' }))) return;
     try {
       await api(`/surveys/${surveyId}/test-cases/${c.id}`, { method: 'DELETE' });
       setRun(null);

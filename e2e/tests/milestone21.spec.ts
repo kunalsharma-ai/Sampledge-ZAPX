@@ -7,6 +7,7 @@
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { autoConfirm } from './confirm-helper';
 
 const run = `m21${Date.now().toString(36)}`;
 const password = 'e2e-password-123';
@@ -30,7 +31,7 @@ test.afterAll(() => {
 });
 
 test('integrations are set up in the CRM by the operator only', async ({ page, browser }) => {
-  page.on('dialog', (d) => void d.accept());
+  await autoConfirm(page);
   await signUp(page, 'operator');
   const out = execFileSync('node', [cli, `operator@${run}.e2e.test`]).toString();
   previous = /previous=(.*)/.exec(out)?.[1]?.trim() ?? '';

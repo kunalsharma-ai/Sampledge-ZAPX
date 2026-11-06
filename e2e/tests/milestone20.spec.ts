@@ -9,7 +9,6 @@ const email = `admin@${run}.e2e.test`;
 const password = 'e2e-password-123';
 
 test('security headers, weak passwords and sign out everywhere', async ({ page, browser }) => {
-  page.on('dialog', (d) => void d.accept());
   const res = await page.goto('/login');
   const headers = res!.headers();
   expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
@@ -47,7 +46,24 @@ test('security headers, weak passwords and sign out everywhere', async ({ page, 
   await second.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(second.getByRole('heading', { name: 'Projects' })).toBeVisible();
 
+  // The neon confirm dialog (not window.confirm): focus starts on Cancel, Cancel and Escape do nothing.
+  const confirm = page.getByRole('alertdialog', { name: 'Sign out on every device?' });
   await page.getByTestId('sign-out-everywhere').click();
+  await expect(confirm).toBeVisible();
+  await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(confirm.getByRole('button', { name: 'Sign out everywhere' })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(confirm.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await confirm.getByRole('button', { name: 'Cancel' }).click();
+  await expect(confirm).toBeHidden();
+  await page.getByTestId('sign-out-everywhere').click();
+  await page.keyboard.press('Escape');
+  await expect(confirm).toBeHidden();
+  expect((await second.request.get('/api/auth/me')).status()).toBe(200);
+
+  await page.getByTestId('sign-out-everywhere').click();
+  await confirm.getByRole('button', { name: 'Sign out everywhere' }).click();
   await expect(page).toHaveURL(/\/login/);
   expect((await second.request.get('/api/auth/me')).status()).toBe(401);
   await other.close();

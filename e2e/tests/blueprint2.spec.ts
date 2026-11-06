@@ -3,11 +3,13 @@
  * case saved from the Programmer debugger and run in the QA lab.
  */
 import { expect, test } from '@playwright/test';
+import { autoConfirm } from './confirm-helper';
 
 const run = `p${Date.now().toString(36)}`;
 
 test('right-to-left translation, glossary and saved test cases', async ({ page }) => {
   page.on('dialog', (d) => void d.accept(d.type() === 'prompt' ? 'Default route' : undefined));
+  await autoConfirm(page);
   await page.goto('/login');
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
   await page.getByLabel('Organization').fill(`E2E Phase2 ${run}`);

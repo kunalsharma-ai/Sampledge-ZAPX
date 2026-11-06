@@ -11,7 +11,6 @@ const memberEmail = `pat@${run}.e2e.test`;
 const password = 'e2e-password-123';
 
 test('reset link, new password and change password', async ({ page, browser }) => {
-  page.on('dialog', (d) => void d.accept());
   await page.goto('/login');
   await expect(page.getByRole('link', { name: 'Forgot your password?' })).toBeVisible();
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
@@ -32,6 +31,10 @@ test('reset link, new password and change password', async ({ page, browser }) =
   await team
     .getByRole('row', { name: /Pat Programmer/ })
     .getByRole('button', { name: 'Reset password' })
+    .click();
+  await page
+    .getByRole('alertdialog', { name: 'Create a password reset link for Pat Programmer?' })
+    .getByRole('button', { name: 'Create link' })
     .click();
   const url = await team.getByTestId('reset-link').getByLabel('Reset link').inputValue();
   expect(url).toMatch(/\/reset-password\?token=/);

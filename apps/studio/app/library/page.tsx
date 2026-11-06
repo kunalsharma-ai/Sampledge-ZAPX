@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { useThemeModule } from '@/lib/theme/ThemeProvider';
 import { PageHeader } from '@/components/neon/PageHeader';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 export interface LibraryItem {
   id: string;
@@ -34,6 +35,7 @@ type Pane = 'QUESTION' | 'SURVEY' | 'templates';
  * templates. Questions are saved from the survey editor and inserted there; surveys start new ones.
  */
 export default function QuestionBankPage() {
+  const confirm = useConfirm();
   const me = useMe();
   useThemeModule('library');
   const canEdit = me?.role === 'ADMIN' || me?.role === 'PROGRAMMER';
@@ -60,7 +62,7 @@ export default function QuestionBankPage() {
   }, [load]);
 
   const remove = async (item: LibraryItem) => {
-    if (!window.confirm(`Remove "${item.name}" from the question bank?`)) return;
+    if (!(await confirm({ title: `Remove "${item.name}" from the question bank?`, confirmLabel: 'Remove', tone: 'danger' }))) return;
     try {
       await api(`/library/${item.id}`, { method: 'DELETE' });
       await load();

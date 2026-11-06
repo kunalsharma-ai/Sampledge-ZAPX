@@ -5,6 +5,7 @@
  */
 import { expect, test } from '@playwright/test';
 import { MockOidc } from '../../apps/api/test/support/mock-oidc';
+import { autoConfirm } from './confirm-helper';
 
 const run = `m8${Date.now().toString(36)}`;
 const domain = `${run}.e2e.test`;
@@ -18,7 +19,7 @@ test.afterAll(async () => {
 });
 
 test('single sign-on, SCIM token, plan usage and disabling members', async ({ page, browser }) => {
-  page.on('dialog', (d) => void d.accept());
+  await autoConfirm(page);
   await page.goto('/login');
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
   await page.getByLabel('Organization').fill(`E2E M8 ${run}`);

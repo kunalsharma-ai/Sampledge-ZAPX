@@ -8,6 +8,7 @@ import { checkGeofence, nextPageIndex, prepareSurvey } from '@zapx/logic-engine'
 import { capiSettingsOf, parseSurveyDefinition } from '@zapx/survey-schema';
 import { locate } from './capture';
 import { NotSignedIn, appeal, downloadPackage, myResults, signIn, signOut, syncNow, type ServerResult } from './api';
+import { useConfirm } from './Confirm';
 import { Interview } from './Interview';
 import { interviews, meta, type Interviewer, type LocalInterview, type PackagedSurvey, type SurveyPackage } from './store';
 
@@ -27,6 +28,7 @@ function useOnline() {
 }
 
 export function App() {
+  const confirm = useConfirm();
   const online = useOnline();
   const [ready, setReady] = useState(false);
   const [me, setMe] = useState<Interviewer | null>(null);
@@ -139,11 +141,13 @@ export function App() {
         const fence = checkGeofence(at, capture.geofences);
         if (
           !fence.inside &&
-          !window.confirm(
-            fence.nearest
-              ? `You seem to be ${(fence.nearest.distanceM / 1000).toFixed(1)} km outside the interview areas of this survey (nearest: ${fence.nearest.label}). The interview will be flagged for review. Start anyway?`
-              : "Your location is unknown, so this interview cannot be checked against the survey's interview areas and will be flagged for review. Start anyway?",
-          )
+          !(await confirm({
+            title: fence.nearest ? 'Outside the interview areas' : 'Location unknown',
+            message: fence.nearest
+              ? `You seem to be ${(fence.nearest.distanceM / 1000).toFixed(1)} km outside the interview areas of this survey (nearest: ${fence.nearest.label}). The interview will be flagged for review.`
+              : "Your location is unknown, so this interview cannot be checked against the survey's interview areas and will be flagged for review.",
+            confirmLabel: 'Start anyway',
+          }))
         )
           return;
       }
@@ -191,7 +195,15 @@ export function App() {
         <button
           className="capi-link"
           onClick={async () => {
-            if (waiting.length && !window.confirm(`${waiting.length} interview(s) are not synced yet. They stay on this device. Sign out?`))
+            if (
+              waiting.length &&
+              !(await confirm({
+                title: 'Sign out?',
+                message: `${waiting.length} interview(s) are not synced yet. They stay on this device.`,
+                confirmLabel: 'Sign out',
+                tone: 'danger',
+              }))
+            )
               return;
             await signOut();
             setMe(null);

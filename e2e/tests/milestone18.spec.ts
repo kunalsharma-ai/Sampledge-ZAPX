@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
+import { autoConfirm } from './confirm-helper';
 
 const run = `m18${Date.now().toString(36)}`;
 const demo = JSON.parse(readFileSync(join(__dirname, '../../docs/examples/demo-screener.json'), 'utf8'));
@@ -14,7 +15,7 @@ const hm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${Stri
 
 test('calling hours and the do-not-call list', async ({ page, browser }) => {
   test.setTimeout(90_000);
-  page.on('dialog', (d) => void d.accept());
+  await autoConfirm(page);
   await page.goto('/login');
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();
   await page.getByLabel('Organization').fill(`E2E M18 ${run}`);

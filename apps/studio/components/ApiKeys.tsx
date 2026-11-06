@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Key {
   id: string;
@@ -25,6 +26,7 @@ function state(k: Key) {
 }
 
 export function ApiKeys({ isAdmin }: { isAdmin: boolean }) {
+  const confirm = useConfirm();
   const [keys, setKeys] = useState<Key[]>([]);
   const [form, setForm] = useState({ name: '', role: 'VIEWER' as Key['role'], expiresInDays: '90' });
   const [created, setCreated] = useState<{ name: string; key: string } | null>(null);
@@ -87,7 +89,15 @@ export function ApiKeys({ isAdmin }: { isAdmin: boolean }) {
                       <button
                         className="link"
                         onClick={async () => {
-                          if (!window.confirm(`Revoke “${k.name}”? Anything using it stops working at once.`)) return;
+                          if (
+                            !(await confirm({
+                              title: `Revoke “${k.name}”?`,
+                              message: 'Anything using it stops working at once.',
+                              confirmLabel: 'Revoke',
+                              tone: 'danger',
+                            }))
+                          )
+                            return;
                           try {
                             await api(`/api-keys/${k.id}`, { method: 'DELETE' });
                             await load();

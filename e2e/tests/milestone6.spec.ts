@@ -5,12 +5,13 @@
  * in and sees only the assigned project.
  */
 import { expect, test } from '@playwright/test';
+import { autoConfirm } from './confirm-helper';
 
 const run = `m6${Date.now().toString(36)}`;
 const patEmail = `pat-${run}@test.zapx`;
 
 test('project access, API keys, webhooks and the audit log', async ({ page, browser }) => {
-  page.on('dialog', (d) => void d.accept());
+  await autoConfirm(page);
 
   await page.goto('/login');
   await page.getByRole('button', { name: 'New here? Create an organization' }).click();

@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
 import { SuperAdminFrame, ago, fmtTime, type PlanRow } from '@/components/super-admin/SuperAdminFrame';
 import type { FeatureDef } from '@/components/super-admin/FeatureMatrix';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 type Params = { days?: number; percent?: number; status?: string };
 type Action = { type: string } & Record<string, unknown>;
@@ -301,6 +302,7 @@ function RuleBuilder({
 }
 
 export default function SuperAutomationPage() {
+  const confirm = useConfirm();
   const [vocab, setVocab] = useState<Vocabulary | null>(null);
   const [rules, setRules] = useState<Rule[] | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
@@ -446,8 +448,8 @@ export default function SuperAutomationPage() {
                 </button>
                 <button
                   className="small danger"
-                  onClick={() => {
-                    if (window.confirm(`Delete the rule "${r.name}"?`))
+                  onClick={async () => {
+                    if (await confirm({ title: `Delete the rule "${r.name}"?`, confirmLabel: 'Delete', tone: 'danger' }))
                       void api(`/super/automation/rules/${r.id}`, { method: 'DELETE' }).then(load, setError);
                   }}
                 >

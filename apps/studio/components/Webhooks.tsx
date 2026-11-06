@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
+import { useConfirm } from '@/components/neon/ConfirmDialog';
 
 interface Hook {
   id: string;
@@ -36,6 +37,7 @@ const EVENT_HELP: Record<string, string> = {
 const STATE_CLASS: Record<Delivery['state'], string> = { DELIVERED: 'good', PENDING: 'warn', FAILED: 'bad', DEAD: 'bad' };
 
 export function Webhooks() {
+  const confirm = useConfirm();
   const [hooks, setHooks] = useState<Hook[]>([]);
   const [events, setEvents] = useState<string[]>([]);
   const [form, setForm] = useState({ url: '', description: '', events: ['response.finished'] as string[] });
@@ -108,7 +110,15 @@ export function Webhooks() {
             <button
               onClick={() =>
                 act(async () => {
-                  if (!window.confirm('Rotate the signing secret? The receiver must switch to the new secret.')) return;
+                  if (
+                    !(await confirm({
+                      title: 'Rotate the signing secret?',
+                      message: 'The receiver must switch to the new secret.',
+                      confirmLabel: 'Rotate secret',
+                      tone: 'danger',
+                    }))
+                  )
+                    return;
                   setSecret({ url: h.url, ...(await api<{ secret: string }>(`/webhooks/${h.id}/rotate-secret`, { method: 'POST' })) });
                 })
               }
@@ -119,7 +129,15 @@ export function Webhooks() {
               className="link"
               onClick={() =>
                 act(async () => {
-                  if (!window.confirm(`Delete the webhook to ${h.url}?`)) return;
+                  if (
+                    !(await confirm({
+                      title: 'Delete this webhook?',
+                      message: `Events stop being sent to ${h.url}.`,
+                      confirmLabel: 'Delete',
+                      tone: 'danger',
+                    }))
+                  )
+                    return;
                   await api(`/webhooks/${h.id}`, { method: 'DELETE' });
                   if (open === h.id) setOpen(null);
                 })
