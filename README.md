@@ -90,16 +90,15 @@ configurations.
 Every provider in milestones 16 to 19 (and Stripe, S3 and SSO from milestone 13) is off until its
 keys are added, and has been tested against local stand-ins only, not the real service.
 
-**Not yet on `main` (open pull requests, merged in order).** The Quantum Design System (#27), the
-Neon AI dashboard and sidebar shell (#29), and the five blueprint phases: loops, blocks, variables and
-the question bank (#30); multilingual tools, URL variables, least-fill and test cases (#31);
-fieldwork evidence, supervision, appeals and email distribution (#32); MaxDiff, conjoint, recodes and
-the AI research assistant (#33); automation, data residency and retention, cleaning, dashboards and
-SMS (#34). Then the maintainer handbook (#35) and the security fixes from its review: the vendor
-shared secret only for admins, password change, administrator reset links and
-"forgot password", and the AWS secret list (branch `security-fixes`). Setting up integrations in the
-CRM (#28) is a separate pull request on `main`. The handbook's
-[changelog](docs/handbook/CHANGELOG.md) lists them all.
+**Since milestone 20 (all merged into `main`).** The Quantum Design System (#27), the Neon AI
+dashboard and sidebar shell (#29), and the blueprint phases: loops, blocks, variables and the question
+bank (#30); multilingual tools, URL variables, least-fill and test cases (#31); fieldwork evidence,
+supervision, appeals and email distribution (#32); MaxDiff, conjoint, recodes and the AI research
+assistant (#33); automation, data residency and retention, cleaning, dashboards and SMS (#34); webcam
+eye tracking, experimental (#37). Then the maintainer handbook (#35, #42), security fixes S1–S3 (#36)
+and S4–S9 (#45), integrations set up in the CRM (#28 as #38), the neon design on every page (#39), the
+super admin console (#41), the Android and iOS app (#40), Node 26 LTS (#44) and neon confirm dialogs
+(#46). The handbook's [changelog](docs/handbook/CHANGELOG.md) lists them all.
 
 ## What works today
 
@@ -162,9 +161,9 @@ CRM (#28) is a separate pull request on `main`. The handbook's
 | Calling rules            | CATI calling hours per time zone and a do-not-call list (Milestone 18)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Phone dialer (optional)  | Twilio click-to-call with hidden numbers and call recording (Milestone 19)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Account security         | Account lockout, sign out everywhere, common-password check, security headers (Milestone 20)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Passwords                | Change your own password on My account; administrators create one-time reset links; "forgot password" emails a link when email is set up (branch `security-fixes`)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Passwords                | Change your own password on My account; administrators create one-time reset links; "forgot password" emails a link when email is set up (PR #36)                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
-Not yet built on `main`: recorded voice-over, AI open-end review, charts in analysis, SAML single logout and encrypted assertions (MaxDiff and conjoint are on open PR #33, chart dashboards on #34). See
+Not yet built on `main`: recorded voice-over, AI open-end review, SAML single logout and encrypted assertions (MaxDiff and conjoint came in #33, chart dashboards in #34). See
 [docs/architecture.md](docs/architecture.md).
 
 ## Repository layout

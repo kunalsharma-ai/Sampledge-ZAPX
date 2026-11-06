@@ -10,7 +10,7 @@ the repository's `package.json` files or scripts; they were run on 2026-11-05 on
 
 | Tool       | Version                                       | Check                                     |
 | ---------- | --------------------------------------------- | ----------------------------------------- |
-| Node.js    | 22 (`engines.node >= 22`)                     | `node -v`                                 |
+| Node.js    | 26 LTS (`engines.node >= 26`, `.nvmrc`)       | `node -v`                                 |
 | pnpm       | 10.28.0 (`packageManager`)                    | `pnpm -v` (`corepack enable` installs it) |
 | PostgreSQL | 16                                            | `psql --version`, or use Docker           |
 | Docker     | optional, for the full stack and image builds | `docker info`                             |
@@ -22,7 +22,7 @@ the repository's `package.json` files or scripts; they were run on 2026-11-05 on
 # 1. get the code (use the branch you want to work on)
 git clone https://github.com/kunalsharma-ai/Sampledge-ZAPX.git
 cd Sampledge-ZAPX
-git checkout mobile-app                  # top of the open stack, or main
+git checkout main                        # everything is merged into main
 
 # 2. settings
 cp .env.example .env                     # edit DATABASE_URL if needed; see CONFIGURATION.md
