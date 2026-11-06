@@ -434,3 +434,150 @@ button.nx-confirm-danger-btn:hover:not(:disabled) {
     flex: 1 1 auto;
   }
 }
+
+/* ---- Info "i" help tips (components/neon/InfoTip.tsx, text in lib/help.ts) ---- */
+button.nx-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  margin: 0 0 0 6px;
+  padding: 0;
+  vertical-align: middle;
+  border: 1px solid color-mix(in srgb, var(--q-accent-text) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--q-accent-text) 10%, transparent);
+  color: var(--q-accent-text);
+  font: inherit;
+  font-size: var(--q-text-sm, 0.85rem);
+  font-weight: 500;
+  line-height: 1;
+  cursor: help;
+  box-shadow: none;
+  transition:
+    background var(--q-dur-fast, 120ms) var(--q-ease, ease-out),
+    box-shadow var(--q-dur-fast, 120ms) var(--q-ease, ease-out);
+}
+button.nx-info.with-label {
+  width: auto;
+  height: 26px;
+  padding: 0 10px 0 6px;
+  margin: 0;
+}
+button.nx-info:hover:not(:disabled),
+button.nx-info[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--q-accent-text) 20%, transparent);
+  box-shadow: 0 0 14px -2px var(--nx-glow-a);
+}
+button.nx-info:focus-visible {
+  outline: 2px solid var(--q-accent-text);
+  outline-offset: 2px;
+}
+.nx-info-card {
+  position: fixed;
+  z-index: 1000;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--nx-edge);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--q-surface) 98%, transparent);
+  backdrop-filter: blur(14px);
+  color: var(--q-text);
+  font-size: var(--q-text-sm, 0.85rem);
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  letter-spacing: normal;
+  text-transform: none;
+  box-shadow:
+    var(--q-shadow-pop, 0 18px 40px rgb(0 0 0 / 0.35)),
+    0 0 34px -10px var(--nx-glow-a);
+  animation: nx-info-in var(--q-dur-base, 160ms) var(--q-ease, ease-out);
+}
+@keyframes nx-info-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+.nx-info-card.above {
+  animation-name: nx-info-in-above;
+}
+@keyframes nx-info-in-above {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+[data-q-motion='off'] .nx-info-card {
+  animation: none;
+}
+.nx-info-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.98rem;
+  font-weight: 650;
+}
+.nx-info-badge {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: var(--q-accent-text);
+  background: color-mix(in srgb, var(--q-accent-text) 16%, transparent);
+  box-shadow: 0 0 16px -4px var(--nx-glow-a);
+}
+.nx-info-row {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.nx-info-row > svg {
+  margin-top: 3px;
+  color: var(--q-accent-text);
+}
+.nx-info-row strong {
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--q-text-muted);
+}
+.nx-info-row p,
+.nx-info-row ol {
+  margin: 2px 0 0;
+}
+.nx-info-row ol {
+  padding-left: 18px;
+}
+.nx-info-row li + li {
+  margin-top: 2px;
+}
+.nx-info-row.tip {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--q-accent-3) 12%, transparent);
+}
+.nx-info-row.tip > svg {
+  color: var(--q-accent-3);
+}
+.nx-info-row.tip p {
+  margin: 0;
+}
+.nx-tab-help {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 12px;
+}

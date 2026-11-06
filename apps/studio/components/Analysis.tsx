@@ -5,6 +5,7 @@ import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { Donut, ShareBars } from './neon/Charts';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Status = 'COMPLETE' | 'TERMINATE' | 'QUOTA_FULL' | 'QUALITY_FAIL' | 'PARTIAL' | 'IN_PROGRESS';
 type Mode = 'CAWI' | 'CAPI' | 'CATI';
@@ -222,7 +223,10 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
     <div className="analysis">
       <aside className="stack">
         <section className="panel stack" aria-label="Saved reports" data-testid="saved-reports">
-          <h2>Saved reports</h2>
+          <h2>
+            Saved reports
+            <InfoTip k="section.savedReports" />
+          </h2>
           {reports.length ? (
             <ul className="report-list">
               {reports.map((r) => (
@@ -252,7 +256,10 @@ export function Analysis({ surveyId, readOnly }: { surveyId: string; readOnly: b
         </section>
 
         <section className="panel stack" aria-label="Filters">
-          <h2>Who to include</h2>
+          <h2>
+            Who to include
+            <InfoTip k="section.whoToInclude" />
+          </h2>
           <fieldset className="plain">
             <legend className="small muted">Interview status</legend>
             {STATUS_OPTIONS.map(([s, label]) => (
@@ -708,7 +715,10 @@ function WeightingPanel({
 
   return (
     <section className="panel stack" aria-label="Weighting" data-testid="weighting">
-      <h2>Weighting</h2>
+      <h2>
+        Weighting
+        <InfoTip k="section.weighting" />
+      </h2>
       {!weighting.dimensions.length ? (
         <p className="small muted">Results are unweighted. Add a variable to weight the sample to known shares, e.g. gender and age.</p>
       ) : null}

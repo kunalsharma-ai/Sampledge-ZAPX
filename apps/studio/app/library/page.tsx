@@ -79,7 +79,7 @@ export default function QuestionBankPage() {
 
   return (
     <Shell>
-      <PageHeader icon={Library} tone={2} eyebrow="Reuse" title="Question bank">
+      <PageHeader icon={Library} tone={2} eyebrow="Reuse" title="Question bank" help="page.library">
         Questions and surveys your team saved for reuse, and ready-made templates. Save a question from the survey editor with &ldquo;Save
         to question bank&rdquo;, and add it to another survey with &ldquo;Insert from question bank&rdquo;.
       </PageHeader>

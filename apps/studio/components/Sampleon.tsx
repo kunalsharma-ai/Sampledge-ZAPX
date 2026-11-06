@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface RequestRow {
   id: string;
@@ -66,7 +67,10 @@ export function Sampleon({
   if (!view.configured) {
     return (
       <section className="panel stack">
-        <h2>SAMPLEON audiences</h2>
+        <h2>
+          SAMPLEON audiences
+          <InfoTip k="section.sampleon" />
+        </h2>
         <p className="muted small">
           SAMPLEON is not connected. An administrator sets SAMPLEON_URL, SAMPLEON_CLIENT_SECRET and SAMPLEON_OUTCOME_SECRET for the API, and
           registers SampCode as a survey host in SAMPLEON.
@@ -76,7 +80,10 @@ export function Sampleon({
   }
   return (
     <section className="panel stack">
-      <h2>SAMPLEON audiences</h2>
+      <h2>
+        SAMPLEON audiences
+        <InfoTip k="section.sampleon" />
+      </h2>
       <p className="muted small">
         Get respondents from the SUPPLY360 panels. SAMPLEON checks feasibility, a supply approver approves the audience before any
         invitation goes out, and outcomes go back to SAMPLEON automatically.

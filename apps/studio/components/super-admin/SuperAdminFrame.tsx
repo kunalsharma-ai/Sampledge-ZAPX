@@ -4,6 +4,7 @@
  * the access check. The API refuses every console route to anyone but a signed-in super admin; this
  * only avoids showing an empty page.
  */
+import type { HelpKey } from '@/lib/help';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -24,11 +25,14 @@ const SECTIONS = [
 
 export function SuperAdminFrame({
   title,
+  help,
   intro,
   actions,
   children,
 }: {
   title: string;
+  /** Key of the "i" help card next to the title. */
+  help?: HelpKey;
   intro?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
@@ -51,7 +55,7 @@ export function SuperAdminFrame({
     );
   return (
     <Shell crumbs={crumbs}>
-      <PageHeader icon={ShieldCheck} eyebrow="Super admin" title={title} actions={actions}>
+      <PageHeader icon={ShieldCheck} eyebrow="Super admin" title={title} help={help} actions={actions}>
         {intro}
       </PageHeader>
       <nav className="sa-tabs" aria-label="Super admin sections">

@@ -9,6 +9,7 @@ import { useRef, useState } from 'react';
 import type { HotspotRegion, Option, Question, SurveyDefinition } from '@zapx/survey-schema';
 import { quotaDimensions, quotaTableCells, quotasFromCells, type QuotaDimension } from '@zapx/logic-engine';
 import { OptionImagePicker, mediaSrc, useHasMediaLibrary } from './MediaLibrary';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Def = SurveyDefinition;
 const LOGIC_HELP = 'Logic, e.g. AGE >= 18 and selected(Q3, 1) · KIDS + 2 · round(SPEND / 12, 1)';
@@ -30,6 +31,7 @@ export function LoopsEditor({ def, onChange }: { def: Def; onChange: (d: Def) =>
     <section className="stack" aria-labelledby="loops-h">
       <h2 id="loops-h" style={{ marginTop: 12 }}>
         Loops
+        <InfoTip k="section.loops" />
       </h2>
       <p className="muted small">
         Ask a run of pages once per item (for example once per brand chosen). Each pass stores its own variables, such as RATE_3 for item 3.
@@ -159,6 +161,7 @@ export function BlocksEditor({ def, onChange }: { def: Def; onChange: (d: Def) =
     <section className="stack" aria-labelledby="blocks-h">
       <h2 id="blocks-h" style={{ marginTop: 12 }}>
         Randomized blocks
+        <InfoTip k="section.blocks" />
       </h2>
       <p className="muted small">
         Pages that follow one another, shown in a random order for each respondent (the order stays the same if they come back). Show only
@@ -243,6 +246,7 @@ export function VariablesEditor({ def, onChange }: { def: Def; onChange: (d: Def
     <section className="stack" aria-labelledby="vars-h">
       <h2 id="vars-h" style={{ marginTop: 12 }}>
         Calculated variables
+        <InfoTip k="section.variables" />
       </h2>
       <p className="muted small">
         Values worked out from answers, usable in conditions, quotas and piping ({'{{NAME}}'}) and exported as their own column.{' '}
@@ -377,6 +381,7 @@ export function RecodesEditor({ def, onChange }: { def: Def; onChange: (d: Def) 
     <section className="stack" aria-labelledby="recodes-h">
       <h2 id="recodes-h" style={{ marginTop: 12 }}>
         Recodes
+        <InfoTip k="section.recodes" />
       </h2>
       <p className="muted small">
         New analysis variables that group another variable&apos;s answers, such as age bands or top-2 box. Answers are not changed; recodes
@@ -458,6 +463,7 @@ export function CleaningEditor({ def, onChange }: { def: Def; onChange: (d: Def)
     <section className="stack" aria-labelledby="cleaning-h">
       <h2 id="cleaning-h" style={{ marginTop: 12 }}>
         Cleaning rules
+        <InfoTip k="section.cleaning" />
       </h2>
       <p className="muted small">
         Edit or fill answers when data is analysed or exported, in order. Stored answers are never changed; Analysis marks cleaned questions
@@ -572,6 +578,7 @@ export function UrlVariablesEditor({ def, onChange }: { def: Def; onChange: (d: 
     <section className="stack" aria-labelledby="urlvars-h">
       <h2 id="urlvars-h" style={{ marginTop: 12 }}>
         URL variables
+        <InfoTip k="section.urlVariables" />
       </h2>
       <p className="muted small">
         Values passed on the survey link, such as <span className="mono">&amp;seg=B2B</span> from a panel or CRM. They are saved with the

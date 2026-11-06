@@ -4,6 +4,7 @@ import type { DiffItem, SurveyDiff } from '@zapx/logic-engine';
 import { api, upload, waitForJob, type Job } from '@/lib/api';
 import { JobProgress } from './ExportJobs';
 import { ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface ChangeSetSummary {
   id: string;
@@ -235,7 +236,10 @@ export function Assist({
         {!readOnly ? (
           <div className="grid2">
             <div className="panel stack" data-testid="ai-panel">
-              <h2>AI Survey Architect</h2>
+              <h2>
+                AI Survey Architect
+                <InfoTip k="section.aiArchitect" />
+              </h2>
               {ai && !ai.configured ? (
                 <p className="small" style={{ color: 'var(--warn)' }} data-testid="ai-not-configured">
                   Claude is not connected yet. An administrator can connect it in Settings › Integrations. File import below works without
@@ -279,7 +283,10 @@ export function Assist({
               </div>
             </div>
             <div className="panel stack" data-testid="import-panel" ref={importPanel}>
-              <h2>Import a questionnaire</h2>
+              <h2>
+                Import a questionnaire
+                <InfoTip k="section.import" />
+              </h2>
               <p className="muted small">
                 Excel or CSV in the SampCode template is imported exactly, with a confidence score per row. Word, PDF and text
                 questionnaires are read by the AI.
@@ -311,7 +318,10 @@ export function Assist({
         )}
       </div>
       <aside className="panel">
-        <h2>Proposals</h2>
+        <h2>
+          Proposals
+          <InfoTip k="section.proposals" />
+        </h2>
         {list.length === 0 ? <p className="muted small">No proposals yet.</p> : null}
         <div className="stack" style={{ gap: 6 }}>
           {list.map((c) => (

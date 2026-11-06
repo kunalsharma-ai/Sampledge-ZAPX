@@ -8,6 +8,7 @@ import { ErrorNote } from '@/components/Shell';
 import { Donut, ShareBars } from '@/components/neon/Charts';
 import { SuperAdminFrame, StatusBadge, fmtDate } from '@/components/super-admin/SuperAdminFrame';
 import { ActivityFeed, type ActivityEvent } from '@/components/super-admin/ActivityFeed';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Overview {
   organizations: number;
@@ -64,6 +65,7 @@ export default function SuperAdminOverview() {
 
   return (
     <SuperAdminFrame
+      help="sa.overview"
       title="Overview"
       intro="Every organization on this installation: their subscriptions, members and what they do. Register organizations, set what each plan includes on the web CRM and the mobile app, and automate subscription handling."
       actions={
@@ -85,7 +87,10 @@ export default function SuperAdminOverview() {
           <div className="sa-grid">
             <section className="panel nx-card">
               <div className="nx-card-head">
-                <h2>Subscriptions</h2>
+                <h2>
+                  Subscriptions
+                  <InfoTip k="sa.subscriptions" />
+                </h2>
                 <Link href="/super-admin/plans" className="small">
                   Plans &amp; features
                 </Link>
@@ -111,6 +116,7 @@ export default function SuperAdminOverview() {
               <div className="nx-card-head">
                 <h2>
                   <CalendarClock size={18} aria-hidden="true" /> Ending in the next 30 days
+                  <InfoTip k="sa.ending" />
                 </h2>
                 <Link href="/super-admin/automation" className="small">
                   Automate renewals
@@ -139,7 +145,10 @@ export default function SuperAdminOverview() {
             </section>
             <section className="panel nx-card">
               <div className="nx-card-head">
-                <h2>Latest activity</h2>
+                <h2>
+                  Latest activity
+                  <InfoTip k="sa.activity" />
+                </h2>
                 <Link href="/super-admin/activity" className="small">
                   All activity
                 </Link>

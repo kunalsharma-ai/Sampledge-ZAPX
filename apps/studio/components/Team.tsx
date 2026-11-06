@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Role = 'ADMIN' | 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
 type Scope = 'ALL' | 'ASSIGNED';
@@ -93,7 +94,10 @@ export function Team() {
 
   return (
     <section className="panel stack wide" data-testid="team">
-      <h2>Team</h2>
+      <h2>
+        Team
+        <InfoTip k="section.team" />
+      </h2>
       <table className="data">
         <thead>
           <tr>

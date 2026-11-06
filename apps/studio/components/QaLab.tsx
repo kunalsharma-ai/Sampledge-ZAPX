@@ -5,6 +5,7 @@ import { TestCases } from './TestCases';
 import { api, waitForJob, type Job } from '@/lib/api';
 import { JobProgress } from './ExportJobs';
 import { ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 /** Runs up to this size answer in the request; larger runs go to the background job worker. */
 const DIRECT_MAX = 2000;
@@ -87,7 +88,10 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
     <div className="editor" style={{ gridTemplateColumns: 'minmax(0,1fr) 300px' }}>
       <div className="stack">
         <div className="panel stack">
-          <h2>QA Laboratory</h2>
+          <h2>
+            QA Laboratory
+            <InfoTip k="section.qaLab" />
+          </h2>
           <p className="muted small">
             Sends synthetic respondents through the survey with the same logic engine live interviews use. They try every option, boundary
             values around your conditions, and skip optional questions, then report what was never reached. Nothing is saved as a response
@@ -141,7 +145,10 @@ export function QaLab({ surveyId, readOnly, dirty, hasLive }: { surveyId: string
         <TestCases surveyId={surveyId} readOnly={readOnly} dirty={dirty} />
       </div>
       <aside className="panel">
-        <h2>Past runs</h2>
+        <h2>
+          Past runs
+          <InfoTip k="section.qaRuns" />
+        </h2>
         {runs.length === 0 ? <p className="muted small">No runs yet.</p> : null}
         <div className="stack" style={{ gap: 6 }}>
           {runs.map((r) => (
@@ -169,6 +176,7 @@ function QaResult({ version, report }: { version: number; report: QaReport }) {
           <span className={`badge ${report.passed ? 'good' : 'bad'}`} data-testid="qa-verdict">
             {report.passed ? 'passed' : 'failed'}
           </span>
+          <InfoTip k="section.qaReport" />
         </h2>
         <span className="muted small">
           {report.respondents} respondents · seed {report.seed} · {report.uniquePaths} distinct paths · {report.durationMs} ms

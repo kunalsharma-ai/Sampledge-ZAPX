@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import type { Variable } from '@zapx/analysis-core';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Table {
   id: string;
@@ -78,7 +79,10 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
 
   return (
     <section className="panel stack" aria-labelledby="assistant-h" data-testid="research-assistant">
-      <h2 id="assistant-h">Research assistant</h2>
+      <h2 id="assistant-h">
+        Research assistant
+        <InfoTip k="section.assistant" />
+      </h2>
       <p className="muted small">
         Ask a question about the completes. SampCode computes the tables (the same frequencies and crosstabs as above) and the AI reads only
         those tables; every finding cites the table it comes from. Open answers are never sent. Check findings against the tables before you

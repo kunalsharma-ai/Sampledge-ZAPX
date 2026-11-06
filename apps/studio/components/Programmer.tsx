@@ -27,6 +27,7 @@ import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { SaveTestCase } from './TestCases';
 import { CodeEditor, type LintMessage } from './CodeEditor';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Pane = 'xml' | 'debug' | 'deps' | 'history' | 'migrate';
 
@@ -343,14 +344,20 @@ function DebugPane({ def, surveyId, readOnly }: { def: SurveyDefinition; surveyI
   return (
     <div className="grid2 debug-pane">
       <section className="panel stack">
-        <h2>Test answers</h2>
+        <h2>
+          Test answers
+          <InfoTip k="section.testAnswers" />
+        </h2>
         <p className="muted small">A simulated respondent to start from. Edit any answer; everything on the right updates.</p>
         <CodeEditor language="json" value={answersText} onChange={setAnswersText} label="Test answers JSON" />
         {answersError ? <p className="error-text small">{answersError}</p> : null}
         <button onClick={() => setAnswersText(JSON.stringify(sample, null, 2))}>Reset to the simulated respondent</button>
       </section>
       <section className="panel stack">
-        <h2>Expression</h2>
+        <h2>
+          Expression
+          <InfoTip k="section.expression" />
+        </h2>
         <label className="field">
           Evaluate
           <input className="mono" value={expr} onChange={(e) => setExpr(e.target.value)} placeholder="e.g. AGE >= 18 and selected(Q3, 2)" />
@@ -414,7 +421,10 @@ function DependencyPane({ def }: { def: SurveyDefinition }) {
   return (
     <section className="panel stack">
       <div className="row">
-        <h2 style={{ margin: 0 }}>Dependency explorer</h2>
+        <h2 style={{ margin: 0 }}>
+          Dependency explorer
+          <InfoTip k="section.dependencies" />
+        </h2>
         <div style={{ flex: 1 }} />
         <input aria-label="Filter variables" placeholder="Filter variables" value={filter} onChange={(e) => setFilter(e.target.value)} />
       </div>
@@ -501,7 +511,10 @@ function HistoryPane({
   };
   return (
     <section className="panel stack">
-      <h2>Versions &amp; diff</h2>
+      <h2>
+        Versions &amp; diff
+        <InfoTip k="section.versions" />
+      </h2>
       <p className="muted small">
         Every published version is kept unchanged. Compare any of them with the draft, or load one back into the draft.
       </p>
@@ -586,7 +599,10 @@ function MigratePane({ onApply, readOnly }: { onApply: (d: SurveyDefinition) => 
   };
   return (
     <section className="panel stack">
-      <h2>Migrate a Decipher-style XML survey</h2>
+      <h2>
+        Migrate a Decipher-style XML survey
+        <InfoTip k="section.xmlMigrate" />
+      </h2>
       <p className="muted small">
         Converts question types (radio, checkbox, select, text, number, html), rows and columns, page breaks and simple conditions such as
         Q1.r2. Python code, styles, loops, quotas and complex conditions are listed below for you to rebuild; nothing is dropped without a

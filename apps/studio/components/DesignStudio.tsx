@@ -16,6 +16,7 @@ import {
   type Theme,
 } from '@zapx/survey-schema';
 import { Preview } from './Preview';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 const FONT_NAMES: Record<Theme['font'], string> = {
   system: 'System (default)',
@@ -80,7 +81,10 @@ export function DesignStudio({
     <div className="editor" style={{ gridTemplateColumns: '380px minmax(0,1fr)' }}>
       <div className="stack">
         <fieldset className="panel stack" disabled={readOnly} style={{ margin: 0 }}>
-          <h2>Theme</h2>
+          <h2>
+            Theme
+            <InfoTip k="section.theme" />
+          </h2>
           <div className="row" role="group" aria-label="Theme presets" style={{ gap: 6 }}>
             {Object.entries(THEME_PRESETS).map(([key, p]) => (
               <button
@@ -216,7 +220,10 @@ export function DesignStudio({
         </fieldset>
 
         <fieldset className="panel stack" disabled={readOnly} style={{ margin: 0 }} data-testid="device-settings">
-          <h2>Devices</h2>
+          <h2>
+            Devices
+            <InfoTip k="section.devices" />
+          </h2>
           <p className="muted small" style={{ margin: 0 }}>
             Respondents on a device that is not allowed are screened out before the survey starts and sent back to the vendor as a
             terminate.

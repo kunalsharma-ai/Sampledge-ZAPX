@@ -8,6 +8,7 @@ import { api, upload } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Summary {
   cases: Partial<Record<'PENDING' | 'CALLBACK' | 'IN_CALL' | 'DONE' | 'CLOSED', number>>;
@@ -143,7 +144,10 @@ export function CatiCalls({ surveyId, readOnly }: { surveyId: string; readOnly: 
 
   return (
     <section className="panel stack" data-testid="cati-calls">
-      <h2 style={{ margin: 0 }}>Phone interviews (CATI)</h2>
+      <h2 style={{ margin: 0 }}>
+        Phone interviews (CATI)
+        <InfoTip k="section.cati" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         Upload the people to call. Assigned interviewers work the list from Calls: callbacks come first, no answer and busy are retried
         later, and a case closes after the maximum attempts. Phone numbers are stored encrypted and shown only to the interviewer on the
@@ -542,7 +546,10 @@ export function DoNotCallList() {
   if (!list) return error ? <ErrorNote error={error} /> : null;
   return (
     <section className="panel stack" data-testid="do-not-call">
-      <h2 style={{ margin: 0 }}>Do-not-call list</h2>
+      <h2 style={{ margin: 0 }}>
+        Do-not-call list
+        <InfoTip k="section.dnc" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         {list.count} number{list.count === 1 ? '' : 's'}. No survey of your organization offers these numbers to interviewers. A respondent
         who says &ldquo;do not call again&rdquo; on a call is added automatically. Numbers are kept as keyed hashes, never in clear.

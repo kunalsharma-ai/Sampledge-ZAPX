@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Governance {
   deploymentRegion: string | null;
@@ -70,6 +71,7 @@ export function DataGovernance() {
     <section className="panel stack" data-testid="data-governance">
       <h2 className="row" style={{ gap: 8 }}>
         <ShieldCheck size={18} aria-hidden /> Data residency and retention
+        <InfoTip k="section.governance" />
       </h2>
       <ErrorNote error={error} />
       {g ? (

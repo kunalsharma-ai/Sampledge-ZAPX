@@ -12,6 +12,7 @@ import { CopyField, ErrorNote, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/neon/PageHeader';
 import { Plug } from 'lucide-react';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Field {
   name: string;
@@ -143,7 +144,10 @@ function IntegrationCard({ initial }: { initial: Integration }) {
   return (
     <section className="panel stack" data-testid={`integration-${it.key}`}>
       <div className="row" style={{ alignItems: 'baseline' }}>
-        <h2 style={{ margin: 0 }}>{it.name}</h2>
+        <h2 style={{ margin: 0 }}>
+          {it.name}
+          <InfoTip k="section.integration" />
+        </h2>
         <span className={s.cls} data-testid="integration-status">
           {s.text}
         </span>
@@ -332,7 +336,7 @@ export default function IntegrationsPage() {
   if (me && !me.canManageIntegrations) {
     return (
       <Shell crumbs={crumbs}>
-        <PageHeader icon={Plug} tone={2} eyebrow="Administration" title="Integrations" />
+        <PageHeader icon={Plug} tone={2} eyebrow="Administration" title="Integrations" help="page.integrations" />
         <p className="muted">
           Integrations are managed by the administrators of the organization that runs this installation. Your organization&apos;s own
           single sign-on, SCIM, webhooks and API keys are on the <Link href="/settings">settings page</Link>.
@@ -343,7 +347,7 @@ export default function IntegrationsPage() {
 
   return (
     <Shell crumbs={crumbs}>
-      <PageHeader icon={Plug} tone={2} eyebrow="Administration" title="Integrations">
+      <PageHeader icon={Plug} tone={2} eyebrow="Administration" title="Integrations" help="page.integrations">
         Connect the services SampCode uses for every organization on this installation. Paste a key, test the connection, then turn it on.
         Keys are stored encrypted and are never shown again; every change and test is recorded in the{' '}
         <Link href="/settings/audit">audit log</Link>. Anything saved here takes over from the server environment.
@@ -354,7 +358,10 @@ export default function IntegrationsPage() {
           <IntegrationCard key={i.key} initial={i} />
         ))}
         <section className="panel stack" data-testid="integrations-elsewhere">
-          <h2>Set up per organization</h2>
+          <h2>
+            Set up per organization
+            <InfoTip k="section.integrationSetup" />
+          </h2>
           <p className="muted small" style={{ margin: 0 }}>
             Each organization connects these itself on its <Link href="/settings">settings page</Link>, so customers can bring their own:
           </p>
@@ -370,7 +377,10 @@ export default function IntegrationsPage() {
           </table>
         </section>
         <section className="panel stack" data-testid="integrations-developer">
-          <h2>Still set on the server</h2>
+          <h2>
+            Still set on the server
+            <InfoTip k="section.integrationServer" />
+          </h2>
           <p className="muted small" style={{ margin: 0 }}>
             These protect or run the server itself, so they cannot be changed from a web page. A developer sets them once at deployment (see
             the go-live guide):

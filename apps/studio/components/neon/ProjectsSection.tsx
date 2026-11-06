@@ -5,6 +5,7 @@ import { FolderKanban, FolderPlus } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote } from '@/components/Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Project {
   id: string;
@@ -100,6 +101,7 @@ export function ProjectsSection({ limit, heading, onCreated }: { limit?: number;
         <form className="panel stack nx-card" onSubmit={create}>
           <h2>
             <FolderPlus size={17} aria-hidden="true" /> New project
+            <InfoTip k="section.newProject" />
           </h2>
           <label className="field">
             Name

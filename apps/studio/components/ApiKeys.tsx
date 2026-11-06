@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Key {
   id: string;
@@ -45,7 +46,10 @@ export function ApiKeys({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <section className="panel stack wide" data-testid="api-keys">
-      <h2>API keys</h2>
+      <h2>
+        API keys
+        <InfoTip k="page.apiKeys" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         For scripts and integrations: send <span className="mono">Authorization: Bearer &lt;key&gt;</span>. A key acts as the member who
         created it, with at most its own role, and sees the same projects. {isAdmin ? 'You see every key in the organization.' : ''}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from '@/components/Shell';
 import { SuperAdminFrame, StatusBadge, ago, fmtDate, type PlanRow } from '@/components/super-admin/SuperAdminFrame';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface OrgRow {
   id: string;
@@ -80,7 +81,10 @@ function RegisterForm({ plans, onDone }: { plans: PlanRow[]; onDone: (c: Created
 
   return (
     <form className="panel nx-card stack" onSubmit={submit} data-testid="register-org">
-      <h2>Register an organization</h2>
+      <h2>
+        Register an organization
+        <InfoTip k="sa.register" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         Creates the organization and its first administrator. The administrator gets a link to choose a password (emailed when email sending
         is set up; you can also copy it).
@@ -160,6 +164,7 @@ export default function OrganizationsPage() {
 
   return (
     <SuperAdminFrame
+      help="sa.organizations"
       title="Organizations"
       intro="Each organization is one customer with its own administrators, members, plan and features."
       actions={

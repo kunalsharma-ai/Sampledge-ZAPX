@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette, type Palette } from '@/lib/theme';
+import type { HelpKey } from '@/lib/help';
+import { InfoButton } from './info';
 
 export type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -105,13 +107,24 @@ export function Hero({ title, subtitle, children }: { title: string; subtitle?: 
   );
 }
 
-export function H2({ children, right }: { children: ReactNode; right?: ReactNode }) {
+export function H2({
+  children,
+  right,
+  help,
+}: {
+  children: ReactNode;
+  right?: ReactNode;
+  /** "i" help card key (lib/help.ts). */ help?: HelpKey;
+}) {
   const p = usePalette();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-      <Text accessibilityRole="header" style={{ color: p.text, fontSize: 17, fontWeight: '700' }}>
-        {children}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
+        <Text accessibilityRole="header" style={{ color: p.text, fontSize: 17, fontWeight: '700' }}>
+          {children}
+        </Text>
+        {help ? <InfoButton k={help} /> : null}
+      </View>
       {right}
     </View>
   );
