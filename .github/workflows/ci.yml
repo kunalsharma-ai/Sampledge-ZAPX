@@ -1,16 +1,27 @@
 name: CI
 
+# Fits GitHub Free for a private repository (2,000 Actions minutes a month): a newer push cancels
+# the run it replaces, every job has a time limit, and the docker compose build (the heaviest job)
+# runs on main and on demand rather than on every pull request.
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Set the repository variable CI_RUNNER to "self-hosted" to run on your own machine, which costs
+    # no Actions minutes (it needs Docker for the Postgres service). Default: GitHub's runner.
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 40
     services:
       postgres:
         image: postgres:16
@@ -46,7 +57,8 @@ jobs:
 
   # Known vulnerabilities in dependencies fail the build at high severity.
   audit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -57,7 +69,9 @@ jobs:
 
   # Builds the production images and boots the whole stack with docker compose.
   docker:
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
       - run: docker compose build
