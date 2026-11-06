@@ -1,4 +1,8 @@
-# Merge order for the open pull requests
+# Merge order for the stacked pull requests
+
+> **Done.** Every PR in this table was merged into `main` on 2026-11-05 in this order, with merge
+> commits, followed by #44, #45 and #46 on 2026-11-06 (`main` = `68f4531`). This page is kept as a
+> record of how the stack was merged. The only open pull request is #47 (SAMPLEON), based on `main`.
 
 The open pull requests are a stack: each one is built on the one before, so they merge one at a time
 from the bottom. Every branch is rebased on the one below it, has no conflicts, and passed
@@ -31,19 +35,18 @@ checks.
    stack. #38 contains all of #28's commits with the conflicts resolved, so once #38 is merged,
    GitHub shows #28 as merged. If it does not, close #28.
 4. After the last merge, run the database migrations on each environment (the deploy script does
-   this). The new migrations run in name order, ending with `20261118000000_integrations_in_crm`.
+   this). The new migrations run in name order, ending with `20261120000000_security_hardening`
+   (after #45).
 
 ## Not part of the stack
 
-The Dependabot pull requests (#20 to #25) are separate and can wait until the stack is in:
-
-- #22 to #25 update GitHub Actions steps, which do not run while Actions is off for this account.
-- #20 (Node 26) and #21 (nginx 1.31) change the Docker images. Merge each on its own after the
-  stack, then build the images and run the checks, since nothing here has been tested on them.
+The Dependabot pull requests (#20 to #25) were closed: PR #44 made the same changes (Node 26 LTS,
+`nginx:1.31-alpine`, newer GitHub Actions steps) and passed the full check on Node 26.
 
 ## Still waiting on something else
 
-- SAMPLEON and Bidzo integrations wait for their API documentation; nothing is built for them.
+- SAMPLEON: survey host and audience requests are in open PR #47, not merged. Bidzo waits for its API
+  documentation; nothing is built for it.
 - Eye tracking is experimental. It is opt-in and marked as not validated in the editor, on the
   respondent screen and in Analysis (ADR 0034). Try it with a few real respondents before relying on
   it.
