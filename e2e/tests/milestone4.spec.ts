@@ -125,19 +125,19 @@ test('redirect rules, callbacks, vendor logs and AI settings', async ({ page, co
 
   // --- PROJEXA vendor form ---
   await page.getByRole('button', { name: 'Close' }).click();
-  await page.getByRole('button', { name: '+ PROJEXA' }).click();
+  await page.getByRole('button', { name: '+ SampTrek' }).click();
   const px = page.getByTestId('projexa-settings');
-  await expect(px).toContainText('has not been tested against a running PROJEXA yet');
+  await expect(px).toContainText('has not been tested against a running SampTrek yet');
   await page.getByRole('button', { name: 'Save vendor' }).click();
-  await expect(page.getByTestId('vendor-editor').getByRole('alert')).toContainText('PROJEXA needs its base URL');
-  await px.getByLabel('PROJEXA base URL').fill('https://projexa.example.com');
-  await px.getByLabel(/PROJEXA client secret/).fill('a-client-secret-from-projexa');
+  await expect(page.getByTestId('vendor-editor').getByRole('alert')).toContainText('SampTrek needs its base URL');
+  await px.getByLabel('SampTrek base URL').fill('https://projexa.example.com');
+  await px.getByLabel(/SampTrek client secret/).fill('a-client-secret-from-projexa');
   await page.getByRole('button', { name: 'Save vendor' }).click();
-  await expect(page.getByRole('cell', { name: /PROJEXA vid=PX/ })).toBeVisible();
+  await expect(page.getByRole('cell', { name: /SampTrek vid=PX/ })).toBeVisible();
   await page
-    .getByRole('row', { name: /PROJEXA vid=PX/ })
+    .getByRole('row', { name: /SampTrek vid=PX/ })
     .getByRole('button', { name: 'Edit' })
     .click();
   await expect(page.getByTestId('projexa-settings').getByText('(saved; leave empty to keep)')).toBeVisible();
-  await expect(page.getByTestId('projexa-settings').getByLabel(/PROJEXA client secret/)).toHaveValue('');
+  await expect(page.getByTestId('projexa-settings').getByLabel(/SampTrek client secret/)).toHaveValue('');
 });

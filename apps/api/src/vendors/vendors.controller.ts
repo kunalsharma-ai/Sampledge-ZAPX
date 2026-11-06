@@ -50,7 +50,7 @@ const vendorSchema = z
   })
   .superRefine((v, ctx) => {
     if (v.integration !== 'DIRECT' && !v.partnerBaseUrl)
-      ctx.addIssue({ code: 'custom', path: ['partnerBaseUrl'], message: `${v.integration} needs its base URL` });
+      ctx.addIssue({ code: 'custom', path: ['partnerBaseUrl'], message: `${{ PROJEXA: 'SampTrek', SAMPLEON: 'SampAudience' }[v.integration] ?? v.integration} needs its base URL` });
   });
 
 const previewSchema = z.object({
