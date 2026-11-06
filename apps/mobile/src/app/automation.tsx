@@ -117,7 +117,7 @@ function AutomationBody() {
           ))}
         </>
       ) : null}
-      <H2>Rules</H2>
+      <H2 help="h.rules">Rules</H2>
       <Async q={rules}>
         {(list) => (
           <List

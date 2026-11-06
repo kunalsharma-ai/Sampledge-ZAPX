@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { SurveyDefinition } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface MaxDiffOut {
   type: 'maxdiff';
@@ -68,7 +69,10 @@ export function ChoiceResults({ surveyId, def }: { surveyId: string; def: Survey
   };
   return (
     <section className="panel stack" data-testid="choice-results">
-      <h2 style={{ margin: 0 }}>MaxDiff and conjoint</h2>
+      <h2 style={{ margin: 0 }}>
+        MaxDiff and conjoint
+        <InfoTip k="section.choiceResults" />
+      </h2>
       <div className="row">
         <label className="field">
           Choice question

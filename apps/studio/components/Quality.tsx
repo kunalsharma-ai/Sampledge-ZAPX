@@ -19,6 +19,7 @@ import { api } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Summary {
   starts: number;
@@ -135,7 +136,10 @@ function FieldworkPanel({ surveyId }: { surveyId: string }) {
   return (
     <section className="panel stack" data-testid="fieldwork">
       <div className="row">
-        <h2 style={{ margin: 0 }}>Fieldwork</h2>
+        <h2 style={{ margin: 0 }}>
+          Fieldwork
+          <InfoTip k="section.fieldwork" />
+        </h2>
         <span className="muted small">Live interviews only (test links excluded).</span>
         <div style={{ flex: 1 }} />
         <button onClick={load}>Refresh</button>
@@ -282,7 +286,10 @@ function ReviewQueue({ surveyId, readOnly }: { surveyId: string; readOnly: boole
   return (
     <section className="panel stack" data-testid="review-queue">
       <div className="row">
-        <h2 style={{ margin: 0 }}>Quality review</h2>
+        <h2 style={{ margin: 0 }}>
+          Quality review
+          <InfoTip k="section.qualityReview" />
+        </h2>
         <span className="muted small">
           Completes scoring below the review threshold wait here. People decide; nothing is rejected silently.
         </span>
@@ -514,7 +521,10 @@ function CaptureSettingsEditor({
   return (
     <section className="panel stack" data-testid="capture-settings">
       <div className="row">
-        <h2 style={{ margin: 0 }}>Face-to-face capture</h2>
+        <h2 style={{ margin: 0 }}>
+          Face-to-face capture
+          <InfoTip k="section.capiCapture" />
+        </h2>
         <span className="muted small">For interviews in the SampCode Interviewer app. Part of the draft.</span>
       </div>
       <fieldset disabled={readOnly} className="stack" style={{ border: 0, padding: 0, margin: 0, gap: 8 }}>
@@ -803,7 +813,10 @@ function BlockList() {
   return (
     <section className="panel stack" data-testid="block-list">
       <div className="row">
-        <h2 style={{ margin: 0 }}>Blocked devices and networks</h2>
+        <h2 style={{ margin: 0 }}>
+          Blocked devices and networks
+          <InfoTip k="section.blocked" />
+        </h2>
         <span className="muted small">For your whole organization. Completes from them are flagged in every survey and go to review.</span>
       </div>
       <ErrorNote error={error} />
@@ -895,7 +908,10 @@ function QualitySettingsEditor({
   return (
     <section className="panel stack" data-testid="quality-settings">
       <div className="row">
-        <h2 style={{ margin: 0 }}>Quality settings</h2>
+        <h2 style={{ margin: 0 }}>
+          Quality settings
+          <InfoTip k="section.qualitySettings" />
+        </h2>
         <span className="muted small">Part of the draft: save and publish to apply them to respondents.</span>
       </div>
       <fieldset disabled={readOnly} className="stack" style={{ border: 0, padding: 0, margin: 0, gap: 8 }}>

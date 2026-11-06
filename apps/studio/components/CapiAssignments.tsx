@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Person {
   id: string;
@@ -41,7 +42,10 @@ export function CapiAssignments({ surveyId, readOnly, hasLive }: { surveyId: str
 
   return (
     <section className="panel stack" data-testid="capi-assignments">
-      <h2 style={{ margin: 0 }}>Interviewers (CAPI and phone)</h2>
+      <h2 style={{ margin: 0 }}>
+        Interviewers (CAPI and phone)
+        <InfoTip k="section.capiAssign" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         Interviewers download the live version to a tablet or phone, interview offline, and sync when they have a connection. The server
         re-checks every interview against the version it was recorded on, counts quotas and scores quality. Completes that arrive after a

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Person {
   id: string;
@@ -44,7 +45,10 @@ export function ProjectAccess({ projectId, isAdmin }: { projectId: string; isAdm
 
   return (
     <section className="panel stack" style={{ marginTop: 16 }} data-testid="project-access">
-      <h2 style={{ margin: 0 }}>Project access</h2>
+      <h2 style={{ margin: 0 }}>
+        Project access
+        <InfoTip k="section.projectAccess" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         Administrators and members with access to all projects always see this project. Members with assigned project access see it only
         when they are added here.

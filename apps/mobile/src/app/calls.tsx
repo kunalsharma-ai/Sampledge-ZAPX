@@ -175,7 +175,7 @@ function CallDesk() {
             />
           </>
         ) : null}
-        <H2>Outcome</H2>
+        <H2 help="h.outcome">Outcome</H2>
         <Card>
           <Async q={dispositions}>
             {(list) => (

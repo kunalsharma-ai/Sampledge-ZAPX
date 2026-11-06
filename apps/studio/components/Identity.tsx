@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Role = 'PROGRAMMER' | 'VIEWER' | 'INTERVIEWER';
 
@@ -125,7 +126,10 @@ export function SsoSettings() {
   if (!state) return null;
   return (
     <section className="panel stack" data-testid="sso-settings">
-      <h2>Single sign-on</h2>
+      <h2>
+        Single sign-on
+        <InfoTip k="section.sso" />
+      </h2>
       {!state.available ? (
         <p className="muted small">Single sign-on is not included in your plan.</p>
       ) : (
@@ -346,7 +350,10 @@ export function ScimSettings() {
   if (!state) return null;
   return (
     <section className="panel stack" data-testid="scim-settings">
-      <h2>SCIM provisioning</h2>
+      <h2>
+        SCIM provisioning
+        <InfoTip k="section.scim" />
+      </h2>
       {!state.available ? (
         <p className="muted small">SCIM provisioning is not included in your plan.</p>
       ) : (
@@ -497,7 +504,10 @@ export function Billing() {
   if (!b.enabled) {
     return (
       <section className="panel stack" data-testid="billing">
-        <h2>Billing</h2>
+        <h2>
+          Billing
+          <InfoTip k="section.billing" />
+        </h2>
         <p className="muted small" style={{ margin: 0 }}>
           Online billing is not turned on for this SampCode installation. Your plan is set by your SampCode operator.
         </p>
@@ -506,7 +516,10 @@ export function Billing() {
   }
   return (
     <section className="panel stack" data-testid="billing">
-      <h2>Billing</h2>
+      <h2>
+        Billing
+        <InfoTip k="section.billing" />
+      </h2>
       {returned === 'success' ? (
         <p className="ok-text small" role="status" style={{ margin: 0 }}>
           Thank you. Your plan changes as soon as Stripe confirms the payment, usually within a minute.

@@ -17,6 +17,7 @@ import type { Answers, QaTestCaseInput, SurveyDefinition } from '@zapx/survey-sc
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface StoredCase {
   id: string;
@@ -146,7 +147,10 @@ export function TestCases({ surveyId, readOnly, dirty }: { surveyId: string; rea
     <section className="panel stack" data-testid="test-cases">
       <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div>
-          <h2 style={{ margin: 0 }}>Test cases</h2>
+          <h2 style={{ margin: 0 }}>
+            Test cases
+            <InfoTip k="section.testCases" />
+          </h2>
           <p className="muted small" style={{ margin: 0 }}>
             Saved answers with the route and ending they must produce. Run them after every change to catch logic regressions. Save new ones
             from Programmer → Debugger.

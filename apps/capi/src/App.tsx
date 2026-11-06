@@ -10,6 +10,7 @@ import { locate } from './capture';
 import { NotSignedIn, appeal, downloadPackage, myResults, signIn, signOut, syncNow, type ServerResult } from './api';
 import { useConfirm } from './Confirm';
 import { Interview } from './Interview';
+import { Info } from './Info';
 import { interviews, meta, type Interviewer, type LocalInterview, type PackagedSurvey, type SurveyPackage } from './store';
 
 function useOnline() {
@@ -243,7 +244,10 @@ export function App() {
           {pkg ? <p className="capi-muted">Surveys updated {new Date(pkg.generatedAt).toLocaleString()}.</p> : null}
         </section>
 
-        <h2>Surveys</h2>
+        <h2>
+          Surveys
+          <Info k="surveys" />
+        </h2>
         {!pkg || pkg.surveys.length === 0 ? (
           <p className="capi-muted">No surveys are assigned to you yet. Ask your project manager, then sync.</p>
         ) : null}
@@ -272,7 +276,10 @@ export function App() {
           );
         })}
 
-        <h2>Interviews on this device</h2>
+        <h2>
+          Interviews on this device
+          <Info k="interviews" />
+        </h2>
         {mine.length === 0 ? <p className="capi-muted">None yet.</p> : null}
         <table className="capi-table" data-testid="local-interviews">
           <tbody>
@@ -343,7 +350,10 @@ function Results({ online }: { online: boolean }) {
   const rejected = rows?.filter((r) => r.status === 'quality_fail' || r.appeal) ?? [];
   return (
     <section data-testid="results">
-      <h2>Results and appeals</h2>
+      <h2>
+        Results and appeals
+        <Info k="results" />
+      </h2>
       <p className="capi-muted">
         Interviews rejected by the quality checks or a back-check can be appealed once; a supervisor looks at it again.
       </p>

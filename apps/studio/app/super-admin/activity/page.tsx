@@ -55,6 +55,7 @@ export default function ActivityPage() {
 
   return (
     <SuperAdminFrame
+      help="sa.activity"
       title="Activity"
       intro="Sign-ins, survey changes, team changes, integration changes and every super admin action, from all organizations."
     >

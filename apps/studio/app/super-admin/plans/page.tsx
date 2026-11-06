@@ -10,6 +10,7 @@ import { ErrorNote } from '@/components/Shell';
 import { SuperAdminFrame } from '@/components/super-admin/SuperAdminFrame';
 import { FeatureMatrix, type FeatureDef, type Surface } from '@/components/super-admin/FeatureMatrix';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Limits {
   seats: number | null;
@@ -216,6 +217,7 @@ export default function PlansPage() {
   const count = (p: Plan) => `${p.webFeatures.length} web · ${p.mobileFeatures.length} mobile features`;
   return (
     <SuperAdminFrame
+      help="sa.plans"
       title="Plans & features"
       intro="What each subscription includes. Organizations get their plan's features; you can still change single features for one organization on its page."
       actions={
@@ -227,7 +229,10 @@ export default function PlansPage() {
       <ErrorNote error={error} />
       {open === '__new' && features.length ? (
         <section className="panel nx-card stack" style={{ marginBottom: 16 }}>
-          <h2>New plan</h2>
+          <h2>
+            New plan
+            <InfoTip k="sa.newPlan" />
+          </h2>
           <PlanEditor
             initial={blank(features)}
             features={features}

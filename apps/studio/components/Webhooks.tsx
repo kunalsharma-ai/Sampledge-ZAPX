@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Hook {
   id: string;
@@ -76,7 +77,10 @@ export function Webhooks() {
 
   return (
     <section className="panel stack wide" data-testid="webhooks">
-      <h2>Webhooks</h2>
+      <h2>
+        Webhooks
+        <InfoTip k="section.webhooks" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         SampCode sends a signed JSON POST for each event (header <span className="mono">X-Zapx-Signature</span>). Payloads carry ids,
         statuses and scores, never respondents&apos; answers. Failed deliveries are retried with backoff for about an hour.

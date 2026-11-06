@@ -21,6 +21,8 @@ import {
   VariablesEditor,
 } from './FlowEditor';
 import { InsertBlockFromBank, InsertFromBank, SavePageToBank, SaveQuestionToBank } from './QuestionBank';
+import { InfoTip } from '@/components/neon/InfoTip';
+import { qtypeHelp } from '@/lib/help';
 
 type Selection = { kind: 'survey' } | { kind: 'page'; page: number } | { kind: 'question'; page: number; q: number };
 
@@ -331,16 +333,21 @@ function Editor({ def, onChange, readOnly }: { def: SurveyDefinition; onChange: 
         ))}
         {!readOnly ? (
           <div className="stack" style={{ marginTop: 12 }}>
-            <label className="field">
-              New question type
-              <select value={newType} onChange={(e) => setNewType(e.target.value as QuestionType)}>
-                {Object.entries(TYPE_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="row" style={{ alignItems: 'flex-end', gap: 6, flexWrap: 'nowrap' }}>
+              <label className="field" style={{ flex: 1, minWidth: 0 }}>
+                New question type
+                <select value={newType} onChange={(e) => setNewType(e.target.value as QuestionType)}>
+                  {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span style={{ paddingBottom: 8 }}>
+                <InfoTip key={newType} k={qtypeHelp(newType)} />
+              </span>
+            </div>
             <button onClick={addPage}>+ Add page</button>
           </div>
         ) : null}
@@ -461,7 +468,10 @@ const CONDITION_HELP = 'Logic, e.g. Q1 == 2 and AGE >= 18 · selected(Q3, 1, 2) 
 function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d: SurveyDefinition) => void }) {
   return (
     <>
-      <h2>Survey settings</h2>
+      <h2>
+        Survey settings
+        <InfoTip k="section.surveySettings" />
+      </h2>
       <Text label="Title" value={def.title} onChange={(v) => onChange({ ...def, title: v ?? '' })} />
       <Text label="Welcome text (first page)" area value={def.welcome} onChange={(v) => onChange({ ...def, welcome: v })} />
       <Text label="Thank-you text (completes)" area value={def.thankYou} onChange={(v) => onChange({ ...def, thankYou: v })} />
@@ -477,7 +487,10 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
           onChange={(v) => onChange({ ...def, settings: { ...def.settings, showProgress: v } })}
         />
       </div>
-      <h2 style={{ marginTop: 12 }}>Terminations</h2>
+      <h2 style={{ marginTop: 12 }}>
+        Terminations
+        <InfoTip k="section.terminations" />
+      </h2>
       <p className="muted small">Checked after every page. The first matching rule ends the interview. {CONDITION_HELP}</p>
       <table className="data list-editor">
         <thead>
@@ -559,7 +572,10 @@ function SurveySettings({ def, onChange }: { def: SurveyDefinition; onChange: (d
           + Termination
         </button>
       </div>
-      <h2 style={{ marginTop: 12 }}>Quotas</h2>
+      <h2 style={{ marginTop: 12 }}>
+        Quotas
+        <InfoTip k="section.quotas" />
+      </h2>
       <p className="muted small">
         Respondents matching the condition count toward the target when they complete. Over-target respondents get the quota-full redirect.
         Quotas with the same least-fill group are alternatives: someone who matches several (aware of three brands, say) counts toward only
@@ -669,7 +685,10 @@ function PageForm({
   return (
     <>
       <div className="row">
-        <h2 style={{ margin: 0 }}>Page {page.id}</h2>
+        <h2 style={{ margin: 0 }}>
+          Page {page.id}
+          <InfoTip k="section.page" />
+        </h2>
         <div style={{ flex: 1 }} />
         <button onClick={() => onMove(-1)} aria-label="Move page up">
           ↑
@@ -815,6 +834,7 @@ function QuestionForm({
       <div className="row">
         <h2 style={{ margin: 0 }}>
           <span className="mono">{q.id}</span> <span className="badge">{TYPE_LABELS[q.type]}</span>
+          <InfoTip key={q.type} k={qtypeHelp(q.type)} />
         </h2>
         <div style={{ flex: 1 }} />
         <button onClick={() => onMove(-1)} aria-label="Move question up">

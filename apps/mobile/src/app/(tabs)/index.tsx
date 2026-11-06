@@ -88,24 +88,24 @@ export default function Home() {
                   hint={`${d.responses.rejectedInReview} rejected`}
                 />
               </Grid>
-              <H2>Survey performance</H2>
+              <H2 help="h.performance">Survey performance</H2>
               <Card>
                 <T muted size={12}>
                   Last {d.trend.length} days
                 </T>
                 <TrendChart points={d.trend} />
               </Card>
-              <H2>Response overview</H2>
+              <H2 help="h.responseOverview">Response overview</H2>
               <Card>
                 <Donut slices={modes} center={d.responses.total.toLocaleString()} />
               </Card>
-              <H2>Device distribution</H2>
+              <H2 help="h.devices">Device distribution</H2>
               <Card>
                 <Donut slices={devices} />
               </Card>
               {d.responses.topCountries.length ? (
                 <>
-                  <H2>Global reach</H2>
+                  <H2 help="h.reach">Global reach</H2>
                   <Card>
                     <T muted size={12}>
                       {d.responses.countries} countries
@@ -116,7 +116,7 @@ export default function Home() {
                   </Card>
                 </>
               ) : null}
-              <H2>Recent surveys</H2>
+              <H2 help="h.recent">Recent surveys</H2>
               <List
                 items={d.recentSurveys}
                 empty="No surveys yet."

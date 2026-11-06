@@ -7,6 +7,7 @@ import { useMe } from '@/lib/useMe';
 import { useThemeModule } from '@/lib/theme/ThemeProvider';
 import { PageHeader } from '@/components/neon/PageHeader';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Op = 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte';
 interface Condition {
@@ -170,6 +171,7 @@ export default function AutomationPage() {
         tone={1}
         eyebrow="Rules & schedules"
         title="Automation"
+        help="page.automation"
         actions={
           canEdit && !draft ? (
             <button className="primary" onClick={() => setDraft(blank())} data-testid="new-rule">
@@ -185,7 +187,10 @@ export default function AutomationPage() {
 
       {waiting.length ? (
         <section className="panel" data-testid="approvals">
-          <h2>Waiting for approval</h2>
+          <h2>
+            Waiting for approval
+            <InfoTip k="section.autoApprovals" />
+          </h2>
           <ul className="nx-list">
             {waiting.map((r) => (
               <li key={r.id} className="row" style={{ justifyContent: 'space-between', gap: 12 }}>
@@ -237,7 +242,10 @@ export default function AutomationPage() {
       ) : null}
 
       <section className="panel">
-        <h2>Rules</h2>
+        <h2>
+          Rules
+          <InfoTip k="section.autoRules" />
+        </h2>
         {rules && !rules.length ? <p className="muted">No rules yet.</p> : null}
         <div className="nx-rule-list" data-testid="rules">
           {rules?.map((r) => (
@@ -331,7 +339,10 @@ export default function AutomationPage() {
       </section>
 
       <section className="panel">
-        <h2>Recent runs</h2>
+        <h2>
+          Recent runs
+          <InfoTip k="section.autoRuns" />
+        </h2>
         {!runs.length ? <p className="muted">Nothing has run yet.</p> : null}
         <table className="table" data-testid="runs">
           <thead>
@@ -388,7 +399,10 @@ function RuleEditor({
   const setAction = (i: number, a: Action) => set({ actions: draft.actions.map((x, k) => (k === i ? a : x)) });
   return (
     <section className="panel" data-testid="rule-editor">
-      <h2>{editing ? 'Edit rule' : 'New rule'}</h2>
+      <h2>
+        {editing ? 'Edit rule' : 'New rule'}
+        <InfoTip k="section.autoEditor" />
+      </h2>
       <div className="grid2">
         <label>
           Name

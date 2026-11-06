@@ -13,6 +13,7 @@ import {
   Switch,
   TextField,
 } from '@/components/quantum';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 const TOKENS = [
   ['--q-bg', 'Page'],
@@ -45,7 +46,10 @@ export function ComponentPreview() {
   return (
     <Surface data-testid="component-preview">
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
-        <h2 style={{ margin: 0 }}>Live preview</h2>
+        <h2 style={{ margin: 0 }}>
+          Live preview
+          <InfoTip k="section.appPreview" />
+        </h2>
         <Badge tone="neutral">Sample values</Badge>
       </div>
       <div className="stack">

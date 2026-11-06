@@ -3,6 +3,7 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { View } from 'react-native';
 import { Gate } from '@/components/gate';
 import { Screen, Segmented } from '@/components/ui';
+import { InfoButton } from '@/components/info';
 import { useApi } from '@/lib/use-api';
 import { useEntitlements } from '@/lib/entitlements-context';
 import type { FeatureKey } from '@/lib/features';
@@ -94,6 +95,9 @@ function SurveyBody() {
       <Stack.Screen options={{ title: q.data?.name ?? 'Survey' }} />
       <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 }}>
         <Segmented value={section} options={visible.map((s) => ({ key: s.key, label: s.label }))} onChange={setSection} />
+        <View style={{ marginTop: 8, alignSelf: 'flex-start' }}>
+          <InfoButton key={section} k={`section.${section}` as const} label="What is this section for?" />
+        </View>
       </View>
       <View style={{ flex: 1 }}>{body()}</View>
     </Screen>

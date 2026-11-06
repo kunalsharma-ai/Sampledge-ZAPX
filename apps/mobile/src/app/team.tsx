@@ -84,7 +84,7 @@ function TeamBody() {
           />
         )}
       </Async>
-      <H2>Add a member</H2>
+      <H2 help="h.addMember">Add a member</H2>
       <Card>
         <Field label="Name" value={form.name} onChangeText={(name) => setForm({ ...form, name })} />
         <Field

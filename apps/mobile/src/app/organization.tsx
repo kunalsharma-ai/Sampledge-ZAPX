@@ -41,7 +41,7 @@ function OrgBody() {
           </Card>
         )}
       </Async>
-      <H2>Limits and usage</H2>
+      <H2 help="h.limits">Limits and usage</H2>
       <Async q={plan}>
         {(p) => (
           <Card>

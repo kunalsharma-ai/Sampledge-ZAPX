@@ -51,6 +51,7 @@ import {
   UsersRound,
   type LucideIcon,
 } from 'lucide-react';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 const TAB_ICONS: Record<string, LucideIcon> = {
   build: PencilRuler,
@@ -263,6 +264,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         icon={ClipboardList}
         eyebrow="Survey"
         title={survey.name}
+        help="page.survey"
         actions={
           !readOnly ? (
             <>
@@ -335,6 +337,9 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
             </button>
           );
         })}
+      </div>
+      <div className="nx-tab-help">
+        <InfoTip key={tab} k={`tab.${tab}` as const} label="What is this tab for?" />
       </div>
 
       {tab === 'build' || tab === 'json' ? (
@@ -466,7 +471,10 @@ function LogicReport({
 }) {
   return (
     <aside className="panel" aria-live="polite" data-testid="logic-report">
-      <h2>Logic check</h2>
+      <h2>
+        Logic check
+        <InfoTip k="section.logicCheck" />
+      </h2>
       {schemaIssues.length ? (
         <>
           <p className="error-text">The definition is incomplete:</p>
@@ -553,7 +561,10 @@ function Distribute({ survey, readOnly, onChanged }: { survey: SurveyDetail; rea
   return (
     <div className="grid2">
       <section className="panel stack">
-        <h2>Vendor links</h2>
+        <h2>
+          Vendor links
+          <InfoTip k="section.vendorLinks" />
+        </h2>
         {vendors.length === 0 ? (
           <p className="muted">
             Add a vendor on the <Link href={`/projects/${survey.projectId}`}>project page</Link> first.
@@ -599,7 +610,10 @@ function Distribute({ survey, readOnly, onChanged }: { survey: SurveyDetail; rea
             ) : null}
           </>
         )}
-        <h2 style={{ marginTop: 12 }}>Test link</h2>
+        <h2 style={{ marginTop: 12 }}>
+          Test link
+          <InfoTip k="section.testLink" />
+        </h2>
         <p className="muted small">Test responses are flagged, excluded from quotas and exports by default, and never redirect.</p>
         <div>
           <button onClick={() => make(true)} disabled={readOnly}>
@@ -617,7 +631,10 @@ function Distribute({ survey, readOnly, onChanged }: { survey: SurveyDetail; rea
         <ErrorNote error={error} />
       </section>
       <section className="panel stack">
-        <h2>Field status</h2>
+        <h2>
+          Field status
+          <InfoTip k="section.fieldStatus" />
+        </h2>
         <p>
           Currently <span className={`badge ${survey.status.toLowerCase()}`}>{survey.status.toLowerCase()}</span>
         </p>
@@ -721,7 +738,10 @@ function Results({ surveyId, readOnly }: { surveyId: string; readOnly?: boolean 
       <ErrorNote error={error} />
       <section className="panel">
         <div className="row">
-          <h2 style={{ margin: 0 }}>Quotas</h2>
+          <h2 style={{ margin: 0 }}>
+            Quotas
+            <InfoTip k="section.quotaProgress" />
+          </h2>
           <div style={{ flex: 1 }} />
           <button onClick={load}>Refresh</button>
         </div>
@@ -787,7 +807,10 @@ function Results({ surveyId, readOnly }: { surveyId: string; readOnly?: boolean 
       </section>
       <section className="panel">
         <div className="row">
-          <h2 style={{ margin: 0 }}>Responses</h2>
+          <h2 style={{ margin: 0 }}>
+            Responses
+            <InfoTip k="section.responses" />
+          </h2>
           <label className="check small">
             <input type="checkbox" checked={includeTest} onChange={(e) => setIncludeTest(e.target.checked)} /> include tests
           </label>

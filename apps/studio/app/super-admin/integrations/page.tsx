@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ErrorNote } from '@/components/Shell';
 import { SuperAdminFrame } from '@/components/super-admin/SuperAdminFrame';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Platform {
   key: string;
@@ -60,6 +61,7 @@ export default function SuperIntegrationsPage() {
 
   return (
     <SuperAdminFrame
+      help="sa.integrations"
       title="Integrations"
       intro="The integrations of the whole installation, and which organizations may use their own."
       actions={
@@ -73,7 +75,10 @@ export default function SuperIntegrationsPage() {
         <>
           <section className="panel nx-card" data-testid="platform-integrations">
             <div className="nx-card-head">
-              <h2>Platform integrations</h2>
+              <h2>
+                Platform integrations
+                <InfoTip k="sa.integrations" />
+              </h2>
               <span className="muted small">Used by every organization. Keys are entered and tested on the setup page.</span>
             </div>
             <div className="scroll-x">
@@ -107,7 +112,10 @@ export default function SuperIntegrationsPage() {
           </section>
           <section className="panel nx-card" style={{ marginTop: 16 }} data-testid="org-integrations-table">
             <div className="nx-card-head">
-              <h2>Organizations&rsquo; own integrations</h2>
+              <h2>
+                Organizations&rsquo; own integrations
+                <InfoTip k="sa.orgOwnIntegrations" />
+              </h2>
               <span className="muted small">
                 Untick to block an integration for an organization (web CRM and mobile app). Applies at once.
               </span>

@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { ErrorNote, Shell } from '@/components/Shell';
 import { PageHeader } from '@/components/neon/PageHeader';
 import { PhoneCall } from 'lucide-react';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface CallSurvey {
   id: string;
@@ -233,12 +234,15 @@ export default function CallsPage() {
 
   return (
     <Shell forInterviewers crumbs={<span>Calls</span>}>
-      <PageHeader icon={PhoneCall} tone={3} eyebrow="Fieldwork" title="Calls">
+      <PageHeader icon={PhoneCall} tone={3} eyebrow="Fieldwork" title="Calls" help="page.calls">
         Phone interviews assigned to you. Take the next case, call the respondent and record the outcome.
       </PageHeader>
       <div className="grid2">
         <section className="panel stack" data-testid="call-surveys">
-          <h2 style={{ margin: 0 }}>Phone surveys</h2>
+          <h2 style={{ margin: 0 }}>
+            Phone surveys
+            <InfoTip k="section.phoneSurveys" />
+          </h2>
           {surveys === null ? null : surveys.length === 0 ? (
             <p className="muted">No phone surveys are assigned to you, or none is live.</p>
           ) : (
@@ -305,7 +309,10 @@ export default function CallsPage() {
 
         {current ? (
           <section className="panel stack" data-testid="call-case">
-            <h2 style={{ margin: 0 }}>{current.name ?? current.code}</h2>
+            <h2 style={{ margin: 0 }}>
+              {current.name ?? current.code}
+              <InfoTip k="section.currentCall" />
+            </h2>
             <div className="small muted">
               Id {current.code} · attempt {current.attempts + 1} of {current.maxAttempts}
               {current.status === 'IN_CALL' && current.lastDisposition === 'callback' ? ' · callback' : ''}

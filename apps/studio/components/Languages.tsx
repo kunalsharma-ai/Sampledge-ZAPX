@@ -11,6 +11,7 @@ import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { GlossaryEditor, useGlossary } from './Glossary';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type RowState = 'missing' | 'outdated' | 'machine' | 'reviewed';
 
@@ -145,7 +146,10 @@ export function Languages({
   return (
     <div className="editor" style={{ gridTemplateColumns: '280px minmax(0,1fr)' }}>
       <aside className="panel stack">
-        <h2>Languages</h2>
+        <h2>
+          Languages
+          <InfoTip k="section.languages" />
+        </h2>
         <label className="field">
           Source language ({def.language})
           <input
@@ -205,6 +209,7 @@ export function Languages({
             <div className="row">
               <h2 style={{ margin: 0 }}>
                 {lang.name} <span className="mono small muted">{lang.tag}</span>
+                <InfoTip k="section.language" />
               </h2>
               <div style={{ flex: 1 }} />
               {!readOnly ? (
