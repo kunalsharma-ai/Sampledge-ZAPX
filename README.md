@@ -7,7 +7,7 @@
 
 AI-native survey programming, QA, hosting and fieldwork platform. **Write. Run. Ship.**
 
-SampCode was called SampCode until November 2026. The product name, logo and icons changed; internal
+SampCode was called ZAPX until November 2026. The product name, logo and icons changed; internal
 identifiers (package names such as `@zapx/*`, the database name, environment variables such as
 `ZAPX_API_URL`, the `X-Zapx-*` and `X-ZAPX-Client` headers, API key prefixes and the mobile bundle id
 `com.sampledge.zapx`) keep the old name on purpose so nothing breaks for existing installations and
