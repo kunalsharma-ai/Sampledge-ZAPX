@@ -1,11 +1,11 @@
 name: CodeQL
 
+# Weekly and on demand only: on a private repository without GitHub Advanced Security the results
+# cannot be uploaded anyway, and a run per pull request costs Actions minutes GitHub Free lacks.
 on:
-  push:
-    branches: [main]
-  pull_request:
   schedule:
     - cron: '23 4 * * 1'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,7 +14,8 @@ permissions:
 
 jobs:
   analyze:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
     env:
       # Code scanning (the Security tab) needs GitHub Advanced Security on a private repository.
       # Until the repository variable CODE_SCANNING_ENABLED is 'true', results are not uploaded to
