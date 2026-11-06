@@ -74,6 +74,16 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v7
+      # The API refuses to start in production with the example secrets or insecure cookies, so
+      # the smoke test gets its own random secrets (compose reads .env for these variables).
+      - name: Generate production-grade settings
+        run: |
+          {
+            echo "JWT_SECRET=$(openssl rand -hex 32)"
+            echo "SECRETS_KEY=$(openssl rand -hex 32)"
+            echo "SIGNING_KEYS_SECRET=$(openssl rand -hex 32)"
+            echo "COOKIE_SECURE=true"
+          } > .env
       - run: docker compose build
       - run: docker compose up -d
       - name: Wait for API, studio, runtime and interviewer app
