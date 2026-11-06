@@ -9,7 +9,8 @@
 FROM node:26-bookworm-slim AS base
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates && rm -rf /var/lib/apt/lists/*
 ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
-RUN corepack enable
+# Node 25+ images no longer bundle corepack; it still reads the pnpm version from packageManager.
+RUN npm install -g corepack@0.36.0 && corepack enable
 WORKDIR /app
 
 FROM base AS build
