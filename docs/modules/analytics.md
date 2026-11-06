@@ -40,7 +40,7 @@ Results are unweighted unless you add weighting (below).
 
 **Weighting** (left column) corrects a sample whose mix differs from the population, e.g. too many
 men. Add one or more single-answer variables (single choice or scale questions, grid rows, or mode,
-vendor, language, device), enter the target share of each category, and **Check weights**. ZAPX
+vendor, language, device), enter the target share of each category, and **Check weights**. SampCode
 rakes the selected interviews (rim weighting, iterative proportional fitting) until every variable
 matches its targets, and shows:
 
@@ -61,7 +61,7 @@ Rules worth knowing:
   keep their weight for it. Targets that do not add up to 100 are rescaled.
 - Weights are kept between the **lowest** and **highest weight** (default 0.2 to 5) and average 1,
   so the weighted total equals the number of interviews. Tight caps or conflicting targets can stop
-  the targets being met; ZAPX says so rather than hiding it.
+  the targets being met; SampCode says so rather than hiding it.
 - A category with a target but no interviews cannot be weighted up; it is reported, and its target
   is shared over the other categories.
 - Weights are computed on each run for the interviews selected by the filters, so a report always

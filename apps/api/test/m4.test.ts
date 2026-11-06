@@ -5,7 +5,7 @@
  * and the AI gateway (permissions, rate limits, cost, circuit breaker, redaction).
  *
  * The PROJEXA mock implements docs/SURVEY_INTEGRATION.md of the PROJEXA repository. It is not
- * a live PROJEXA, so these tests prove ZAPX follows the documented contract, nothing more.
+ * a live PROJEXA, so these tests prove SampCode follows the documented contract, nothing more.
  */
 import { vi } from 'vitest';
 

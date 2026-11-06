@@ -66,7 +66,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "files" {
   }
 }
 
-# Versions protect against accidental deletes; ZAPX's own erasure removes the current version, and
+# Versions protect against accidental deletes; SampCode's own erasure removes the current version, and
 # old versions expire after 30 days so erased photos and recordings do not linger.
 resource "aws_s3_bucket_versioning" "files" {
   bucket = aws_s3_bucket.files.id
@@ -163,6 +163,6 @@ resource "aws_db_instance" "main" {
 # ---- Application secret (values are put in by an operator, never by Terraform) -------------------
 resource "aws_secretsmanager_secret" "app" {
   name        = "${local.name}/app"
-  description = "ZAPX settings that are secret: JSON with ${join(", ", var.app_secret_keys)}"
+  description = "SampCode settings that are secret: JSON with ${join(", ", var.app_secret_keys)}"
   kms_key_id  = aws_kms_key.data.arn
 }

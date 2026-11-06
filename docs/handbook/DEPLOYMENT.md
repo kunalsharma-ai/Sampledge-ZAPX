@@ -1,6 +1,6 @@
 # Testing, deployment and maintenance
 
-This file covers how ZAPX is tested, built, released, rolled back, backed up and monitored, and
+This file covers how SampCode is tested, built, released, rolled back, backed up and monitored, and
 what to do regularly to keep it healthy. Every section separates **Implemented** (exists in the
 repository and was checked) from **Recommended** (not built yet).
 
@@ -25,10 +25,10 @@ The deeper guides it builds on: [infra/terraform/README.md](../../infra/terrafor
 | Dependency audit      | `pnpm audit`             | accepted exceptions in [docs/security.md](../security.md)                                                                                              | inside full `pnpm check`                                                                             |
 | Everything at once    | `scripts/check.sh`       | —                                                                                                                                                      | `pnpm check` / `--quick` / `--no-docker` / `--no-e2e`                                                |
 
-Results at the time of writing (branch `mobile-app`, the top of the stack, run on 2026-11-05):
-`pnpm test` passed **651 tests** (api 322, logic-engine 133, quantum 108, analysis-core 37,
-quality-core 21, redirect-core 18, survey-schema 6, survey-renderer 6). The Playwright suite was
-**not run** for this refresh.
+Results at the time of writing: on 2026-11-05 (branch `mobile-app`) `pnpm test` passed **651 tests**
+(api 322, logic-engine 133, quantum 108, analysis-core 37, quality-core 21, redirect-core 18,
+survey-schema 6, survey-renderer 6). On 2026-11-06, after #44–#46 were merged, the full
+`pnpm check --no-docker` passed on `main` (`68f4531`) with Node 26, including all 29 browser tests.
 
 The GitHub workflows `.github/workflows/ci.yml` and `codeql.yml` exist but **do not run**: GitHub
 refuses to start the jobs ("recent account payments have failed or your spending limit needs to be
@@ -111,8 +111,9 @@ first.
 1. Terraform state bucket, ACM certificates (one in us-east-1 for CloudFront), DNS validation.
 2. `terraform apply` with `waf_mode = "count"` (`infra/terraform/<env>.tfvars`).
 3. Put the app secret JSON in Secrets Manager. Every key in `app_secret_keys`
-   (`infra/terraform/variables.tf`) must be present, empty if unused. The example JSON in the
-   Terraform README lists them all (fixed on branch `security-fixes`; before it, `TWILIO_AUTH_TOKEN`
+   (`infra/terraform/variables.tf`) must be present, empty if unused; `JWT_SECRET`, `SECRETS_KEY`
+   and `SIGNING_KEYS_SECRET` (PR #45) must be your own, different random values. The example JSON in the
+   Terraform README lists them all (fixed in PR #36; before it, `TWILIO_AUTH_TOKEN`
    and `SENDGRID_API_KEY` were missing); see [CONFIGURATION.md](CONFIGURATION.md#gaps-found).
 4. First release (below), then create the first organization with a temporary
    `ALLOW_SIGNUP = "true"` and remove it again.
@@ -154,7 +155,7 @@ aws logs tail /zapx/<env>/api --since 15m
 
 Then sign in to the studio, open one survey, and open one test link in the runtime.
 
-## 4b. Releasing the mobile app _(PR #40, unmerged)_
+## 4b. Releasing the mobile app _(PR #40)_
 
 The Android and iOS apps are built and signed in the cloud by Expo Application Services (EAS). The full
 steps, accounts and costs are in [docs/operations/mobile-release.md](../operations/mobile-release.md).
@@ -311,18 +312,15 @@ Regular tasks:
 
 Improvements worth planning (details in [SECURITY_REVIEW.md](SECURITY_REVIEW.md)):
 
-1. **Merge or close the open stack** (#27 → #41 → #40, in the order of
-   [merge-order.md](../operations/merge-order.md); #28 is superseded by #38). Fifteen unmerged branches
-   make every fix harder; the longer they stay open the more conflicts they collect.
-2. **Done on branch `security-fixes`:** the root `README.md`, `docs/architecture.md` and
+1. ~~Merge or close the open stack~~: done, every PR through #46 is merged (2026-11-05 and 2026-11-06).
+2. **Done in PR #36:** the root `README.md`, `docs/architecture.md` and
    `go-live.md` now go past milestone 13; password change and reset exist; the vendor secret is
    hidden from everyone but administrators; the AWS secret list matches its README.
 3. **Seal the vendor shared secret at rest** with `SecretBox`, like the partner secret (needs a
    data migration).
-4. **Shared rate limiting**: the throttler is per process; with two or more API tasks the limits
-   multiply. A shared store (database or Valkey) would make them exact.
+4. ~~Shared rate limiting~~: done in PR #45 (`THROTTLE_STORE=database`, the `RateLimitBucket` table).
 5. **Studio unit tests** and a coverage report (section 1).
-6. ~~Node 22 → newer LTS~~: done on branch `dependency-updates` (Node 26 LTS, with Dependabot #20–#25).
+6. ~~Node 22 → newer LTS~~: done in PR #44 (Node 26 LTS; Dependabot #20–#25 closed as replaced).
 7. **Decide where provider keys live** now that PR #38 lets them be set in the CRM: either keep them
    in Secrets Manager (`app_secret_keys`) or remove them there and enter them in Settings →
    Integrations, but not half of each ([CONFIGURATION.md](CONFIGURATION.md)).

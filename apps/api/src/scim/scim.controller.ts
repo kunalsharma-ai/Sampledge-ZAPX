@@ -55,7 +55,7 @@ function roleOf(roles: unknown): Role | undefined {
 
 /**
  * SCIM 2.0 user provisioning (RFC 7643/7644), Milestone 8. Lets an identity provider create, update
- * and deactivate ZAPX members. Groups are not supported; the role comes from the user's `roles`.
+ * and deactivate SampCode members. Groups are not supported; the role comes from the user's `roles`.
  * Deleting a user disables them (history and audit stay attached to the account).
  */
 @Public()
@@ -118,7 +118,7 @@ export class ScimController {
       sort: { supported: false },
       etag: { supported: false },
       authenticationSchemes: [
-        { type: 'oauthbearertoken', name: 'Bearer token', description: 'The SCIM token from ZAPX settings', primary: true },
+        { type: 'oauthbearertoken', name: 'Bearer token', description: 'The SCIM token from SampCode settings', primary: true },
       ],
     });
   }
@@ -295,7 +295,7 @@ export class ScimController {
     this.send(res, 200, this.present(await this.apply(before, change)));
   }
 
-  /** Deleting a user disables them; ZAPX keeps the account so audit history stays attached. */
+  /** Deleting a user disables them; SampCode keeps the account so audit history stays attached. */
   @Delete('Users/:id')
   @HttpCode(204)
   async remove(@Req() req: ScimRequest, @Param('id') id: string) {

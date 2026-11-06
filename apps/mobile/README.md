@@ -1,4 +1,4 @@
-# ZAPX mobile app (Android and iOS)
+# SampCode mobile app (Android and iOS)
 
 Expo (React Native) app with the CRM's features in the Neon AI design. Every screen is gated by the
 features the super admin gives the member's organization and the member on mobile, and changes show
@@ -14,7 +14,7 @@ npm run typecheck
 npm test
 ```
 
-Sign in with the address of a ZAPX server (the studio address, e.g. `https://zapx.example.com`; on a
+Sign in with the address of a SampCode server (the studio address, e.g. `https://zapx.example.com`; on a
 local network `http://192.168.x.x:3000` also works), and an email and password. Single sign-on
 organizations use the web for now.
 

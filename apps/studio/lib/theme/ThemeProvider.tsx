@@ -26,7 +26,7 @@ interface ThemeContextValue {
   saveState: SaveState;
   /** Applies at once (no reload) and saves to the member's account shortly after. */
   update: (patch: Partial<Appearance>) => void;
-  /** Forgets the member's own choice; the organization default (or the ZAPX default) applies. */
+  /** Forgets the member's own choice; the organization default (or the SampCode default) applies. */
   resetToOrganization: () => Promise<void>;
   /** Admins: make `a` the organization default, or clear it with null. */
   setOrganizationDefault: (a: Appearance | null) => Promise<void>;

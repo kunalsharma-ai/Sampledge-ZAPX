@@ -36,7 +36,7 @@ test('right-to-left translation, glossary and saved test cases', async ({ page }
   await expect(page.getByTestId('language-summary')).toContainText('written right to left');
   await expect(page.getByTestId('translation-grid').locator('textarea').first()).toHaveAttribute('dir', 'rtl');
   await page.getByTestId('glossary').locator('summary').click();
-  await page.getByLabel('Glossary term').fill('ZAPX');
+  await page.getByLabel('Glossary term').fill('SampCode');
   await page.getByLabel('Glossary translation').fill('زابكس');
   await page.getByRole('button', { name: 'Add term' }).click();
   await expect(page.getByTestId('glossary')).toContainText('1 terms');

@@ -70,7 +70,7 @@ export class ApiKeysController {
       select: SELECT,
     });
     await this.audit.record(user, 'api_key.create', 'api_key', created.id, { name: created.name, prefix, role: created.role });
-    // The only time the full key is returned. ZAPX keeps a hash of the secret, not the key.
+    // The only time the full key is returned. SampCode keeps a hash of the secret, not the key.
     return { ...created, key };
   }
 

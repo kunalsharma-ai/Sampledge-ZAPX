@@ -1,14 +1,14 @@
 # Architecture
 
-How ZAPX is put together and how a request travels through it. Code references are to branch
-`mobile-app` (PR #40, the top of the open stack). For the reasons behind each decision, read the ADRs in
+How SampCode is put together and how a request travels through it. Code references are to `main`
+(commit `68f4531`, every PR through #46 merged). For the reasons behind each decision, read the ADRs in
 [docs/adr](../adr/README.md); this file describes what the code does.
 
 ## 1. Project overview
 
 ### What the application does
 
-ZAPX is a survey programming, testing, hosting and fieldwork platform for market research.
+SampCode is a survey programming, testing, hosting and fieldwork platform for market research.
 
 | Who                                           | Uses                                                                               | To                                                                                                  |
 | --------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
@@ -222,9 +222,9 @@ full list of 283 routes, with their files, is in [API_DOCUMENTATION.md](API_DOCU
 | URL                      | File                                                                                                           | Shows                                                                                 |
 | ------------------------ | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | `/login`                 | `apps/studio/app/login/page.tsx`                                                                               | sign-in, sign-up, "Sign in with SSO"                                                  |
-| `/forgot-password`       | `apps/studio/app/forgot-password/page.tsx`                                                                     | ask for a reset link by email _(branch `security-fixes`)_                             |
-| `/reset-password`        | `apps/studio/app/reset-password/page.tsx`                                                                      | set a new password from a one-time link _(branch `security-fixes`)_                   |
-| `/account`               | `apps/studio/app/account/page.tsx`                                                                             | My account: change password _(branch `security-fixes`)_                               |
+| `/forgot-password`       | `apps/studio/app/forgot-password/page.tsx`                                                                     | ask for a reset link by email _(PR #36)_                                              |
+| `/reset-password`        | `apps/studio/app/reset-password/page.tsx`                                                                      | set a new password from a one-time link _(PR #36)_                                    |
+| `/account`               | `apps/studio/app/account/page.tsx`                                                                             | My account: change password _(PR #36)_                                                |
 | `/`                      | `apps/studio/app/page.tsx`                                                                                     | dashboard _(PR #29)_: counts, charts, latest projects, create survey                  |
 | `/projects`              | `apps/studio/app/projects/page.tsx`                                                                            | project list _(PR #29 moved it here)_                                                 |
 | `/projects/[id]`         | `apps/studio/app/projects/[id]/page.tsx`                                                                       | a project's surveys, vendors, access                                                  |

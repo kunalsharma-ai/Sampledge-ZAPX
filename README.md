@@ -1,6 +1,17 @@
-# SAMPLEDGE ZAPX
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/sampcode-logo-dark.png" />
+  <img src="docs/brand/sampcode-logo-light.png" alt="SampCode: Write. Run. Ship. By Sampledge" width="360" />
+</picture>
 
-AI-native survey programming, QA, hosting and fieldwork platform.
+# SampCode by Sampledge
+
+AI-native survey programming, QA, hosting and fieldwork platform. **Write. Run. Ship.**
+
+SampCode was called SampCode until November 2026. The product name, logo and icons changed; internal
+identifiers (package names such as `@zapx/*`, the database name, environment variables such as
+`ZAPX_API_URL`, the `X-Zapx-*` and `X-ZAPX-Client` headers, API key prefixes and the mobile bundle id
+`com.sampledge.zapx`) keep the old name on purpose so nothing breaks for existing installations and
+partners. Brand assets and usage: [docs/brand/](docs/brand/README.md).
 
 **Milestone 1 (Foundation)** is a working vertical slice that proves the core architecture end to
 end: a programmer builds a survey, passes an automatic logic check, publishes it, and respondents take
@@ -48,7 +59,7 @@ quality review, and saved reports that anyone on the team can rerun or download 
 
 **Milestone 11 (rich media and question types)** adds rating scales and NPS, ranking, constant sum
 and sliders; images, video and audio on questions and pictures as answers (uploaded, served by
-ZAPX, cached offline in the interviewer app); play-to-the-end for ads; and read aloud.
+SampCode, cached offline in the interviewer app); play-to-the-end for ads; and read aloud.
 
 **Milestone 12 (fraud detection and face-to-face capture)** adds fraud signals to the quality score
 (automated browsers, a honeypot field, pages answered without input, pasted answers, the same device
@@ -90,16 +101,15 @@ configurations.
 Every provider in milestones 16 to 19 (and Stripe, S3 and SSO from milestone 13) is off until its
 keys are added, and has been tested against local stand-ins only, not the real service.
 
-**Not yet on `main` (open pull requests, merged in order).** The Quantum Design System (#27), the
-Neon AI dashboard and sidebar shell (#29), and the five blueprint phases: loops, blocks, variables and
-the question bank (#30); multilingual tools, URL variables, least-fill and test cases (#31);
-fieldwork evidence, supervision, appeals and email distribution (#32); MaxDiff, conjoint, recodes and
-the AI research assistant (#33); automation, data residency and retention, cleaning, dashboards and
-SMS (#34). Then the maintainer handbook (#35) and the security fixes from its review: the vendor
-shared secret only for admins, password change, administrator reset links and
-"forgot password", and the AWS secret list (branch `security-fixes`). Setting up integrations in the
-CRM (#28) is a separate pull request on `main`. The handbook's
-[changelog](docs/handbook/CHANGELOG.md) lists them all.
+**Since milestone 20 (all merged into `main`).** The Quantum Design System (#27), the Neon AI
+dashboard and sidebar shell (#29), and the blueprint phases: loops, blocks, variables and the question
+bank (#30); multilingual tools, URL variables, least-fill and test cases (#31); fieldwork evidence,
+supervision, appeals and email distribution (#32); MaxDiff, conjoint, recodes and the AI research
+assistant (#33); automation, data residency and retention, cleaning, dashboards and SMS (#34); webcam
+eye tracking, experimental (#37). Then the maintainer handbook (#35, #42), security fixes S1–S3 (#36)
+and S4–S9 (#45), integrations set up in the CRM (#28 as #38), the neon design on every page (#39), the
+super admin console (#41), the Android and iOS app (#40), Node 26 LTS (#44) and neon confirm dialogs
+(#46). The handbook's [changelog](docs/handbook/CHANGELOG.md) lists them all.
 
 ## What works today
 
@@ -119,7 +129,7 @@ CRM (#28) is a separate pull request on `main`. The handbook's
 | Data                     | CSV and Excel export (codes, one column per option or grid row, codebook sheet, spreadsheet formula-injection protection)                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Audit                    | Append-only audit trail of logins, edits, publishes, vendor changes, links, exports, QA runs and change-set decisions                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | AI Survey Architect      | Build or edit a survey from a typed or dictated instruction plus an optional brief or questionnaire (Word, PDF, text). The AI's answer is validated by the same schema and logic check as a manual edit, with one automatic repair round, and lists the assumptions a programmer should confirm. Needs `ANTHROPIC_API_KEY`                                                                                                                                                                                                                                                       |
-| File import              | The ZAPX Excel/CSV template is imported deterministically with a confidence score and issues per row (download it from the studio). Word, PDF and text questionnaires are read by the AI. Files are checked by content, not just extension, and limited in size                                                                                                                                                                                                                                                                                                                  |
+| File import              | The SampCode Excel/CSV template is imported deterministically with a confidence score and issues per row (download it from the studio). Word, PDF and text questionnaires are read by the AI. Files are checked by content, not just extension, and limited in size                                                                                                                                                                                                                                                                                                              |
 | Change sets              | AI output, imports and pasted definitions become proposals with a structured diff, data-impact warning, logic check and a 200-respondent QA preview. A programmer applies or rejects them; applying fails if the draft changed since the proposal was made                                                                                                                                                                                                                                                                                                                       |
 | QA Laboratory            | Simulate up to 2,000 synthetic respondents per run on the draft or live version: outcome mix, coverage of pages, questions, options, branches and outcomes, and defects (never shown, constant conditions, impossible completes, stuck pages) with an example respondent. Runs are deterministic per seed, saved, and never touch responses or quotas                                                                                                                                                                                                                            |
 | Experience Studio        | Theme presets, brand colours, logo, font, corner radius, spacing, progress style, button labels and motion (always off for respondents who ask for reduced motion), with contrast warnings and a live preview at desktop, tablet and phone width. Presentation only: it cannot change questions, codes or logic                                                                                                                                                                                                                                                                  |
@@ -162,9 +172,9 @@ CRM (#28) is a separate pull request on `main`. The handbook's
 | Calling rules            | CATI calling hours per time zone and a do-not-call list (Milestone 18)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Phone dialer (optional)  | Twilio click-to-call with hidden numbers and call recording (Milestone 19)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Account security         | Account lockout, sign out everywhere, common-password check, security headers (Milestone 20)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Passwords                | Change your own password on My account; administrators create one-time reset links; "forgot password" emails a link when email is set up (branch `security-fixes`)                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Passwords                | Change your own password on My account; administrators create one-time reset links; "forgot password" emails a link when email is set up (PR #36)                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
-Not yet built on `main`: recorded voice-over, AI open-end review, charts in analysis, SAML single logout and encrypted assertions (MaxDiff and conjoint are on open PR #33, chart dashboards on #34). See
+Not yet built on `main`: recorded voice-over, AI open-end review, SAML single logout and encrypted assertions (MaxDiff and conjoint came in #33, chart dashboards in #34). See
 [docs/architecture.md](docs/architecture.md).
 
 ## Repository layout
@@ -253,7 +263,7 @@ Vendors send respondents to:
 https://<runtime-host>/s/<surveyId>?vid=<VENDOR_CODE>&uid=<RESPONDENT_ID>[&cc=US][&rurl=<return url>][&exp=..&sig=..]
 ```
 
-At the end ZAPX redirects according to the vendor's mode:
+At the end SampCode redirects according to the vendor's mode:
 
 - **Static** – fixed URL per status, e.g. the Sampledge preset
   `https://platform.sampledge.com/response/status?status=[STATUS]&uid=[UID]` with status words
@@ -269,7 +279,7 @@ the vendor API and the PROJEXA adapter are documented in
 
 ## Maintainer handbook
 
-For troubleshooting, maintaining and extending ZAPX, start with the
+For troubleshooting, maintaining and extending SampCode, start with the
 [maintainer handbook](docs/handbook/README.md): architecture, file structure, database, API
 reference, configuration, development guide, troubleshooting, deployment, security review and
 changelog.

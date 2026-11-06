@@ -344,8 +344,8 @@ export default function IntegrationsPage() {
   return (
     <Shell crumbs={crumbs}>
       <PageHeader icon={Plug} tone={2} eyebrow="Administration" title="Integrations">
-        Connect the services ZAPX uses for every organization on this installation. Paste a key, test the connection, then turn it on. Keys
-        are stored encrypted and are never shown again; every change and test is recorded in the{' '}
+        Connect the services SampCode uses for every organization on this installation. Paste a key, test the connection, then turn it on.
+        Keys are stored encrypted and are never shown again; every change and test is recorded in the{' '}
         <Link href="/settings/audit">audit log</Link>. Anything saved here takes over from the server environment.
       </PageHeader>
       <ErrorNote error={error} />

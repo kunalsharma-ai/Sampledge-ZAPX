@@ -9,7 +9,7 @@ import { useApi } from '@/lib/use-api';
 import { usePalette } from '@/lib/theme';
 
 /**
- * Face-to-face (CAPI) interviewing. The ZAPX CAPI app is an offline-first web app (it keeps
+ * Face-to-face (CAPI) interviewing. The SampCode CAPI app is an offline-first web app (it keeps
  * interviews on the device and syncs later), so the mobile app hosts it in a WebView with camera,
  * microphone and location allowed, rather than duplicating the interview engine natively.
  */

@@ -26,7 +26,7 @@ variable "nat_gateway_per_az" {
 
 # ---- Addresses ---------------------------------------------------------------------------------
 variable "studio_domain" {
-  description = "Where research teams use ZAPX, e.g. zapx.sampledge.com. Served by the load balancer."
+  description = "Where research teams use SampCode, e.g. zapx.sampledge.com. Served by the load balancer."
   type        = string
 }
 

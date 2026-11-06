@@ -412,12 +412,12 @@ export class SsoService {
     let user = await this.prisma.user.findUnique({ where: { tenantId_ssoSubject: { tenantId, ssoSubject: sub } } });
     if (!user) {
       const byEmail = await this.prisma.user.findUnique({ where: { email } });
-      if (byEmail && byEmail.tenantId !== tenantId) throw new SsoError('This email address belongs to another ZAPX organization');
+      if (byEmail && byEmail.tenantId !== tenantId) throw new SsoError('This email address belongs to another SampCode organization');
       if (byEmail?.ssoSubject && byEmail.ssoSubject !== sub) throw new SsoError('This account is linked to a different identity');
       if (byEmail) {
         user = await this.prisma.user.update({ where: { id: byEmail.id }, data: { ssoSubject: sub } });
       } else {
-        if (!jitRole) throw new SsoError('You do not have a ZAPX account yet. Ask your administrator to add you.');
+        if (!jitRole) throw new SsoError('You do not have a SampCode account yet. Ask your administrator to add you.');
         await this.plans.assertSeat(tenantId, jitRole).catch((e: Error) => {
           throw new SsoError(`Your account could not be created: ${e.message}`);
         });

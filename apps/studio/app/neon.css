@@ -1,5 +1,5 @@
 /*
- * ZAPX Neon layout: sidebar app shell, dashboard and neon surface treatment. Built only on Quantum
+ * SampCode Neon layout: sidebar app shell, dashboard and neon surface treatment. Built only on Quantum
  * tokens (--q-*), so it follows every theme preset, light and dark, high contrast and reduced motion.
  * The Neon AI preset (the default) supplies the indigo/violet/cyan palette.
  */
@@ -79,16 +79,10 @@
   text-decoration: none;
 }
 .nx-logo-mark {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, var(--q-accent-3), var(--q-accent) 55%, var(--q-accent-2));
-  color: #fff;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, #fff 18%, transparent) inset,
-    0 6px 22px -4px var(--nx-glow-a);
+  width: 40px;
+  height: 40px;
+  flex: none;
+  filter: drop-shadow(0 6px 14px var(--nx-glow-a));
 }
 .nx-logo-text {
   display: flex;
@@ -98,12 +92,12 @@
 .nx-logo-word {
   font-size: 22px;
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: -0.01em;
 }
 .nx-logo-sub {
   font-size: 10.5px;
   color: var(--q-text-muted);
-  max-width: 150px;
+  white-space: nowrap;
 }
 .nx-nav {
   display: flex;
@@ -1502,4 +1496,46 @@ table.data th {
   padding: 2px 4px;
   color: #fff;
   text-shadow: 0 1px 2px #000;
+}
+
+/* SampCode brand (components/neon/Brand.tsx). "Code" keeps the logo's own gradient in every theme. */
+.sc-word {
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.sc-word-code {
+  background: linear-gradient(100deg, #22d3ee, #6366f1 55%, #a855f7);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+[data-q-contrast='high'] .sc-word-code {
+  background: none;
+  color: var(--q-accent);
+}
+.sc-logo {
+  display: inline-block;
+  line-height: 0;
+}
+.sc-logo img {
+  max-width: 100%;
+  height: auto;
+}
+/* Light artwork by default; the dark artwork when the scheme is dark (saved theme, else the system). */
+.sc-logo-dark {
+  display: none;
+}
+:root[data-q-scheme='dark'] .sc-logo-light {
+  display: none;
+}
+:root[data-q-scheme='dark'] .sc-logo-dark {
+  display: inline;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-q-scheme]) .sc-logo-light {
+    display: none;
+  }
+  :root:not([data-q-scheme]) .sc-logo-dark {
+    display: inline;
+  }
 }

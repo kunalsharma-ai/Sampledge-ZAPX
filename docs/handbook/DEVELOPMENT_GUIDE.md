@@ -1,6 +1,6 @@
 # Development guide
 
-How to set up a machine, run ZAPX, and make the common kinds of change. Every command below exists in
+How to set up a machine, run SampCode, and make the common kinds of change. Every command below exists in
 the repository's `package.json` files or scripts; they were run on 2026-11-05 on this branch
 (install, build, migrate, seed and the 590 unit and API tests all passed).
 
@@ -10,7 +10,7 @@ the repository's `package.json` files or scripts; they were run on 2026-11-05 on
 
 | Tool       | Version                                       | Check                                     |
 | ---------- | --------------------------------------------- | ----------------------------------------- |
-| Node.js    | 22 (`engines.node >= 22`)                     | `node -v`                                 |
+| Node.js    | 26 LTS (`engines.node >= 26`, `.nvmrc`)       | `node -v`                                 |
 | pnpm       | 10.28.0 (`packageManager`)                    | `pnpm -v` (`corepack enable` installs it) |
 | PostgreSQL | 16                                            | `psql --version`, or use Docker           |
 | Docker     | optional, for the full stack and image builds | `docker info`                             |
@@ -22,7 +22,7 @@ the repository's `package.json` files or scripts; they were run on 2026-11-05 on
 # 1. get the code (use the branch you want to work on)
 git clone https://github.com/kunalsharma-ai/Sampledge-ZAPX.git
 cd Sampledge-ZAPX
-git checkout mobile-app                  # top of the open stack, or main
+git checkout main                        # everything is merged into main
 
 # 2. settings
 cp .env.example .env                     # edit DATABASE_URL if needed; see CONFIGURATION.md
@@ -109,7 +109,7 @@ publish, set it live, and create a link under **Distribution**. Open the link to
 Run `pnpm check` before merging. GitHub Actions does not run on this account, so this is the only
 gate ([ADR 0009](../adr/0009-local-quality-gates.md)).
 
-## 3. Rules that keep ZAPX consistent
+## 3. Rules that keep SampCode consistent
 
 These come from `docs/architecture.md` and the ADRs, and the code follows them. Break them only with
 a new ADR.

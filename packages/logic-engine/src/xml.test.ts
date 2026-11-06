@@ -90,7 +90,7 @@ const full = surveyDefinitionSchema.parse({
   },
 });
 
-describe('ZAPX XML', () => {
+describe('SampCode XML', () => {
   it('round-trips the whole definition', () => {
     const xml = toZapxXml(full);
     expect(xml).toContain('<hotspot id="SPOT"');

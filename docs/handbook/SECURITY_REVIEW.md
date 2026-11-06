@@ -1,7 +1,8 @@
 # Security and code quality review
 
 This review was done while writing the handbook, by reading the code on `blueprint-p5-enterprise`
-(PR #34) on 2026-11-05, and extended for PRs #37–#41 on branch `mobile-app` the same day (S10–S13).
+(PR #34) on 2026-11-05, and extended for PRs #37–#41 on branch `mobile-app` the same day (S10–S13). All the fixes below are merged
+into `main` (2026-11-05 and 2026-11-06); S10, S11 and sealing the vendor secret are still open.
 **No code was changed by this review** (S1–S3 were then fixed in PR #36). Each finding says what was seen, where, why it
 matters and what to consider. Severities are the reviewer's judgement, not the result of a
 penetration test; nothing here was exploited against a running system other than the local one.
@@ -39,21 +40,21 @@ For the project's own security notes, which this review does not replace, see
 
 ## 2. Potential issues found
 
-| #   | Severity | Finding                                                                                               | Status                                            |
-| --- | -------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| S1  | Medium   | Vendor shared secret is readable by every role, including VIEWER                                      | **Fixed** on branch `security-fixes` (ADMIN only) |
-| S2  | Medium   | Terraform secret list and the documented secret JSON disagree                                         | **Fixed** on branch `security-fixes`              |
-| S3  | Medium   | No way to reset or change a password                                                                  | **Fixed** on branch `security-fixes`              |
-| S4  | Low–Med  | Rate limits are per API process                                                                       | **Fixed** on branch `security-s4-s9`              |
-| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                                                            | **Fixed** on branch `security-s4-s9`              |
-| S6  | Low      | Studio content security policy does not restrict scripts                                              | **Fixed** on branch `security-s4-s9`              |
-| S7  | Low      | Login answers with the session token in the body too                                                  | **Fixed** on branch `security-s4-s9`              |
-| S8  | Low      | Automated security scanning never runs on GitHub                                                      | **Fixed** on branch `security-s4-s9`              |
-| S9  | Info     | Row-level security covers two tables only                                                             | **Fixed** on branch `security-s4-s9`              |
-| S10 | Low–Med  | Feature gating is a list of route patterns; unlisted routes are open _(PR #41)_                       | open                                              |
-| S11 | Low      | The oldest organization becomes the platform operator automatically _(PR #38)_                        | open                                              |
-| S12 | Info     | Super admins saw the vendor secret only if they were also ADMIN of that organization _(PR #36 + #41)_ | **Fixed** on branch `vendor-secret-super-admin`   |
-| S13 | Info     | Runtime CSP now allows `'wasm-unsafe-eval'` for eye tracking _(PR #37)_                               | accepted by design                                |
+| #   | Severity | Finding                                                                                               | Status                           |
+| --- | -------- | ----------------------------------------------------------------------------------------------------- | -------------------------------- |
+| S1  | Medium   | Vendor shared secret is readable by every role, including VIEWER                                      | **Fixed** in PR #36 (ADMIN only) |
+| S2  | Medium   | Terraform secret list and the documented secret JSON disagree                                         | **Fixed** in PR #36              |
+| S3  | Medium   | No way to reset or change a password                                                                  | **Fixed** in PR #36              |
+| S4  | Low–Med  | Rate limits are per API process                                                                       | **Fixed** in PR #45              |
+| S5  | Low–Med  | `JWT_SECRET` keys several unrelated things                                                            | **Fixed** in PR #45              |
+| S6  | Low      | Studio content security policy does not restrict scripts                                              | **Fixed** in PR #45              |
+| S7  | Low      | Login answers with the session token in the body too                                                  | **Fixed** in PR #45              |
+| S8  | Low      | Automated security scanning never runs on GitHub                                                      | **Fixed** in PR #45              |
+| S9  | Info     | Row-level security covers two tables only                                                             | **Fixed** in PR #45              |
+| S10 | Low–Med  | Feature gating is a list of route patterns; unlisted routes are open _(PR #41)_                       | open                             |
+| S11 | Low      | The oldest organization becomes the platform operator automatically _(PR #38)_                        | open                             |
+| S12 | Info     | Super admins saw the vendor secret only if they were also ADMIN of that organization _(PR #36 + #41)_ | **Fixed** in PR #43              |
+| S13 | Info     | Runtime CSP now allows `'wasm-unsafe-eval'` for eye tracking _(PR #37)_                               | accepted by design               |
 
 The review below describes the code as it was found on `blueprint-p5-enterprise`; each fixed
 finding ends with what the fix changed.
@@ -73,8 +74,8 @@ finding ends with what the fix changed.
   is audited; seal it with `SecretBox` like the partner secret. Existing secrets can then be rotated
   with `POST /api/vendors/:id/rotate-secret`.
 
-- **Fixed (branch `security-fixes`):** `presentVendor(v, role)` returns `secret` only to ADMIN
-  (`SEES_VENDOR_SECRET`; ZAPX has no separate super admin role). Programmers and viewers get the
+- **Fixed (PR #36):** `presentVendor(v, role)` returns `secret` only to ADMIN
+  (`SEES_VENDOR_SECRET`; SampCode has no separate super admin role). Programmers and viewers get the
   rest of the vendor without it; programmers can still edit vendors and rotate the secret, but an
   admin hands the new secret to the vendor. Test: `apps/api/test/security-fixes.test.ts`. Sealing the column
   with `SecretBox` is still open (it needs a data migration of every vendor).
@@ -91,7 +92,7 @@ finding ends with what the fix changed.
 - **Consider:** add both keys to the example JSON and `SENDGRID_API_KEY` to `app_secret_keys`.
   Re-check after PR #28 (integrations in the CRM) merges, since it moves provider keys.
 
-- **Fixed (branch `security-fixes`):** `SENDGRID_API_KEY` added to `app_secret_keys`, and the
+- **Fixed (PR #36):** `SENDGRID_API_KEY` added to `app_secret_keys`, and the
   README's example JSON now lists every key including `TWILIO_AUTH_TOKEN`. A test in
   `apps/api/test/security-fixes.test.ts` fails if the two drift apart again.
 
@@ -106,7 +107,7 @@ finding ends with what the fix changed.
 - **Consider:** "change my password" (needs the current one, sets `sessionsRevokedAt`) and an
   administrator reset that issues a one-time link; both audited.
 
-- **Fixed (branch `security-fixes`):** `POST /api/auth/change-password` (current password needed,
+- **Fixed (PR #36):** `POST /api/auth/change-password` (current password needed,
   other sessions signed out, this one kept), `POST /api/users/:id/password-reset` (admin one-time
   link, also emailed when email is set up), `POST /api/auth/forgot-password` (emails a link; always 204) and `POST /api/auth/reset-password`. Tokens are stored as SHA-256 hashes in `PasswordReset`,
   work once, expire after `PASSWORD_RESET_HOURS` and are voided by a newer link; every change is
@@ -122,7 +123,7 @@ finding ends with what the fix changed.
 - **Consider:** a shared throttler store (PostgreSQL or Valkey) when exact limits matter, for example
   for the vendor API (120/min) and AI routes.
 
-- **Fixed (branch `security-s4-s9`):** `THROTTLE_STORE=database` (the default in production) keeps the
+- **Fixed (PR #45):** `THROTTLE_STORE=database` (the default in production) keeps the
   counters in the `RateLimitBucket` table (`apps/api/src/common/db-throttler-storage.ts`): one upsert
   per request, fixed windows, blocks shared by every task; finished rows are swept every 5 minutes. If
   the database cannot be reached the process counts on its own (logged) instead of failing requests.
@@ -142,7 +143,7 @@ finding ends with what the fix changed.
 - **Consider:** document this in the rotation procedure now; later derive separate keys for each
   purpose from a dedicated secret.
 
-- **Fixed (branch `security-s4-s9`):** new `SIGNING_KEYS_SECRET` (required in production, its own
+- **Fixed (PR #45):** new `SIGNING_KEYS_SECRET` (required in production, its own
   value; in Terraform's `app_secret_keys`). Test links, network and device hashes and SSO state each
   use their own key derived from it with HKDF (`apps/api/src/common/signing-keys.ts`). Unset
   (development) the old JWT_SECRET derivation is kept, so nothing changes until it is set. The rotation
@@ -158,7 +159,7 @@ finding ends with what the fix changed.
   is the main defence. `connect-src 'self'` does limit where stolen data can be sent with `fetch`.
 - **Consider:** a nonce-based `script-src` through Next.js middleware.
 
-- **Fixed (branch `security-s4-s9`):** `apps/studio/middleware.ts` sends
+- **Fixed (PR #45):** `apps/studio/middleware.ts` sends
   `script-src 'self' 'nonce-…' 'strict-dynamic'` with a new nonce per page; Next.js puts it on its own
   scripts and `app/layout.tsx` on the theme boot script. Pages are now rendered per request (they
   were client-rendered behind sign-in anyway). The milestone 20 browser test checks the header and
@@ -177,7 +178,7 @@ finding ends with what the fix changed.
   cookie). Any change here must keep a way for the app to get it, for example only when the request
   carries `X-ZAPX-Client: mobile`.
 
-- **Fixed (branch `security-s4-s9`):** sign-in, sign-up and change-password leave `token` out of the
+- **Fixed (PR #45):** sign-in, sign-up and change-password leave `token` out of the
   body when the request has `Sec-Fetch-Mode`, which every current browser sends and page scripts
   cannot remove (`bodyToken` in `auth/session.ts`). The mobile app, scripts and tests send no such
   header and still get the token. (A custom header such as `X-ZAPX-Client` would not do: a script can
@@ -191,13 +192,13 @@ finding ends with what the fix changed.
 - **Consider:** run CodeQL CLI or Semgrep locally before releases, or enable Actions if the plan
   changes. Keep Dependabot PRs (#20–#25) moving.
 
-- **Fixed (branch `security-s4-s9`):** `pnpm lint` (so `pnpm check`) now runs
+- **Fixed (PR #45):** `pnpm lint` (so `pnpm check`) now runs
   `eslint-plugin-security` rules as errors: eval with expressions, `new Function`, child processes,
   non-literal `require`, `new Buffer`, pseudo-random bytes, timing-attack comparisons, bidi characters
   and more. Its `detect-unsafe-regex` rule is off: the 21 regexes it flagged on `main` were reviewed by
   hand and all are anchored and delimited or bounded (no nested ambiguous repetition), so none can
   backtrack badly. For a release, a CodeQL CLI or Semgrep run is still worthwhile. The Dependabot PRs
-  are handled on branch `dependency-updates`.
+  are handled in PR #44.
 
 ### S9. Row-level security covers two tables (Info)
 
@@ -208,7 +209,7 @@ finding ends with what the fix changed.
 - **Consider:** keep the review rule "every `findMany` has `tenantId`" in PR reviews, and extend RLS
   to other personal-data tables (for example CATI call lists) when convenient.
 
-- **Fixed (branch `security-s4-s9`):** migration `20261120000000_security_hardening` adds the same
+- **Fixed (PR #45):** migration `20261120000000_security_hardening` adds the same
   policy to `CatiCase`, `CatiCall`, `DoNotCall`, `Contact`, `Invitation`, `BackCheck` and
   `QualityAppeal`, and the studio reads of call cases, call history, the do-not-call list, contacts
   and wave links now go through `forTenant`. A test checks the policy on all nine tables and that a
@@ -242,7 +243,7 @@ finding ends with what the fix changed.
   check, and the super admin console does not show other organizations' vendors.
 - **Why it matters:** the owner asked that "the super admin and admin both" can see it. Today a super
   admin sees it only in their own organization, and only when their role there is ADMIN.
-- **Fixed (branch `vendor-secret-super-admin`, owner's decision 2026-11-05):** `seesVendorSecret(user)`
+- **Fixed (PR #43, owner's decision 2026-11-05):** `seesVendorSecret(user)`
   returns true for role ADMIN or for a super admin signed in with a session (never an API key), so a
   super admin sees the secret whatever their role. The super admin console still does not list other
   organizations' vendors. Test: `apps/api/test/security-fixes.test.ts`.
@@ -263,8 +264,7 @@ JavaScript `eval()`. Accepted by design ([ADR 0034](../adr/0034-webcam-eye-track
 - **Comments explain why.** Most decisions are commented with the milestone and ADR that introduced
   them, which helps when tracing behaviour back to a decision.
 - **No studio unit tests** (only Playwright). See [DEPLOYMENT.md](DEPLOYMENT.md#1-testing).
-- **Fifteen open stacked PRs.** Fixes on `main` have to be merged up through #27 → #41 → #40; conflicts
-  grow the longer the stack stays open.
+- ~~Fifteen open stacked PRs~~: all merged into `main` on 2026-11-05 and 2026-11-06.
 - **Two package managers.** `apps/mobile` uses npm with its own lockfile while the rest uses pnpm;
   `pnpm audit` does not cover the mobile app's dependencies (**Needs Verification**: run `npm audit`
   in `apps/mobile`).
@@ -272,13 +272,13 @@ JavaScript `eval()`. Accepted by design ([ADR 0034](../adr/0034-webcam-eye-track
 ## Documentation drift
 
 Existing documents that did not match the code when the handbook was written. The first three and
-the Terraform README were brought up to date on branch `security-fixes`.
+the Terraform README were brought up to date in PR #36.
 
 | Document                                     | What is out of date                                                                                                                                |
 | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `README.md` (root)                           | **Updated.** The product summary stopped at Milestone 13; it now covers M14–M20 and the open PRs.                                                  |
-| `docs/architecture.md`                       | **Updated.** Title and content covered Milestones 1 to 13 only; now M1–M20, the open PRs and stale known limits.                                   |
-| `docs/operations/go-live.md`                 | **Updated.** Step 1 said to merge PRs #1 to #19, which were merged on 2026-11-02; it now names the open stack.                                     |
+| `README.md` (root)                           | **Updated.** The product summary stopped at Milestone 13; it now covers M14–M20 and PRs #27–#46.                                                   |
+| `docs/architecture.md`                       | **Updated.** Title and content covered Milestones 1 to 13 only; now M1–M20, PRs #27–#46 and stale known limits.                                    |
+| `docs/operations/go-live.md`                 | **Updated.** Step 1 said to merge PRs #1 to #19, which were merged on 2026-11-02; 2026-11-06: all merged, only #47 open.                           |
 | `docs/api/openapi.yaml`, `capi-openapi.yaml` | They describe only the vendor API (2 paths) and the CAPI sync (2 paths). The API has 283 routes; see [API_DOCUMENTATION.md](API_DOCUMENTATION.md). |
 | `.env.example`                               | Missing several variables that have defaults; listed in [CONFIGURATION.md](CONFIGURATION.md#gaps-found).                                           |
 | `infra/terraform/README.md`                  | **Updated.** Example secret JSON missed `TWILIO_AUTH_TOKEN` (S2).                                                                                  |

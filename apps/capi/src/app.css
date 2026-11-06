@@ -1,4 +1,4 @@
-/* ZAPX Neon (matches the studio's default Neon AI theme): deep indigo, violet and cyan with soft glows. */
+/* SampCode Neon (matches the studio's default Neon AI theme): deep indigo, violet and cyan with soft glows. */
 :root {
   --bg: #0b0820;
   --card: #151034;
@@ -209,14 +209,13 @@ h2 {
 .capi-brand-mark {
   width: 28px;
   height: 28px;
-  border-radius: 9px;
-  display: inline-grid;
-  place-items: center;
-  background: linear-gradient(135deg, #22d3ee, #8b5cf6 55%, #d946ef);
-  box-shadow: 0 6px 18px -6px rgba(139, 92, 246, 0.9);
-  color: #fff;
-  font-size: 15px;
-  font-weight: 800;
+  flex: none;
+}
+.capi-brand-code {
+  background: linear-gradient(100deg, #22d3ee, #6366f1 55%, #a855f7);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .capi-table tr:hover td {
   background: rgba(139, 92, 246, 0.08);

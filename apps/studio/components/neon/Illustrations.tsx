@@ -4,7 +4,7 @@
  */
 import { useId } from 'react';
 
-/** The ZAPX AI assistant: a friendly robot standing on a glowing platform. */
+/** The SampCode AI assistant: a friendly robot standing on a glowing platform. */
 export function Robot({ size = 220, platform = true, className }: { size?: number; platform?: boolean; className?: string }) {
   const id = useId().replace(/:/g, '');
   const h = platform ? size * 1.08 : size * 0.92;

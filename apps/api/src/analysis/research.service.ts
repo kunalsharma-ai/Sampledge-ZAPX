@@ -1,5 +1,5 @@
 /**
- * AI research assistant (blueprint phase 4). ZAPX computes the tables (frequencies, or crosstabs by
+ * AI research assistant (blueprint phase 4). SampCode computes the tables (frequencies, or crosstabs by
  * a banner, with significance letters) exactly as the Analysis tab does; the model only reads them.
  * Every finding must cite a table it was read from: findings that cite nothing, or a table that was
  * not sent, are dropped and the answer says how many. Answers are never written into reports

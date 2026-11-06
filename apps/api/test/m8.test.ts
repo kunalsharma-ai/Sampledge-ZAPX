@@ -155,7 +155,7 @@ describe('single sign-on (OpenID Connect)', () => {
   it('refuses people without an account unless just-in-time provisioning is on', async () => {
     const refused = await ssoLogin(`new@${domain}`, { sub: 'idp-new' });
     expect(refused.session).toBeUndefined();
-    expect(decodeURIComponent(refused.location)).toContain('do not have a ZAPX account');
+    expect(decodeURIComponent(refused.location)).toContain('do not have a SampCode account');
     await http
       .put('/api/sso')
       .set(admin)

@@ -1,7 +1,7 @@
 /**
  * Milestone 19 acceptance test, through the real UI, with a stand-in for Twilio that behaves like
  * it: when the dialer places a call, the stand-in reports the interviewer's phone ringing and
- * answered, asks ZAPX (signed, like Twilio) what to do, and reports that the respondent was busy.
+ * answered, asks SampCode (signed, like Twilio) what to do, and reports that the respondent was busy.
  * The interviewer never sees the number, and the busy line is suggested as the call outcome.
  */
 import { createHmac, randomBytes } from 'node:crypto';

@@ -1,5 +1,5 @@
 /**
- * HTTP client for the ZAPX API. The mobile app signs in with email and password, keeps the session
+ * HTTP client for the SampCode API. The mobile app signs in with email and password, keeps the session
  * token in the device's secure store and sends it as a Bearer token (no cookies, so no CSRF header).
  * Every request says it comes from the mobile app (X-ZAPX-Client: mobile), so the server applies the
  * super admin's mobile subscription, not the web one.
@@ -35,7 +35,7 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 /** Turn a typed-in server address into the API base ("https://zapx.example.com" -> ".../api"). */
 export function normalizeServer(input: string): string {
   let s = input.trim();
-  if (!s) throw new Error('Enter your ZAPX address');
+  if (!s) throw new Error('Enter your SampCode address');
   if (!/^https?:\/\//i.test(s)) s = `https://${s}`;
   const u = new URL(s);
   if (u.protocol === 'http:' && !/^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(u.hostname)) {
@@ -97,7 +97,7 @@ export class ApiClient {
     try {
       res = await this.raw(method, path, { body });
     } catch {
-      throw new ApiError(0, 'Cannot reach ZAPX. Check your connection.');
+      throw new ApiError(0, 'Cannot reach SampCode. Check your connection.');
     }
     const text = await res.text();
     let parsed: unknown = undefined;

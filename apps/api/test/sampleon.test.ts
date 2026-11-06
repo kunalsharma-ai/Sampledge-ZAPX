@@ -1,10 +1,10 @@
 /**
- * SAMPLEON integration (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md): an independent ZAPX survey asks
+ * SAMPLEON integration (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md): an independent SampCode survey asks
  * SAMPLEON for an audience with a signed request, respondents SAMPLEON sends in are answered with
  * SAMPLEON's survey-host contract (redirect + signed S2S outcome), and SAMPLEON's signed events
  * update the studio's view of the request.
  *
- * The SAMPLEON here is a mock that checks signatures with its own HMAC code (not ZAPX's), following
+ * The SAMPLEON here is a mock that checks signatures with its own HMAC code (not SampCode's), following
  * the documented contract. The cross-service run lives in the SAMPLEON repository (e2e).
  */
 import { vi } from 'vitest';
@@ -74,7 +74,7 @@ function handle(h: Hit): [number, unknown] {
   if (h.url === '/api/v1/audience-requests' && h.method === 'POST') {
     if (!sampleonVerify(h)) return [401, { message: 'Bad signature' }];
     const b = JSON.parse(h.body);
-    if (b.source?.platform !== 'ZAPX') return [403, { message: 'A ZAPX client can only create ZAPX requests' }];
+    if (b.source?.platform !== 'ZAPX') return [403, { message: 'A SampCode client can only create SampCode requests' }];
     return [201, { audienceRequestId: AR, status: 'submitted', requiredCompletes: b.requiredCompletes, source: b.source }];
   }
   return [404, {}];
@@ -161,7 +161,7 @@ const request1 = {
   fieldwork: { start: '2026-11-10', end: '2026-12-10' },
 };
 
-describe('independent ZAPX survey → SAMPLEON audience request', () => {
+describe('independent SampCode survey → SAMPLEON audience request', () => {
   it('shows the launch URL SAMPLEON or PROJEXA should use', async () => {
     const r = (await http.get(`/api/surveys/${surveyId}/sampleon`).set(auth).expect(200)).body;
     expect(r.configured).toBe(true);
@@ -188,7 +188,7 @@ describe('independent ZAPX survey → SAMPLEON audience request', () => {
     expect(hits.length).toBe(before);
   });
 
-  it('sends a signed ZAPX audience request and records it', async () => {
+  it('sends a signed SampCode audience request and records it', async () => {
     const r = await http.post(`/api/surveys/${surveyId}/sampleon/audience-requests`).set(auth).send(request1).expect(201);
     expect(r.body.audienceRequest).toMatchObject({ audienceRequestId: AR, status: 'submitted' });
     const hit = hits.find((h) => h.url === '/api/v1/audience-requests')!;

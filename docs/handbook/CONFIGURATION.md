@@ -1,6 +1,6 @@
 # Configuration and environment variables
 
-Every setting ZAPX reads, where it is read, whether you must set it, and a placeholder value. No real
+Every setting SampCode reads, where it is read, whether you must set it, and a placeholder value. No real
 secret appears here; replace every `<…>` placeholder with your own value.
 
 ## Where settings come from
@@ -17,7 +17,7 @@ secret appears here; replace every `<…>` placeholder with your own value.
 If a value is invalid the API refuses to start with `Invalid configuration: NAME: message; …`.
 Start from `.env.example` (`cp .env.example .env`).
 
-## Integrations set in the CRM _(PR #38, unmerged)_
+## Integrations set in the CRM _(PR #38)_
 
 From PR #38 the provider settings below no longer have to be environment variables. An administrator
 of the organization that runs the installation (or the super admin) enters them in the studio under
@@ -89,7 +89,7 @@ Provider switches are checked too: turning a provider on without its credentials
 | `SIGNUP_RATE_PER_MINUTE`     | sign-ups per minute per address                                                             | `5`     | `5`                         |
 | `LOGIN_MAX_FAILURES`         | wrong passwords in a row before the account locks                                           | `10`    | `10`                        |
 | `LOGIN_LOCK_MINUTES`         | lock length                                                                                 | `15`    | `15`                        |
-| `PASSWORD_RESET_HOURS`       | hours a password reset link works (1–168) _(branch `security-fixes`)_                       | `24`    | `24`                        |
+| `PASSWORD_RESET_HOURS`       | hours a password reset link works (1–168) _(PR #36)_                                        | `24`    | `24`                        |
 | `SSO_ALLOW_INSECURE_ISSUER`  | allow http/private identity providers (development and tests only; refused in production)   | off     | `false`                     |
 | `TRUST_PROXY_HOPS`           | proxies in front of the API that add `X-Forwarded-For`                                      | `1`     | `1`                         |
 | `EDGE_SHARED_SECRET`         | secret the CDN sends as `X-Zapx-Edge`; only then viewer address/country headers are trusted | unset   | `<openssl rand -hex 32>`    |
@@ -127,16 +127,16 @@ Provider switches are checked too: turning a provider on without its credentials
 
 ### Phone, email and SMS
 
-| Variable                                                                                                                       | Purpose                                                               | Default                                    |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------ |
-| `TELEPHONY`                                                                                                                    | `off` or `twilio` (CATI dialer)                                       | `off`                                      |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_CALLER_ID` (E.164), `TELEPHONY_WEBHOOK_BASE` (public API URL ending `/api`) | required with `twilio`                                                | empty                                      |
-| `TWILIO_API_BASE`, `TELEPHONY_RING_SECONDS`                                                                                    | endpoint and ring time                                                | `https://api.twilio.com`, `30`             |
-| `EMAIL_PROVIDER` _(PR #32)_                                                                                                    | `off` or `sendgrid`                                                   | `off`                                      |
-| `SENDGRID_API_KEY`, `EMAIL_FROM` _(PR #32)_                                                                                    | required with `sendgrid` (`EMAIL_FROM` must be a verified sender)     | empty                                      |
-| `SENDGRID_API_BASE`, `EMAIL_FROM_NAME` _(PR #32)_                                                                              | endpoint and sender name                                              | `https://api.sendgrid.com`, `ZAPX surveys` |
-| `SMS_PROVIDER` _(PR #34)_                                                                                                      | `off` or `twilio` (uses the Twilio SID and token above)               | `off`                                      |
-| `SMS_FROM` _(PR #34)_                                                                                                          | E.164 number or Messaging Service SID (`MG…`), required with `twilio` | empty                                      |
+| Variable                                                                                                                       | Purpose                                                               | Default                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------- |
+| `TELEPHONY`                                                                                                                    | `off` or `twilio` (CATI dialer)                                       | `off`                                          |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_CALLER_ID` (E.164), `TELEPHONY_WEBHOOK_BASE` (public API URL ending `/api`) | required with `twilio`                                                | empty                                          |
+| `TWILIO_API_BASE`, `TELEPHONY_RING_SECONDS`                                                                                    | endpoint and ring time                                                | `https://api.twilio.com`, `30`                 |
+| `EMAIL_PROVIDER` _(PR #32)_                                                                                                    | `off` or `sendgrid`                                                   | `off`                                          |
+| `SENDGRID_API_KEY`, `EMAIL_FROM` _(PR #32)_                                                                                    | required with `sendgrid` (`EMAIL_FROM` must be a verified sender)     | empty                                          |
+| `SENDGRID_API_BASE`, `EMAIL_FROM_NAME` _(PR #32)_                                                                              | endpoint and sender name                                              | `https://api.sendgrid.com`, `SampCode surveys` |
+| `SMS_PROVIDER` _(PR #34)_                                                                                                      | `off` or `twilio` (uses the Twilio SID and token above)               | `off`                                          |
+| `SMS_FROM` _(PR #34)_                                                                                                          | E.164 number or Messaging Service SID (`MG…`), required with `twilio` | empty                                          |
 
 ### Background work, files and callbacks
 
@@ -155,7 +155,7 @@ Provider switches are checked too: turning a provider on without its credentials
 | `EXPORT_FILE_TTL_HOURS`                                  | export files are deleted after                                                            | `72`                |
 | `JOB_RETENTION_DAYS`, `WEBHOOK_DELIVERY_RETENTION_DAYS`  | housekeeping retention                                                                    | `30`, `30`          |
 
-S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS task role on AWS,
+S3 credentials are not SampCode settings: the AWS SDK uses its normal chain (the ECS task role on AWS,
 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` elsewhere).
 
 ### Billing
@@ -186,7 +186,7 @@ S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS
   `TELEPHONY_RING_SECONDS`, `TRANSCRIPTION_TIMEOUT_S`, `NETWORK_REPUTATION_TIMEOUT_MS`,
   `AI_TIMEOUT_MS`, `STRIPE_API_BASE`. They all have safe defaults, so nothing breaks, but they are
   easy to miss.
-- **Fixed on branch `security-fixes`:** on AWS, `app_secret_keys` (`infra/terraform/variables.tf`)
+- **Fixed in PR #36:** on AWS, `app_secret_keys` (`infra/terraform/variables.tf`)
   included `TWILIO_AUTH_TOKEN` but the example secret JSON in `infra/terraform/README.md` did not,
   and `SENDGRID_API_KEY` had no secret slot. Both now match (and a test checks it). Every key in
   `app_secret_keys` must exist in the secret, empty if unused, or the tasks fail to start. With PR #38
@@ -196,7 +196,7 @@ S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS
 - `ANTHROPIC_API_BASE` _(PR #38)_ exists only for tests (an Anthropic-compatible stand-in); leave it
   at its default.
 
-## Super admin automation _(PR #41, unmerged; [ADR 0036](../adr/0036-super-admin.md))_
+## Super admin automation _(PR #41; [ADR 0036](../adr/0036-super-admin.md))_
 
 | Variable                 | Default | What it does                                                                 |
 | ------------------------ | ------- | ---------------------------------------------------------------------------- |
@@ -206,7 +206,7 @@ S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS
 The first super admin is made with `node apps/api/dist/cli/set-super-admin.js <email>` (the member must
 belong to the organization that runs the installation; see `set-operator.js`). Remove with `--remove`.
 
-## Mobile app settings _(PR #40, unmerged)_
+## Mobile app settings _(PR #40)_
 
 The mobile app has no environment file. The member types the server address (the studio address)
 on the sign-in screen. Build settings are in `apps/mobile/app.json` (name, icons, bundle id

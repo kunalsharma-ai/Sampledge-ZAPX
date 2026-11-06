@@ -45,7 +45,7 @@ export function SuperAdminFrame({
       <Shell crumbs={crumbs}>
         <section className="panel" data-testid="super-admin-denied">
           <h1>Super admin only</h1>
-          <p className="muted">This console is for the super admin of this ZAPX installation.</p>
+          <p className="muted">This console is for the super admin of this SampCode installation.</p>
         </section>
       </Shell>
     );

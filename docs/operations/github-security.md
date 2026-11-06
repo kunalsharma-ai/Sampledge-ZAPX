@@ -1,6 +1,6 @@
 # Protecting the repository on GitHub's free plan
 
-ZAPX lives in a private repository on GitHub's free plan, without GitHub Actions
+SampCode lives in a private repository on GitHub's free plan, without GitHub Actions
 ([ADR 0009](../adr/0009-local-quality-gates.md)). Branch protection, rulesets, secret scanning and
 push protection are not available for private repositories on that plan, so the protections below
 are the ones that work today. Steps marked **you** need the repository owner; nobody else can do them.
@@ -8,7 +8,7 @@ are the ones that work today. Steps marked **you** need the repository owner; no
 ## Already in the repository
 
 - **Secret scanner** (`scripts/secret-scan.mjs`): AWS, Anthropic, OpenAI, Stripe, GitHub, Slack,
-  Google, Twilio and ZAPX keys, private keys, database addresses with passwords, and files that
+  Google, Twilio and SampCode keys, private keys, database addresses with passwords, and files that
   must never be committed (`.env`, `*.pem`, Terraform state and variables). It runs:
   - in `pnpm check`,
   - before every commit (staged changes) and every push (all tracked files), through the hooks in
@@ -41,7 +41,7 @@ In your account › **Settings › Applications** and **Developer settings**:
    delete classic tokens.
 
 In the repository › **Settings › Collaborators**: give the least access that works (Write, not
-Admin), and remove people who no longer work on ZAPX.
+Admin), and remove people who no longer work on SampCode.
 
 ## Without branch protection
 
@@ -59,5 +59,5 @@ Admin), and remove people who no longer work on ZAPX.
    with a clone knows.
 3. Record what happened in the audit notes.
 
-Where each ZAPX secret lives and how to rotate it is in [go-live.md](go-live.md) and
+Where each SampCode secret lives and how to rotate it is in [go-live.md](go-live.md) and
 [../security.md](../security.md).

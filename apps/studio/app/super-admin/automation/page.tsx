@@ -346,7 +346,7 @@ export default function SuperAutomationPage() {
   return (
     <SuperAdminFrame
       title="Automation"
-      intro="Let ZAPX handle subscriptions on its own: warn before they end, suspend or downgrade when they end, start trials, and alert you about usage. Rules are checked every minute."
+      intro="Let SampCode handle subscriptions on its own: warn before they end, suspend or downgrade when they end, start trials, and alert you about usage. Rules are checked every minute."
       actions={
         <>
           <button onClick={() => void runNow().catch(setError)} data-testid="run-all">

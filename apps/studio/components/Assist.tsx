@@ -281,8 +281,8 @@ export function Assist({
             <div className="panel stack" data-testid="import-panel" ref={importPanel}>
               <h2>Import a questionnaire</h2>
               <p className="muted small">
-                Excel or CSV in the ZAPX template is imported exactly, with a confidence score per row. Word, PDF and text questionnaires
-                are read by the AI.
+                Excel or CSV in the SampCode template is imported exactly, with a confidence score per row. Word, PDF and text
+                questionnaires are read by the AI.
               </p>
               <a href="/api/imports/template.xlsx" className="small">
                 Download the Excel template

@@ -30,7 +30,7 @@ const FIELDS = [
 
 /**
  * Blueprint phase 5: data residency and retention for the organization (administrators).
- * Residency is a control on what ZAPX sends out, not a certification; it never moves data.
+ * Residency is a control on what SampCode sends out, not a certification; it never moves data.
  */
 export function DataGovernance() {
   const [g, setG] = useState<Governance | null>(null);
@@ -75,8 +75,8 @@ export function DataGovernance() {
       {g ? (
         <>
           <p className="small muted" style={{ margin: 0 }}>
-            This deployment keeps data in region <strong>{g.deploymentRegion ?? 'not declared (set DATA_REGION)'}</strong>. ZAPX does not
-            move data between regions; it tells you when the two differ and can stop sending data to outside services.
+            This deployment keeps data in region <strong>{g.deploymentRegion ?? 'not declared (set DATA_REGION)'}</strong>. SampCode does
+            not move data between regions; it tells you when the two differ and can stop sending data to outside services.
           </p>
           <div className="row" style={{ gap: 8, alignItems: 'end' }}>
             <label>

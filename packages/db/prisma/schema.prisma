@@ -1,4 +1,4 @@
-// ZAPX relational model. The survey questionnaire itself is a versioned JSON document
+// SampCode relational model. The survey questionnaire itself is a versioned JSON document
 // (SurveyVersion.definition) validated by @zapx/survey-schema; everything that is queried
 // operationally (responses, quotas, vendors, audit) lives in tables.
 
@@ -101,13 +101,13 @@ enum ResponseStatus {
   TECHNICAL_ERROR
 }
 
-/// How ZAPX exchanges outcomes with a sample source (see packages/redirect-core).
+/// How SampCode exchanges outcomes with a sample source (see packages/redirect-core).
 enum VendorIntegration {
-  /// ZAPX resolves redirects itself and sends optional signed callbacks.
+  /// SampCode resolves redirects itself and sends optional signed callbacks.
   DIRECT
-  /// ZAPX is a client survey platform behind PROJEXA (PROJEXA docs/SURVEY_INTEGRATION.md).
+  /// SampCode is a client survey platform behind PROJEXA (PROJEXA docs/SURVEY_INTEGRATION.md).
   PROJEXA
-  /// ZAPX is the survey host behind SAMPLEON, the Sampledge audience and routing engine. Same
+  /// SampCode is the survey host behind SAMPLEON, the Sampledge audience and routing engine. Same
   /// survey-host contract as PROJEXA (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md §5.3).
   SAMPLEON
 }
@@ -593,7 +593,7 @@ model ChangeSet {
   @@index([tenantId, surveyId, createdAt])
 }
 
-/// Redirect audit log: every outcome redirect ZAPX resolved, with the level that supplied it.
+/// Redirect audit log: every outcome redirect SampCode resolved, with the level that supplied it.
 model RedirectEvent {
   id         String   @id @default(cuid())
   tenantId   String
@@ -1458,10 +1458,10 @@ model RateLimitBucket {
   @@index([windowEnds])
 }
 
-/// An audience request with SAMPLEON for a ZAPX survey. ZAPX never selects or invites respondents:
+/// An audience request with SAMPLEON for a SampCode survey. SampCode never selects or invites respondents:
 /// SAMPLEON owns targeting, feasibility, approval, invitations, quotas and routing, and SUPPLY360
-/// owns the respondents. ZAPX keeps this row so the studio can show progress, updated from
-/// SAMPLEON's signed events. `sourcePlatform` is ZAPX for independent surveys (ZAPX created the
+/// owns the respondents. SampCode keeps this row so the studio can show progress, updated from
+/// SAMPLEON's signed events. `sourcePlatform` is "ZAPX" (the SAMPLEON wire value) for independent surveys (SampCode created the
 /// request) and PROJEXA when PROJEXA created it for a PROJEXA-linked survey.
 model SampleonAudienceRequest {
   id                String    @id @default(cuid())

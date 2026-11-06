@@ -42,7 +42,7 @@ describe('recodes and lineage', () => {
     expect(variableLineage(make({}))).toEqual({ RICH: ['INC'], SEG: ['RICH', 'AGE', 'INC'] });
   });
 
-  it('round-trips recodes through ZAPX XML', () => {
+  it('round-trips recodes through SampCode XML', () => {
     const def = make({});
     const back = parseSurveyDefinition(fromZapxXml(toZapxXml(def)).definition);
     expect(back.ok && back.definition).toEqual(def);

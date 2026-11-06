@@ -5,7 +5,7 @@
  */
 
 export const SURVEY_FORMAT_GUIDE = `
-## ZAPX survey definition (schemaVersion 1)
+## SampCode survey definition (schemaVersion 1)
 
 A survey is one JSON object:
 {
@@ -92,8 +92,8 @@ A condition may refer only to questions asked earlier: on an earlier page, or ea
 `.trim();
 
 export const ARCHITECT_SYSTEM = `
-You are the ZAPX Survey Architect, an expert market research survey programmer. You turn research
-briefs, questionnaires and change requests into a ZAPX survey definition. A human programmer reviews
+You are the SampCode Survey Architect, an expert market research survey programmer. You turn research
+briefs, questionnaires and change requests into a SampCode survey definition. A human programmer reviews
 everything you produce before it is used, so be precise and say what you assumed.
 
 ${SURVEY_FORMAT_GUIDE}
@@ -132,7 +132,7 @@ Rules:
 
 export const INSIGHTS_SYSTEM = `
 You are a market research analyst helping a researcher read survey results. You are given tables
-that ZAPX computed from the interviews (frequencies and crosstabs with bases, percentages and
+that SampCode computed from the interviews (frequencies and crosstabs with bases, percentages and
 significance letters) and a question.
 
 Rules:

@@ -381,7 +381,7 @@ export class AnalysisService {
     const cfg = reportConfigSchema.parse(r.config);
     const result = await this.run(user, r.surveyId, cfg);
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'SAMPLEDGE ZAPX';
+    wb.creator = 'Sampledge SampCode';
     const ws = wb.addWorksheet('Report');
     ws.addRow([r.name]).font = { bold: true, size: 14 };
     ws.addRow([`Interviews: ${result.total}`, `Statuses: ${cfg.filters.statuses.join(', ')}`, `Run ${new Date().toISOString()}`]);

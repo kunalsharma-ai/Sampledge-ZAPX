@@ -1,5 +1,5 @@
 /**
- * Canonical ZAPX survey definition (schema version 1).
+ * Canonical SampCode survey definition (schema version 1).
  *
  * This is the single source of truth for a questionnaire. The studio, the API, the respondent
  * runtime, QA and (later) AI, translation and the offline CAPI app all read and write this format.
@@ -21,11 +21,11 @@ const variableName = z
     message: 'Reserved word',
   });
 
-/** An expression in the ZAPX logic language, e.g. `Q1 == 2 and AGE >= 18`. */
+/** An expression in the SampCode logic language, e.g. `Q1 == 2 and AGE >= 18`. */
 const expression = z.string().min(1).max(2000);
 
 // ---- Media (Milestone 11) --------------------------------------------------------------------------
-// Media are uploaded to ZAPX and referenced by id. External URLs are not allowed: they would leak
+// Media are uploaded to SampCode and referenced by id. External URLs are not allowed: they would leak
 // respondents' network addresses to third parties and could change after the survey is approved.
 
 export const MEDIA_KINDS = ['image', 'video', 'audio'] as const;
@@ -493,7 +493,7 @@ export const bankBlockSchema = z.object({ pages: z.array(pageSchema).min(1).max(
 export type BankBlock = z.infer<typeof bankBlockSchema>;
 
 /** Final statuses a respondent can reach. Each maps to a vendor redirect. */
-/** The same eight statuses as PROJEXA. `partial` = abandoned; `technical_error` = ZAPX could not continue. */
+/** The same eight statuses as PROJEXA. `partial` = abandoned; `technical_error` = SampCode could not continue. */
 export const OUTCOME_STATUSES = [
   'complete',
   'terminate',

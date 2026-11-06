@@ -82,7 +82,7 @@ export class ChangeSetsController {
   }
 
   /**
-   * Import a questionnaire file. The ZAPX template (XLSX/CSV) is imported deterministically;
+   * Import a questionnaire file. The SampCode template (XLSX/CSV) is imported deterministically;
    * Word, PDF and text questionnaires are read by the AI architect.
    */
   @Post('surveys/:id/import')

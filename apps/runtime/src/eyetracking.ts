@@ -1,6 +1,6 @@
 /**
  * Face landmarks for webcam eye tracking (experimental), from MediaPipe's face landmarker running in
- * the respondent's browser. The library, its WebAssembly and the model are served by ZAPX itself
+ * the respondent's browser. The library, its WebAssembly and the model are served by SampCode itself
  * (public/eyetracking), loaded only when a respondent agrees to an eye-tracking task, and the camera
  * picture never leaves the device.
  */

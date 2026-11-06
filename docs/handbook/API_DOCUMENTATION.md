@@ -1,6 +1,6 @@
 # API documentation
 
-The ZAPX backend is a REST API under `/api`, served by `apps/api` on port 4000. This file explains the
+The SampCode backend is a REST API under `/api`, served by `apps/api` on port 4000. This file explains the
 common rules, walks through the main flows with **real requests and responses** (captured from a
 local run on 2026-11-05; ids shortened), and then lists **all 283 endpoints** with who may call them
 and the exact handler.
@@ -93,7 +93,7 @@ curl -s http://localhost:4000/api/auth/me -H "Authorization: Bearer $TOKEN"
 
 Files: `apps/api/src/auth/auth.controller.ts` (`login`, `me`), `apps/studio/app/login/page.tsx`, `apps/studio/lib/useMe.ts`.
 
-### Change or reset a password _(branch `security-fixes`)_
+### Change or reset a password _(PR #36)_
 
 ```bash
 # Change my own password (keeps this session, signs out the others; 400 if the current one is wrong)
@@ -144,7 +144,7 @@ Vendor body fields (all optional except `name` and `code`) are defined by `vendo
 
 The vendor's shared `secret` (64 hex characters) is in the answer only for ADMIN
 and for a signed-in super admin (whatever their role; never through an API key); for PROGRAMMER and
-VIEWER the field is left out _(branch `security-fixes`, super admin from branch `vendor-secret-super-admin`)_.
+VIEWER the field is left out _(PR #36, super admin from PR #43)_.
 
 ### Save a draft, publish and go live
 
@@ -284,7 +284,7 @@ A wrong signature answers `401 {"message":"Invalid vendor credentials"}` and is 
 `vendor_api.denied`. Page with `?since=<next>`; filter with `surveyId`; one respondent:
 `GET /api/v1/vendor/outcomes/:uid`.
 
-### Webhooks (ZAPX calls you)
+### Webhooks (SampCode calls you)
 
 Events: `response.finished`, `response.review_decided`, `survey.published`, `survey.status_changed`,
 `quota.full` _(PR #34)_, `automation.fired` _(PR #34)_, plus `webhook.test`. Each POST carries
@@ -586,25 +586,25 @@ Backend: `apps/api/src/cati` · Frontend: `apps/studio/app/calls/page.tsx`, `app
 
 Backend: `apps/api/src/analysis` · Frontend: `apps/studio/components/Analysis.tsx`, `apps/studio/components/ChoiceResults.tsx`, `apps/studio/components/ResearchAssistant.tsx`
 
-| Method | Endpoint                                                    | Who can call it                               | Handler (file:line)                                                                                             |
-| ------ | ----------------------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| POST   | `/api/surveys/{id}/analysis/assistant/tables`               | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.assistantTables`](../../apps/api/src/analysis/analysis.controller.ts#L40)                  |
-| POST   | `/api/surveys/{id}/analysis/assistant`                      | ADMIN, PROGRAMMER, VIEWER · rate limit 10/min | [`AnalysisController.ask`](../../apps/api/src/analysis/analysis.controller.ts#L51)                              |
-| GET    | `/api/surveys/{id}/analysis/variables`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.variables`](../../apps/api/src/analysis/analysis.controller.ts#L57)                        |
-| POST   | `/api/surveys/{id}/analysis/frequencies`                    | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.frequencies`](../../apps/api/src/analysis/analysis.controller.ts#L64)                      |
-| POST   | `/api/surveys/{id}/analysis/dashboard`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.dashboard`](../../apps/api/src/analysis/analysis.controller.ts#L73)                        |
-| POST   | `/api/surveys/{id}/analysis/crosstab`                       | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.crosstab`](../../apps/api/src/analysis/analysis.controller.ts#L82)                         |
-| POST   | `/api/surveys/{id}/analysis/choice/{questionId}`            | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.choice`](../../apps/api/src/analysis/analysis.controller.ts#L89)                           |
-| POST   | `/api/surveys/{id}/analysis/eyetracking/{questionId}`       | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.eyeTracking`](../../apps/api/src/analysis/analysis.controller.ts#L94) _(PR #37, unmerged)_ |
-| GET    | `/api/surveys/{id}/analysis/choice/{questionId}/design.csv` | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.design`](../../apps/api/src/analysis/analysis.controller.ts#L104)                          |
-| POST   | `/api/surveys/{id}/analysis/weights`                        | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.weights`](../../apps/api/src/analysis/analysis.controller.ts#L119)                         |
-| GET    | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.list`](../../apps/api/src/analysis/analysis.controller.ts#L126)                            |
-| POST   | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER                             | [`AnalysisController.create`](../../apps/api/src/analysis/analysis.controller.ts#L132)                          |
-| GET    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.get`](../../apps/api/src/analysis/analysis.controller.ts#L139)                             |
-| PUT    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.update`](../../apps/api/src/analysis/analysis.controller.ts#L145)                          |
-| DELETE | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.remove`](../../apps/api/src/analysis/analysis.controller.ts#L154)                          |
-| POST   | `/api/reports/{id}/run`                                     | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.run`](../../apps/api/src/analysis/analysis.controller.ts#L161)                             |
-| GET    | `/api/reports/{id}/export.xlsx`                             | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.export`](../../apps/api/src/analysis/analysis.controller.ts#L168)                          |
+| Method | Endpoint                                                    | Who can call it                               | Handler (file:line)                                                                                   |
+| ------ | ----------------------------------------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| POST   | `/api/surveys/{id}/analysis/assistant/tables`               | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.assistantTables`](../../apps/api/src/analysis/analysis.controller.ts#L40)        |
+| POST   | `/api/surveys/{id}/analysis/assistant`                      | ADMIN, PROGRAMMER, VIEWER · rate limit 10/min | [`AnalysisController.ask`](../../apps/api/src/analysis/analysis.controller.ts#L51)                    |
+| GET    | `/api/surveys/{id}/analysis/variables`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.variables`](../../apps/api/src/analysis/analysis.controller.ts#L57)              |
+| POST   | `/api/surveys/{id}/analysis/frequencies`                    | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.frequencies`](../../apps/api/src/analysis/analysis.controller.ts#L64)            |
+| POST   | `/api/surveys/{id}/analysis/dashboard`                      | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.dashboard`](../../apps/api/src/analysis/analysis.controller.ts#L73)              |
+| POST   | `/api/surveys/{id}/analysis/crosstab`                       | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.crosstab`](../../apps/api/src/analysis/analysis.controller.ts#L82)               |
+| POST   | `/api/surveys/{id}/analysis/choice/{questionId}`            | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.choice`](../../apps/api/src/analysis/analysis.controller.ts#L89)                 |
+| POST   | `/api/surveys/{id}/analysis/eyetracking/{questionId}`       | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.eyeTracking`](../../apps/api/src/analysis/analysis.controller.ts#L94) _(PR #37)_ |
+| GET    | `/api/surveys/{id}/analysis/choice/{questionId}/design.csv` | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.design`](../../apps/api/src/analysis/analysis.controller.ts#L104)                |
+| POST   | `/api/surveys/{id}/analysis/weights`                        | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.weights`](../../apps/api/src/analysis/analysis.controller.ts#L119)               |
+| GET    | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.list`](../../apps/api/src/analysis/analysis.controller.ts#L126)                  |
+| POST   | `/api/surveys/{id}/reports`                                 | ADMIN, PROGRAMMER                             | [`AnalysisController.create`](../../apps/api/src/analysis/analysis.controller.ts#L132)                |
+| GET    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.get`](../../apps/api/src/analysis/analysis.controller.ts#L139)                   |
+| PUT    | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.update`](../../apps/api/src/analysis/analysis.controller.ts#L145)                |
+| DELETE | `/api/reports/{id}`                                         | ADMIN, PROGRAMMER                             | [`AnalysisController.remove`](../../apps/api/src/analysis/analysis.controller.ts#L154)                |
+| POST   | `/api/reports/{id}/run`                                     | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.run`](../../apps/api/src/analysis/analysis.controller.ts#L161)                   |
+| GET    | `/api/reports/{id}/export.xlsx`                             | ADMIN, PROGRAMMER, VIEWER                     | [`AnalysisController.export`](../../apps/api/src/analysis/analysis.controller.ts#L168)                |
 
 ### Home dashboard and global search
 
@@ -742,7 +742,7 @@ Backend: `apps/api/src/governance` · Frontend: `apps/studio/components/DataGove
 | GET    | `/api/organization/governance` | ADMIN           | [`GovernanceController.get`](../../apps/api/src/governance/governance.controller.ts#L13)    |
 | PUT    | `/api/organization/governance` | ADMIN           | [`GovernanceController.update`](../../apps/api/src/governance/governance.controller.ts#L18) |
 
-### Platform integrations (Settings → Integrations) _(PR #38, unmerged)_
+### Platform integrations (Settings → Integrations) _(PR #38)_
 
 Backend: `apps/api/src/platform` · Frontend: `apps/studio/app/settings/integrations/page.tsx`.
 Only administrators of the organization that runs the installation (`Tenant.platformOperator`; the
@@ -761,7 +761,7 @@ never returned in full ([ADR 0035](../adr/0035-integrations-in-the-crm.md)).
 left empty falls back to the environment variable; `DELETE` removes the row so the environment
 applies again.
 
-### Mobile app _(PR #40, unmerged)_
+### Mobile app _(PR #40)_
 
 Backend: `apps/api/src/mobile/mobile.controller.ts` · Client: `apps/mobile` ([ADR 0037](../adr/0037-mobile-app.md)).
 The app signs in with `POST /api/auth/login` and sends the token as `Authorization: Bearer …` plus
@@ -775,7 +775,7 @@ The app signs in with `POST /api/auth/login` and sends the token as `Authorizati
 `version` answers `{ service: "zapx", minimumAppVersion }` (from `MOBILE_MIN_VERSION`, or null);
 `config` adds `capiAppUrl`, `runtimeBaseUrl` and `studioUrl`.
 
-### Super admin and entitlements _(PR #41, unmerged)_ ([ADR 0036](../adr/0036-super-admin.md))
+### Super admin and entitlements _(PR #41)_ ([ADR 0036](../adr/0036-super-admin.md))
 
 Every signed-in member, including a suspended organization's:
 

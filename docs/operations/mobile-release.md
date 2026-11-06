@@ -1,4 +1,4 @@
-# Releasing the ZAPX mobile app
+# Releasing the SampCode mobile app
 
 The app is built and signed in the cloud with Expo Application Services (EAS); no Mac or Android
 Studio is needed. These steps need accounts only the owner can create.
@@ -11,7 +11,7 @@ Studio is needed. These steps need accounts only the owner can create.
 | Google Play Console     | USD 25 once                  | Publishing on Google Play                        |
 | Apple Developer Program | USD 99 a year                | Publishing on the App Store and TestFlight       |
 
-Also decide: the app name on the stores (now "ZAPX"), the bundle id `com.sampledge.zapx` (change in
+Also decide: the app name on the stores (now "SampCode"), the bundle id `com.sampledge.zapx` (change in
 `apps/mobile/app.json` before the first upload; it cannot change afterwards), a privacy policy URL,
 a support URL and a support email. Store listings also need screenshots (the ones in
 `/mnt/project-files/zapx/mobile/` can be used as a start) and a short description.
@@ -41,7 +41,7 @@ To ship a default server address with the app, set `expo.extra.zapxServer` in `a
   `npx eas-cli@latest submit --platform ios`. It goes to TestFlight first; submit for review from
   App Store Connect.
 
-Review notes for both stores: give the reviewers a demo login on a reachable ZAPX server, and
+Review notes for both stores: give the reviewers a demo login on a reachable SampCode server, and
 explain that camera, microphone and location are used only in face-to-face interviews with consent.
 
 ## Updates

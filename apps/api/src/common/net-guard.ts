@@ -1,7 +1,7 @@
 /**
  * Server-side request forgery (SSRF) guard (Milestone 20).
  *
- * ZAPX calls addresses that customers type in (vendor callbacks, webhooks, identity providers). Those
+ * SampCode calls addresses that customers type in (vendor callbacks, webhooks, identity providers). Those
  * calls must never reach the cloud metadata service, the database or anything else on a private
  * network. Two things make a simple "look up the name, then fetch" check unsafe:
  *

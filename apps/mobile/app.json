@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ZAPX",
+    "name": "SampCode",
     "slug": "zapx",
     "version": "1.0.0",
     "orientation": "default",
@@ -14,9 +14,9 @@
       "supportsTablet": true,
       "config": { "usesNonExemptEncryption": false },
       "infoPlist": {
-        "NSCameraUsageDescription": "ZAPX uses the camera for photo questions and face-to-face interview evidence, only when a survey asks for it.",
-        "NSMicrophoneUsageDescription": "ZAPX records audio in face-to-face interviews only when the respondent consents.",
-        "NSLocationWhenInUseUsageDescription": "ZAPX records where face-to-face interviews take place, when the survey requires it."
+        "NSCameraUsageDescription": "SampCode uses the camera for photo questions and face-to-face interview evidence, only when a survey asks for it.",
+        "NSMicrophoneUsageDescription": "SampCode records audio in face-to-face interviews only when the respondent consents.",
+        "NSLocationWhenInUseUsageDescription": "SampCode records where face-to-face interviews take place, when the survey requires it."
       }
     },
     "android": {

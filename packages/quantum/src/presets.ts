@@ -1,6 +1,6 @@
 /**
  * The Quantum theme presets: 16 families (Neon AI, the default, the original ten, and five from the
- * ZAPX blueprint's Theme Studio). Each preset is a colour family with a dark and a light scheme, so
+ * SampCode blueprint's Theme Studio). Each preset is a colour family with a dark and a light scheme, so
  * the person's light/dark/system choice works with every preset. Only key colours are listed here:
  * the theme engine derives the remaining tokens and corrects anything that would miss WCAG contrast.
  */

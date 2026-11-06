@@ -1,4 +1,4 @@
-// Copies MediaPipe's vision WebAssembly files into public/, so eye tracking is served from ZAPX
+// Copies MediaPipe's vision WebAssembly files into public/, so eye tracking is served from SampCode
 // itself (no outside CDN, which the respondent page's Content-Security-Policy would refuse anyway).
 import { copyFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';

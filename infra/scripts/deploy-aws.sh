@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Release ZAPX to an AWS environment created by infra/terraform (Milestone 13).
+# Release SampCode to an AWS environment created by infra/terraform (Milestone 13).
 #
 #   ENVIRONMENT=production infra/scripts/deploy-aws.sh [image-tag]
 #

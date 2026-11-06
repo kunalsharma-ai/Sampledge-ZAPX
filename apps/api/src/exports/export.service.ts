@@ -56,7 +56,7 @@ export class ExportService {
   /** Columns are the union across every version answered, so data from all versions lines up. */
   columns(versions: Pick<SurveyVersion, 'definition'>[]): Column[] {
     const cols: Column[] = [
-      { key: 'response_id', label: 'ZAPX response id', get: (r) => r.id },
+      { key: 'response_id', label: 'SampCode response id', get: (r) => r.id },
       { key: 'uid', label: 'Respondent id (UID)', get: (r) => r.uid },
       { key: 'vendor', label: 'Vendor code', get: (r) => r.vendor?.code ?? null },
       { key: 'country', label: 'Country', get: (r) => r.country },
@@ -121,12 +121,12 @@ export class ExportService {
             break;
           }
           case 'signature':
-            // The drawing stays in ZAPX (shown in the review queue); the export says whether it was given.
+            // The drawing stays in SampCode (shown in the review queue); the export says whether it was given.
             add({ key: q.id, label: `${q.id}: signed (1/0)`, get: (r) => (ans(r)[q.id] === undefined ? null : ans(r)[q.id] ? 1 : 0) });
             break;
           case 'eyetrack': {
             // Experimental webcam eye tracking: the outcome, the calibration error, and per area of
-            // interest the share of on-picture time spent in it. Raw gaze points stay in ZAPX (Analysis).
+            // interest the share of on-picture time spent in it. Raw gaze points stay in SampCode (Analysis).
             const read = (r: ExportRow) => parseEyeTrack(ans(r)[q.id]);
             add({
               key: `${q.id}_status`,
@@ -289,7 +289,7 @@ export class ExportService {
 
   async toXlsx(columns: Column[], rows: ExportRow[], versions: Pick<SurveyVersion, 'definition' | 'version'>[]): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'SAMPLEDGE ZAPX';
+    wb.creator = 'Sampledge SampCode';
     const data = wb.addWorksheet('Responses');
     data.columns = columns.map((c) => ({ header: c.key, key: c.key, width: Math.min(40, Math.max(10, c.key.length + 2)) }));
     for (const r of rows) {

@@ -4,7 +4,7 @@
  * FILE_STORE=local (the default) writes under FILES_DIR: one host, or several sharing a volume.
  * FILE_STORE=s3 keeps every file as an object in a private bucket, encrypted at rest with SSE-KMS
  * when S3_KMS_KEY_ID is set and SSE-S3 (AES-256) otherwise. Credentials come from the standard AWS
- * chain (the ECS task role on AWS; environment or profile elsewhere), never from ZAPX settings.
+ * chain (the ECS task role on AWS; environment or profile elsewhere), never from SampCode settings.
  * S3_ENDPOINT points the store at an S3-compatible service (MinIO, LocalStack) for testing.
  */
 import { Injectable, Logger } from '@nestjs/common';
@@ -20,7 +20,7 @@ export abstract class FileStore {
   abstract delete(key: string): Promise<void>;
 }
 
-/** Keys are made by ZAPX itself; anything else is refused before it reaches a disk or a bucket. */
+/** Keys are made by SampCode itself; anything else is refused before it reaches a disk or a bucket. */
 export function checkKey(key: string) {
   if (!/^[A-Za-z0-9/_-]+$/.test(key) || key.includes('..') || key.startsWith('/')) throw new Error('Invalid storage key');
   return key;

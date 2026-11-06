@@ -1,5 +1,5 @@
 /**
- * The ZAPX logic expression language.
+ * The SampCode logic expression language.
  *
  * A small, side-effect-free language used for skip logic, display conditions, validations,
  * terminations and quotas. It is parsed into an AST and interpreted; nothing is ever passed to

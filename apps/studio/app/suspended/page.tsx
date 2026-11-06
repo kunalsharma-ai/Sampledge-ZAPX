@@ -8,8 +8,8 @@ export default function SuspendedPage() {
       <section className="panel stack" data-testid="suspended">
         <h1>Your organization is suspended</h1>
         <p>
-          Your organization&rsquo;s ZAPX access is paused, so you cannot open projects, surveys or settings right now. This usually means
-          the subscription ended. Contact your ZAPX account manager to reactivate it; everything is kept as it was.
+          Your organization&rsquo;s SampCode access is paused, so you cannot open projects, surveys or settings right now. This usually
+          means the subscription ended. Contact your SampCode account manager to reactivate it; everything is kept as it was.
         </p>
         <div className="row">
           <button

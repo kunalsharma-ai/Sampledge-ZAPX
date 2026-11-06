@@ -1,49 +1,83 @@
 # Changelog
 
 What was built when, taken from the repository's pull requests. Dates are when the PR was merged
-(or opened, for open PRs), in UTC. Each milestone has a design record in [docs/adr/](../adr/) and,
+(or opened, for the open PR), in UTC. Each milestone has a design record in [docs/adr/](../adr/) and,
 for most, a module guide in [docs/modules/](../modules/).
 
 The format follows [Keep a Changelog](https://keepachangelog.com/): newest first, grouped by
-release. ZAPX has no version numbers or git tags yet, so entries are grouped by milestone or PR.
+release. SampCode (called ZAPX until 2026-11-06) has no version numbers or git tags yet, so entries are grouped by milestone or PR.
 
-## Unreleased (open pull requests, not on `main`)
+## SAMPLEON, CI, docs and the SampCode name (merged 2026-11-06, PRs #47–#50)
 
-- 2026-11-05, branch `security-s4-s9`: security review findings S4–S9 fixed (shared rate-limit store,
-  `SIGNING_KEYS_SECRET`, studio script nonce, no session token in browser bodies, security lint rules,
-  row-level security on seven more tables). Migration `20261120000000_security_hardening`.
+- PR #47, branch `claude/sampleon-survey-host`: SAMPLEON integration (survey host and audience
+  requests); see [docs/modules/sampleon.md](../modules/sampleon.md). Not described in this handbook yet.
+- PR #49, branch `claude/ci-free-minutes`: GitHub Actions CI workflow changes.
+- PR #48, branch `docs-final-handoff`: docs brought in line with `main` after #46.
+- PR #50, branch `rename-sampcode`: the product is renamed **SampCode** (formerly ZAPX) with the new logo,
+  icon and favicon in the studio, the CAPI app and the mobile app; internal identifiers keep `zapx`
+  (ADR 0038, [docs/brand/](../brand/README.md)).
 
-These exist only on their branches. The stack is merged in order: #27 → #29 → #30 → #31 → #32 →
-#33 → #34 → #35 → #36 → #37 → #38 → #39 → #41 → #40 (note #41 before #40). PR #28 is based on
-`main`; its work was rebuilt on the stack as #38.
+## Clean-up: Node 26, security S4–S9, confirm dialogs (merged 2026-11-06, PRs #44–#46)
 
-| PR  | Opened     | Branch                         | Base                           | What it adds                                                                                       | ADR           |
-| --- | ---------- | ------------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------------- | ------------- |
-| #40 | 2026-11-05 | `mobile-app`                   | `super-admin-console`          | Android and iOS app (Expo), gated live by the super admin's mobile features                        | 0037          |
-| #41 | 2026-11-05 | `super-admin-console`          | `neon-everywhere`              | Super admin: organizations, plans, web and mobile features, suspension, activity, automation       | 0036          |
-| #39 | 2026-11-05 | `neon-everywhere`              | `stack-integrations-in-crm`    | Neon design on every studio page and the CAPI app (visual only)                                    | 0028 addendum |
-| #38 | 2026-11-05 | `stack-integrations-in-crm`    | `blueprint-p6-eye-tracking`    | Integrations in the CRM (#28) on top of the stack                                                  | 0035          |
-| #37 | 2026-11-05 | `blueprint-p6-eye-tracking`    | `security-fixes`               | Webcam eye tracking (experimental, opt-in)                                                         | 0034          |
-| #36 | 2026-11-05 | `security-fixes`               | `docs-handbook`                | Security fixes S1–S3 and older docs brought past M13                                               | —             |
-| #35 | 2026-11-05 | `docs-handbook`                | `blueprint-p5-enterprise`      | This maintainer handbook                                                                           | —             |
-| #34 | 2026-11-05 | `blueprint-p5-enterprise`      | `blueprint-p4-research`        | Automation, data residency and retention, data cleaning, dashboards, SMS, area themes              | 0033          |
-| #33 | 2026-11-04 | `blueprint-p4-research`        | `blueprint-p3-fieldwork`       | MaxDiff, conjoint, recodes, AI research assistant, CAPI video                                      | 0032          |
-| #32 | 2026-11-04 | `blueprint-p3-fieldwork`       | `blueprint-p2-ai-multilingual` | Fieldwork evidence, supervision, appeals, email distribution                                       | 0031          |
-| #31 | 2026-11-04 | `blueprint-p2-ai-multilingual` | `blueprint-p1-core`            | Multilingual tools, URL variables, least-fill, test cases, voice, 16 themes                        | 0030          |
-| #30 | 2026-11-04 | `blueprint-p1-core`            | `neon-ai-dashboard`            | Loops, blocks, variables, programmer workspace, question bank                                      | 0029          |
-| #29 | 2026-11-04 | `neon-ai-dashboard`            | `quantum-design-system`        | Neon AI dashboard theme (new default), sidebar shell, real-data home screen                        | 0028          |
-| #28 | 2026-11-03 | `integrations-in-crm`          | `main`                         | Set up every integration (Claude, IPinfo, Deepgram, Twilio, Stripe, S3) in Settings → Integrations | 0035          |
-| #27 | 2026-11-02 | `quantum-design-system`        | `main`                         | Quantum Design System: audit, theme engine, first components                                       | 0027          |
+`main` = `68f4531`. The full `pnpm check --no-docker` passed on Node 26 after each merge.
 
-Dates are the "opened" dates from GitHub.
+### Changed
 
-Also open: Dependabot PRs #20–#25 (Node 26 and nginx 1.31 base images; GitHub Actions versions).
+- Node 26 LTS everywhere: `.nvmrc`, `engines.node >= 26`, `@types/node` 26, Docker images
+  `node:26-bookworm-slim` and `nginx:1.31-alpine`, newer GitHub Actions steps (#44). The Dependabot
+  PRs #20–#25 were closed as replaced.
+- Confirmations in the studio and the CAPI app use a neon dialog (`useConfirm()`,
+  `components/neon/ConfirmDialog.tsx`, `apps/capi/src/Confirm.tsx`) instead of `window.confirm` (#46).
 
-### Security (#36, branch `security-fixes`)
+### Security (#45)
+
+- Security review findings S4–S9 fixed: rate limits shared by every API task (`RateLimitBucket`,
+  `THROTTLE_STORE`), `SIGNING_KEYS_SECRET` with one derived key per purpose, studio script nonce
+  (`apps/studio/middleware.ts`), no session token in browser response bodies, `eslint-plugin-security`
+  in `pnpm lint`, row-level security on seven more tables.
+
+### Database
+
+- Migration `20261120000000_security_hardening`: table `RateLimitBucket`, row-level security policies
+  on `CatiCase`, `CatiCall`, `DoNotCall`, `Contact`, `Invitation`, `BackCheck`, `QualityAppeal`.
+  Backward-compatible: yes (#45).
+
+### Configuration
+
+- New `SIGNING_KEYS_SECRET` (32+ characters, required in production, different from `JWT_SECRET`
+  and `SECRETS_KEY`); on AWS it is in `app_secret_keys`, so it must be in the Secrets Manager JSON (#45).
+- New `THROTTLE_STORE` (`database`, the production default, or `memory`) (#45).
+
+## Design system, blueprint, integrations, super admin, mobile (merged 2026-11-05, PRs #27–#43)
+
+All merged into `main` with merge commits on 2026-11-05, in this order: #27 → #29 → #30 → #31 →
+#32 → #33 → #34 → #35 → #36 → #37 → #38 (which also merged #28) → #39 → #41 → #40 → #42 → #43.
+
+| PR  | Branch                         | What it adds                                                                                       | ADR           |
+| --- | ------------------------------ | -------------------------------------------------------------------------------------------------- | ------------- |
+| #43 | `vendor-secret-super-admin`    | Super admins see the vendor shared secret whatever their role, never through an API key            | —             |
+| #42 | `docs-handbook-refresh`        | Handbook refresh for #37–#41                                                                       | —             |
+| #40 | `mobile-app`                   | Android and iOS app (Expo), gated live by the super admin's mobile features                        | 0037          |
+| #41 | `super-admin-console`          | Super admin: organizations, plans, web and mobile features, suspension, activity, automation       | 0036          |
+| #39 | `neon-everywhere`              | Neon design on every studio page and the CAPI app (visual only)                                    | 0028 addendum |
+| #38 | `stack-integrations-in-crm`    | Integrations in the CRM (#28) on top of the stack                                                  | 0035          |
+| #37 | `blueprint-p6-eye-tracking`    | Webcam eye tracking (experimental, opt-in)                                                         | 0034          |
+| #36 | `security-fixes`               | Security fixes S1–S3 and older docs brought past M13                                               | —             |
+| #35 | `docs-handbook`                | This maintainer handbook                                                                           | —             |
+| #34 | `blueprint-p5-enterprise`      | Automation, data residency and retention, data cleaning, dashboards, SMS, area themes              | 0033          |
+| #33 | `blueprint-p4-research`        | MaxDiff, conjoint, recodes, AI research assistant, CAPI video                                      | 0032          |
+| #32 | `blueprint-p3-fieldwork`       | Fieldwork evidence, supervision, appeals, email distribution                                       | 0031          |
+| #31 | `blueprint-p2-ai-multilingual` | Multilingual tools, URL variables, least-fill, test cases, voice, 16 themes                        | 0030          |
+| #30 | `blueprint-p1-core`            | Loops, blocks, variables, programmer workspace, question bank                                      | 0029          |
+| #29 | `neon-ai-dashboard`            | Neon AI dashboard theme (new default), sidebar shell, real-data home screen                        | 0028          |
+| #28 | `integrations-in-crm`          | Set up every integration (Claude, IPinfo, Deepgram, Twilio, Stripe, S3) in Settings → Integrations | 0035          |
+| #27 | `quantum-design-system`        | Quantum Design System: audit, theme engine, first components                                       | 0027          |
+
+### Security (#36)
 
 - The vendor shared secret is returned only to ADMIN; programmers and viewers no longer receive it.
 - The super admin also receives the vendor shared secret, whatever their role, but never through an
-  API key (branch `vendor-secret-super-admin`).
+  API key (#43).
 - Password change on My account (`POST /api/auth/change-password`), administrator one-time reset
   links (`POST /api/users/:id/password-reset`), "forgot password" by email
   (`POST /api/auth/forgot-password`) and `POST /api/auth/reset-password`.
@@ -86,10 +120,10 @@ Also open: Dependabot PRs #20–#25 (Node 26 and nginx 1.31 base images; GitHub 
 
 ### Documentation
 
-- Added this maintainer handbook in `docs/handbook/` (#35), refreshed for #37–#41 on branch
-  `docs-handbook-refresh`.
+- Added this maintainer handbook in `docs/handbook/` (#35), refreshed for #37–#41 (#42) and brought
+  up to date with `main` after #46 on 2026-11-06.
 - Root `README.md`, `docs/architecture.md`, `docs/operations/go-live.md` and `docs/security.md`
-  brought up to date past Milestone 13 (branch `security-fixes`).
+  brought up to date past Milestone 13 (PR #36).
 
 ## Milestone 20: security hardening (2026-11-02, PR #26)
 

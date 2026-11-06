@@ -1,7 +1,7 @@
 /**
  * Milestone 13 acceptance test, through the real UI: an administrator connects a SAML identity
  * provider (a local test IdP that signs with a throwaway key, not a real identity provider), and a new
- * person signs in through it from the login page: ZAPX sends the browser to the IdP, the IdP posts a
+ * person signs in through it from the login page: SampCode sends the browser to the IdP, the IdP posts a
  * signed response back to the ACS URL, and the person lands in the studio as a viewer. The billing
  * panel says plainly that online billing is off on this installation.
  */
@@ -18,7 +18,7 @@ let server: Server;
 let ssoUrl = '';
 
 test.beforeAll(async () => {
-  // The IdP "signs in" whoever ZAPX names in login_hint and posts the response straight back.
+  // The IdP "signs in" whoever SampCode names in login_hint and posts the response straight back.
   server = createServer((req, res) => {
     void (async () => {
       const url = `http://127.0.0.1${req.url ?? '/'}`;
@@ -63,7 +63,7 @@ test('SAML single sign-on from the login page, and the billing panel', async ({ 
   await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
   await page.getByRole('link', { name: 'Settings' }).click();
 
-  await expect(page.getByTestId('billing')).toContainText('Online billing is not turned on for this ZAPX installation.');
+  await expect(page.getByTestId('billing')).toContainText('Online billing is not turned on for this SampCode installation.');
 
   const sso = page.getByTestId('sso-settings');
   await sso.getByRole('radio', { name: 'SAML 2.0' }).check();

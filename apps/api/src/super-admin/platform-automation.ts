@@ -110,7 +110,7 @@ export const TEMPLATES: Array<{ id: string; description: string; rule: Automatio
         { type: 'notify_super_admins', message: '{organization}: the {plan} subscription ends on {endsAt}.' },
         {
           type: 'email_org_admins',
-          subject: 'Your ZAPX subscription ends soon',
+          subject: 'Your SampCode subscription ends soon',
           message: 'Hello, the {plan} subscription of {organization} ends on {endsAt}. Contact us to renew it.',
         },
       ],

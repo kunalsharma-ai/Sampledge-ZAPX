@@ -1,5 +1,5 @@
 /*
- * ZAPX Neon, every page: carries the dashboard's look (glowing icon tiles, gradient edges, pill tabs,
+ * SampCode Neon, every page: carries the dashboard's look (glowing icon tiles, gradient edges, pill tabs,
  * neon tables and stat tiles) to the rest of the CRM. Visual only, built on Quantum tokens (--q-*),
  * so every theme preset, light mode, high contrast and reduced motion keep working.
  */
@@ -330,14 +330,11 @@ textarea:focus {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  font-size: 14px;
+  font-size: 20px;
 }
 .nx-auth-brand .nx-logo-mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
+  width: 32px;
+  height: 32px;
 }
 .nx-auth .nx-logo {
   padding: 0;

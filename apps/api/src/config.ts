@@ -83,15 +83,15 @@ const schema = z
     SIGNING_KEYS_SECRET: optionalString.refine((v) => !v || v.length >= 32, 'SIGNING_KEYS_SECRET must be at least 32 characters'),
     /**
      * SAMPLEON, the Sampledge audience and routing engine (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md).
-     * ZAPX sends audience requests for independent surveys to SAMPLEON and receives its signed events.
+     * SampCode sends audience requests for independent surveys to SAMPLEON and receives its signed events.
      * Unset SAMPLEON_URL: the SAMPLEON integration is off.
      */
     SAMPLEON_URL: optionalString.refine((v) => !v || /^https?:\/\//.test(v), 'SAMPLEON_URL must be an http(s) URL'),
-    /** ZAPX's client id at SAMPLEON. */
+    /** SampCode's client id at SAMPLEON. */
     SAMPLEON_CLIENT_ID: z.string().default('zapx'),
-    /** ZAPX's client secret at SAMPLEON: signs ZAPX's API calls and verifies SAMPLEON's webhooks. */
+    /** SampCode's client secret at SAMPLEON: signs SampCode's API calls and verifies SAMPLEON's webhooks. */
     SAMPLEON_CLIENT_SECRET: optionalString,
-    /** The survey-host outcome secret SAMPLEON holds for ZAPX (S2S outcome confirmation). */
+    /** The survey-host outcome secret SAMPLEON holds for SampCode (S2S outcome confirmation). */
     SAMPLEON_OUTCOME_SECRET: optionalString,
     NODE_ENV: z.string().default('development'),
     /** Callback outbox worker. "off" leaves delivery to another process (or to tests). */
@@ -167,7 +167,7 @@ const schema = z
     SENDGRID_API_KEY: z.string().default(''),
     SENDGRID_API_BASE: z.string().url().default('https://api.sendgrid.com'),
     EMAIL_FROM: z.string().default(''),
-    EMAIL_FROM_NAME: z.string().max(100).default('ZAPX surveys'),
+    EMAIL_FROM_NAME: z.string().max(100).default('SampCode surveys'),
     /**
      * Blueprint phase 5: SMS invitations. "twilio" sends through Twilio's Messages API with the
      * TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN above, from SMS_FROM (an E.164 number, or a Messaging
@@ -243,7 +243,7 @@ const schema = z
     BILLING_FALLBACK_PLAN: z.enum(['free', 'team', 'business', 'enterprise']).default('free'),
     /** Public address of the studio; SSO callbacks are ${STUDIO_URL}/api/auth/sso/callback. */
     STUDIO_URL: z.string().url().default('http://localhost:3000'),
-    /** Oldest ZAPX mobile app version allowed to sign in (e.g. 1.2.0); older apps are asked to update. */
+    /** Oldest SampCode mobile app version allowed to sign in (e.g. 1.2.0); older apps are asked to update. */
     MOBILE_MIN_VERSION: z
       .string()
       .regex(/^\d+\.\d+\.\d+$/)

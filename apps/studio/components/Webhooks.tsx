@@ -78,8 +78,8 @@ export function Webhooks() {
     <section className="panel stack wide" data-testid="webhooks">
       <h2>Webhooks</h2>
       <p className="muted small" style={{ margin: 0 }}>
-        ZAPX sends a signed JSON POST for each event (header <span className="mono">X-Zapx-Signature</span>). Payloads carry ids, statuses
-        and scores, never respondents&apos; answers. Failed deliveries are retried with backoff for about an hour.
+        SampCode sends a signed JSON POST for each event (header <span className="mono">X-Zapx-Signature</span>). Payloads carry ids,
+        statuses and scores, never respondents&apos; answers. Failed deliveries are retried with backoff for about an hour.
       </p>
       {secret ? (
         <div className="callout stack" style={{ gap: 6 }} data-testid="webhook-secret">
@@ -217,7 +217,7 @@ export function Webhooks() {
             <input
               required
               type="url"
-              placeholder="https://example.com/zapx"
+              placeholder="https://example.com/sampcode"
               value={form.url}
               onChange={(e) => setForm({ ...form, url: e.target.value })}
             />

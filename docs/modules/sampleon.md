@@ -5,21 +5,21 @@
 SAMPLEON is the Sampledge audience, invitation and routing engine (repository
 `kunalsharma-ai/Sampleon`, design in its `docs/ECOSYSTEM_ARCHITECTURE.md`). In the ecosystem:
 
-- **ZAPX** programs, hosts and runs the survey, records the outcome and confirms it.
+- **SampCode** programs, hosts and runs the survey, records the outcome and confirms it.
 - **SAMPLEON** decides who is invited and when, counts quotas, and routes a respondent onward.
 - **SUPPLY360** owns the respondents; **PROJEXA** owns projects when there is one.
 
-ZAPX keeps no respondent list, no invitation engine and no second quota service for SAMPLEON
+SampCode keeps no respondent list, no invitation engine and no second quota service for SAMPLEON
 traffic. It keeps one `SampleonAudienceRequest` row per request so the studio can show progress.
 
 ## Two workflows
 
-|                       | PROJEXA-linked survey                                                             | Independent ZAPX survey                                   |
-| --------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| Who asks SAMPLEON     | PROJEXA, with the launch URL from `POST /api/surveys/{id}/sampleon/connect`       | ZAPX: `POST /api/surveys/{id}/sampleon/audience-requests` |
-| `source.platform`     | `PROJEXA`                                                                         | `ZAPX` (`source.projectId` = ZAPX project id)             |
-| Progress events go to | PROJEXA                                                                           | ZAPX (`POST /api/v1/sampleon/events`)                     |
-| Respondent path       | card → SAMPLEON `/go` → `{runtime}/s/{survey}?vid=SAMPLEON&uid={token}` → outcome | same                                                      |
+|                       | PROJEXA-linked survey                                                             | Independent SampCode survey                                   |
+| --------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Who asks SAMPLEON     | PROJEXA, with the launch URL from `POST /api/surveys/{id}/sampleon/connect`       | SampCode: `POST /api/surveys/{id}/sampleon/audience-requests` |
+| `source.platform`     | `PROJEXA`                                                                         | `SampCode` (`source.projectId` = SampCode project id)         |
+| Progress events go to | PROJEXA                                                                           | SampCode (`POST /api/v1/sampleon/events`)                     |
+| Respondent path       | card → SAMPLEON `/go` → `{runtime}/s/{survey}?vid=SAMPLEON&uid={token}` → outcome | same                                                          |
 
 ## In the studio
 
@@ -74,4 +74,4 @@ snapshot (by `sequence`).
 
 `packages/redirect-core/src/redirect.test.ts` (adapter and signature vectors shared with
 `@sampledge/contracts`), `apps/api/test/sampleon.test.ts`, and SAMPLEON's `e2e/ecosystem/run.mjs`,
-which runs both workflows with ZAPX, SAMPLEON, SUPPLY360 and PROJEXA together.
+which runs both workflows with SampCode, SAMPLEON, SUPPLY360 and PROJEXA together.

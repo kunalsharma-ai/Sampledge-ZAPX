@@ -5,6 +5,7 @@ describe('voice commands', () => {
   it('navigates between tabs', () => {
     expect(parseVoiceCommand('Open the programmer')).toEqual({ kind: 'tab', tab: 'code' });
     expect(parseVoiceCommand('go to translations tab')).toEqual({ kind: 'tab', tab: 'languages' });
+    expect(parseVoiceCommand('Hey SampCode, show me quotas.')).toEqual({ kind: 'tab', tab: 'results' });
     expect(parseVoiceCommand('Hey ZAPX, show me quotas.')).toEqual({ kind: 'tab', tab: 'results' });
     expect(parseVoiceCommand('preview')).toEqual({ kind: 'tab', tab: 'preview' });
     expect(parseVoiceCommand('open the moon')).toEqual({ kind: 'none' });
@@ -16,7 +17,7 @@ describe('voice commands', () => {
   });
 
   it('sends anything else to the AI architect as an instruction', () => {
-    expect(parseVoiceCommand('ZAPX, add a region question after gender with North and South')).toEqual({
+    expect(parseVoiceCommand('SampCode, add a region question after gender with North and South')).toEqual({
       kind: 'ai',
       instruction: 'add a region question after gender with North and South',
     });

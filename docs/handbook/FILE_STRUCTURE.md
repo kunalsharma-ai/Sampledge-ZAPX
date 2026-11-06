@@ -1,8 +1,8 @@
 # File and folder structure
 
 What every folder and important file is for, how files depend on each other, and which files to
-change for a given feature. Branch `mobile-app` (PR #40, the top of the open stack). Files added by the open PRs
-are marked _(PR #NN)_.
+change for a given feature. Matches `main` (commit `68f4531`). Files added after milestone 20
+are marked with the PR that added them, _(PR #NN)_.
 
 Kinds used below: **config** (settings), **entry** (where a program starts), **controller** (HTTP
 routes), **service** (business logic), **repository** (database access only), **guard / middleware**
@@ -103,13 +103,13 @@ before the apps see the change, because apps import the built `dist/` output.
 | `auth/auth.guard.ts`                                                          | guard              | global authentication + role check (see ARCHITECTURE §7)                                                |
 | `auth/decorators.ts`                                                          | utility            | `@Public()`, `@Roles()`, `CAN_EDIT`, `ALL_ROLES`, `@CurrentUser()`                                      |
 | `auth/auth.types.ts`                                                          | types              | `AuthUser`, role names, cookie and CSRF header names, API key prefix                                    |
-| `auth/password-reset.service.ts`                                              | service            | password reset links (hash only, one use, expiry), reset emails _(branch `security-fixes`)_             |
+| `auth/password-reset.service.ts`                                              | service            | password reset links (hash only, one use, expiry), reset emails _(PR #36)_                              |
 | `auth/session.ts`                                                             | utility            | issues the 12-hour HS256 session and cookie                                                             |
 | `auth/auth.controller.ts`                                                     | controller         | login (lockout), register, logout, logout-all, me                                                       |
 | `auth/password-policy.ts`                                                     | utility            | refuses common and patterned passwords                                                                  |
 | `auth/api-keys.ts`                                                            | utility            | API key format, hashing, constant-time comparison                                                       |
 | `auth/sso.controller.ts`, `sso.service.ts`, `saml.service.ts`, `sso-error.ts` | controller/service | OpenID Connect and SAML sign-in and the per-organization settings                                       |
-| `platform/secret-box.ts`                                                      | utility            | AES-256-GCM sealing of secrets ZAPX must read back (`SECRETS_KEY`)                                      |
+| `platform/secret-box.ts`                                                      | utility            | AES-256-GCM sealing of secrets SampCode must read back (`SECRETS_KEY`)                                  |
 | `platform/integrations.ts`, `integration-settings.service.ts`                 | service            | the integrations catalog and the saved values (CRM first, environment fallback, refresh timer) (PR #38) |
 | `platform/integrations.controller.ts`, `integration-checks.ts`                | controller/utility | Settings → Integrations routes and the "Test" connection checks (PR #38)                                |
 
@@ -125,7 +125,7 @@ before the apps see the change, because apps import the built `dist/` output.
 | `quotas/`       | `quota-places.ts`: atomic quota take/release, least-fill groups (PR #33)                                                                                                                                                                                                                                                                                                             | quota counting                                           |
 | `integrations/` | redirect resolution (`redirect.service.ts`), all its DB access (`redirect.repository.ts`), settings mapping (`integration-config.ts`), callback outbox worker (`callback.worker.ts`, `http-delivery.ts`), webhooks (`webhook.service.ts`, `webhook-signing.ts`, `webhooks.controller.ts`), vendor API (`vendor-api.controller.ts`), logs and defaults (`integrations.controller.ts`) | redirects, callbacks, webhooks, the partner API          |
 | `ai/`           | `ai-gateway.ts` (every AI call: model per task, permissions, rate/budget limits, breaker, redaction, usage), `ai-provider.ts` (interface), `claude.provider.ts`, `architect.service.ts`, `propose.service.ts`, `prompts.ts`, `redact.ts`, `circuit-breaker.ts`, `ai-usage.repository.ts`, `ai-settings.controller.ts`                                                                | AI behaviour, prompts, adding a provider                 |
-| `imports/`      | `documents.ts` (file type by content), `template-import.ts` (ZAPX Excel/CSV template)                                                                                                                                                                                                                                                                                                | import formats                                           |
+| `imports/`      | `documents.ts` (file type by content), `template-import.ts` (SampCode Excel/CSV template)                                                                                                                                                                                                                                                                                            | import formats                                           |
 | `changesets/`   | proposals from AI, import or paste; diff, check, QA preview; apply/reject                                                                                                                                                                                                                                                                                                            | review workflow                                          |
 | `qa/`           | QA lab runs (`qa.service.ts`) and saved test cases (`test-cases.controller.ts`, PR #31)                                                                                                                                                                                                                                                                                              | QA lab                                                   |
 | `quality/`      | quality scoring and review queue (`quality.service.ts`), fraud blocks, IPinfo (`network-reputation.service.ts`)                                                                                                                                                                                                                                                                      | quality rules, review decisions                          |
@@ -163,7 +163,7 @@ Supertest. `test/support/` has mock OIDC, SAML and S3 servers.
 | `app/globals.css`, `app/quantum.css`, `app/neon.css`                                                                                          | style           | all studio CSS (custom properties; `neon.css` is PR #29)                                                    |
 | `app/page.tsx`                                                                                                                                | page            | dashboard (PR #29)                                                                                          |
 | `app/login/page.tsx`                                                                                                                          | page            | sign-in / sign-up / SSO                                                                                     |
-| `app/forgot-password/page.tsx`, `app/reset-password/page.tsx`, `app/account/page.tsx`                                                         | page            | password reset and change _(branch `security-fixes`)_                                                       |
+| `app/forgot-password/page.tsx`, `app/reset-password/page.tsx`, `app/account/page.tsx`                                                         | page            | password reset and change _(PR #36)_                                                                        |
 | `app/projects/page.tsx`, `app/projects/[id]/page.tsx`                                                                                         | page            | project list, one project (surveys, vendors, access)                                                        |
 | `app/surveys/[id]/page.tsx`                                                                                                                   | page            | **survey workspace**: loads survey + draft, holds unsaved state, saves, publishes, renders the tabs         |
 | `app/library/page.tsx`                                                                                                                        | page            | question bank (PR #30)                                                                                      |
@@ -231,7 +231,7 @@ proxy) and `runtime-headers.conf`.
 | `public/sw.js`                            | service worker: app shell cache, media cache                                        |
 | `public/manifest.webmanifest`, `icon.svg` | installable app metadata                                                            |
 
-## 5b. `apps/mobile` — Android and iOS app _(PR #40, unmerged)_
+## 5b. `apps/mobile` — Android and iOS app _(PR #40)_
 
 An Expo (React Native) project with its **own `package.json` and `package-lock.json`**. It is
 excluded from the pnpm workspace (`pnpm-workspace.yaml`: `!apps/mobile`), so run `npm ci` inside the

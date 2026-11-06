@@ -12,9 +12,9 @@ Design and trade-offs: [ADR 0014](../adr/0014-sso-scim-and-plans.md).
    - Redirect URI: `${STUDIO_URL}/api/auth/sso/callback` (shown in Settings → Single sign-on).
    - Scopes: `openid email profile`. Client authentication: client secret sent in the request body
      (`client_secret_post`).
-2. In ZAPX, Settings → Single sign-on: issuer URL, client ID, client secret, and the email domains
+2. In SampCode, Settings → Single sign-on: issuer URL, client ID, client secret, and the email domains
    that belong to your organization. Saving checks the provider's discovery document.
-3. Choose what happens to people who sign in without a ZAPX account: refuse, or create them as
+3. Choose what happens to people who sign in without a SampCode account: refuse, or create them as
    viewers, programmers or interviewers (never admins).
 4. Optionally **require single sign-on**: everyone except admins must use it.
 
@@ -27,11 +27,11 @@ People sign in by typing their work email and choosing **Sign in with SSO**.
 | Google Workspace   | `https://accounts.google.com`                                    |
 | Keycloak           | `https://<host>/realms/<realm>`                                  |
 
-These are the providers' documented issuer formats; none has been tried with ZAPX yet.
+These are the providers' documented issuer formats; none has been tried with SampCode yet.
 
-Rules ZAPX applies: PKCE, `state` and `nonce` are checked; the ID token must be signed by the
+Rules SampCode applies: PKCE, `state` and `nonce` are checked; the ID token must be signed by the
 provider's published keys for this client; the email must be in your domains and not marked
-unverified; an email that belongs to another ZAPX organization is refused; disabled members are
+unverified; an email that belongs to another SampCode organization is refused; disabled members are
 refused. The member is linked to the provider's `sub` on first sign-in.
 
 ## Disabling members
@@ -51,7 +51,7 @@ Supported: `GET /Users` (filters `userName eq`, `externalId eq`, `emails eq`, pa
 `startIndex` and `count`), `POST /Users`, `GET/PUT/PATCH/DELETE /Users/{id}`,
 `/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`.
 
-| SCIM attribute                | ZAPX                                                              |
+| SCIM attribute                | SampCode                                                          |
 | ----------------------------- | ----------------------------------------------------------------- |
 | `userName` (or primary email) | email (sign-in name)                                              |
 | `displayName` or `name`       | name                                                              |
@@ -105,7 +105,7 @@ Choose **SAML 2.0** under Settings → Single sign-on for identity providers tha
 Entra ID, Okta, OneLogin, PingFederate). The organization's email domains, just-in-time role and
 "require single sign-on" work as for OpenID Connect; an organization uses one protocol at a time.
 
-In the identity provider, add ZAPX as a SAML application:
+In the identity provider, add SampCode as a SAML application:
 
 | Setting                    | Value                                                                             |
 | -------------------------- | --------------------------------------------------------------------------------- |
@@ -116,14 +116,14 @@ In the identity provider, add ZAPX as a SAML application:
 | Attributes                 | `email` (or `mail`, or the Microsoft email claim), and a display name if you like |
 | Signing                    | Sign the assertion (RSA-SHA256)                                                   |
 
-Then enter the provider's sign-in URL, its entity ID and its signing certificate in ZAPX. During a
+Then enter the provider's sign-in URL, its entity ID and its signing certificate in SampCode. During a
 certificate rotation paste both certificates; either is accepted until you remove the old one.
 
-What ZAPX checks on every response: the assertion is signed by one of the configured certificates,
-its issuer is the configured entity ID, the audience is ZAPX, the timestamps are current (60 s of
-clock skew), and it answers a sign-in ZAPX started in the last 10 minutes. Each sign-in request can
+What SampCode checks on every response: the assertion is signed by one of the configured certificates,
+its issuer is the configured entity ID, the audience is SampCode, the timestamps are current (60 s of
+clock skew), and it answers a sign-in SampCode started in the last 10 minutes. Each sign-in request can
 be answered once, so a captured response cannot be replayed. Sign-ins started at the identity
-provider's portal (IdP-initiated) are refused: start from the ZAPX login page or link to
+provider's portal (IdP-initiated) are refused: start from the SampCode login page or link to
 `/login`. Not supported yet: single logout, encrypted assertions and signed AuthnRequests.
 
 **Tested** against a test identity provider in the API tests and in the browser

@@ -1,7 +1,7 @@
 /**
  * On-device storage (IndexedDB). Interviews are written after every page, so closing the app,
  * losing power or losing the connection never loses an answer. Nothing here is sent anywhere
- * except by sync, to the ZAPX API this app was loaded from.
+ * except by sync, to the SampCode API this app was loaded from.
  */
 import type { Answers } from '@zapx/survey-schema';
 
