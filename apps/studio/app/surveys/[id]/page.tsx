@@ -28,6 +28,7 @@ import { ChoiceResults } from '@/components/ChoiceResults';
 import { EyeTrackingResults } from '@/components/EyeTrackingResults';
 import { ResearchAssistant } from '@/components/ResearchAssistant';
 import { EmailInvitations } from '@/components/EmailInvitations';
+import { Sampleon } from '@/components/Sampleon';
 import { CatiCalls, DoNotCallList } from '@/components/CatiCalls';
 import { ExportJobs } from '@/components/ExportJobs';
 import { Analysis } from '@/components/Analysis';
@@ -384,6 +385,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
         <div className="stack">
           <Distribute survey={survey} readOnly={readOnly} onChanged={load} />
           <EmailInvitations surveyId={id} readOnly={readOnly} live={!!survey.liveVersionId} />
+          <Sampleon surveyId={id} surveyName={survey.name} readOnly={readOnly} live={!!survey.liveVersionId} />
         </div>
       ) : null}
       {tab === 'capi' ? (

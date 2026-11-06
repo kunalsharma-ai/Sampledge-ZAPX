@@ -19,6 +19,15 @@ traffic. It keeps one `SampleonAudienceRequest` row per request so the studio ca
 | Progress events go to | PROJEXA                                                                           | ZAPX (`POST /api/v1/sampleon/events`)                     |
 | Respondent path       | card → SAMPLEON `/go` → `{runtime}/s/{survey}?vid=SAMPLEON&uid={token}` → outcome | same                                                      |
 
+## In the studio
+
+A survey's **Distribute** tab has a **SAMPLEON audiences** panel: **Connect to SAMPLEON** creates
+the project's SAMPLEON vendor and shows the survey ID and launch link to paste into the PROJEXA
+project's SAMPLEON tab; the form beside it asks SAMPLEON for an audience for this survey on its
+own (description, countries, completes, incidence, LOI, reward, fieldwork dates, language,
+routing); the table lists every request for the survey, PROJEXA's included, with status and
+SAMPLEON completes.
+
 ## Survey-host contract
 
 The project's `SAMPLEON` vendor (created by `connect` or the first request, integration
