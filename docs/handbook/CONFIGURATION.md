@@ -17,7 +17,7 @@ secret appears here; replace every `<…>` placeholder with your own value.
 If a value is invalid the API refuses to start with `Invalid configuration: NAME: message; …`.
 Start from `.env.example` (`cp .env.example .env`).
 
-## Integrations set in the CRM _(PR #38, unmerged)_
+## Integrations set in the CRM _(PR #38)_
 
 From PR #38 the provider settings below no longer have to be environment variables. An administrator
 of the organization that runs the installation (or the super admin) enters them in the studio under
@@ -89,7 +89,7 @@ Provider switches are checked too: turning a provider on without its credentials
 | `SIGNUP_RATE_PER_MINUTE`     | sign-ups per minute per address                                                             | `5`     | `5`                         |
 | `LOGIN_MAX_FAILURES`         | wrong passwords in a row before the account locks                                           | `10`    | `10`                        |
 | `LOGIN_LOCK_MINUTES`         | lock length                                                                                 | `15`    | `15`                        |
-| `PASSWORD_RESET_HOURS`       | hours a password reset link works (1–168) _(branch `security-fixes`)_                       | `24`    | `24`                        |
+| `PASSWORD_RESET_HOURS`       | hours a password reset link works (1–168) _(PR #36)_                                        | `24`    | `24`                        |
 | `SSO_ALLOW_INSECURE_ISSUER`  | allow http/private identity providers (development and tests only; refused in production)   | off     | `false`                     |
 | `TRUST_PROXY_HOPS`           | proxies in front of the API that add `X-Forwarded-For`                                      | `1`     | `1`                         |
 | `EDGE_SHARED_SECRET`         | secret the CDN sends as `X-Zapx-Edge`; only then viewer address/country headers are trusted | unset   | `<openssl rand -hex 32>`    |
@@ -186,7 +186,7 @@ S3 credentials are not SampCode settings: the AWS SDK uses its normal chain (the
   `TELEPHONY_RING_SECONDS`, `TRANSCRIPTION_TIMEOUT_S`, `NETWORK_REPUTATION_TIMEOUT_MS`,
   `AI_TIMEOUT_MS`, `STRIPE_API_BASE`. They all have safe defaults, so nothing breaks, but they are
   easy to miss.
-- **Fixed on branch `security-fixes`:** on AWS, `app_secret_keys` (`infra/terraform/variables.tf`)
+- **Fixed in PR #36:** on AWS, `app_secret_keys` (`infra/terraform/variables.tf`)
   included `TWILIO_AUTH_TOKEN` but the example secret JSON in `infra/terraform/README.md` did not,
   and `SENDGRID_API_KEY` had no secret slot. Both now match (and a test checks it). Every key in
   `app_secret_keys` must exist in the secret, empty if unused, or the tasks fail to start. With PR #38
@@ -196,7 +196,7 @@ S3 credentials are not SampCode settings: the AWS SDK uses its normal chain (the
 - `ANTHROPIC_API_BASE` _(PR #38)_ exists only for tests (an Anthropic-compatible stand-in); leave it
   at its default.
 
-## Super admin automation _(PR #41, unmerged; [ADR 0036](../adr/0036-super-admin.md))_
+## Super admin automation _(PR #41; [ADR 0036](../adr/0036-super-admin.md))_
 
 | Variable                 | Default | What it does                                                                 |
 | ------------------------ | ------- | ---------------------------------------------------------------------------- |
@@ -206,7 +206,7 @@ S3 credentials are not SampCode settings: the AWS SDK uses its normal chain (the
 The first super admin is made with `node apps/api/dist/cli/set-super-admin.js <email>` (the member must
 belong to the organization that runs the installation; see `set-operator.js`). Remove with `--remove`.
 
-## Mobile app settings _(PR #40, unmerged)_
+## Mobile app settings _(PR #40)_
 
 The mobile app has no environment file. The member types the server address (the studio address)
 on the sign-in screen. Build settings are in `apps/mobile/app.json` (name, icons, bundle id

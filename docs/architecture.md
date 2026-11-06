@@ -1,4 +1,4 @@
-# SampCode architecture (Milestones 1 to 20, and the open pull requests)
+# SampCode architecture (Milestones 1 to 20 and PRs #27–#46)
 
 The full plan, including the module map and roadmap, is in the project's
 "SampCode architecture and first milestone" document. This file records what the code does today and
@@ -249,7 +249,7 @@ Each is an interface with one first provider, off by default, tested against a l
   everywhere), a common-password list, security headers in `bootstrap.ts`, and production settings
   checks in `config.ts`. [ADR 0026](adr/0026-security-hardening.md)
 
-## Passwords (security fixes after the handbook review, branch `security-fixes`)
+## Passwords (security fixes after the handbook review, PR #36)
 
 - `POST /api/auth/change-password` (current password required) signs out the member's other sessions
   and keeps this one: sessions carry their issue time in milliseconds (`iatMs`) so the new session is
@@ -258,22 +258,30 @@ Each is an interface with one first provider, off by default, tested against a l
   emails one when `EMAIL_PROVIDER` is set and always answers 204; `POST /api/auth/reset-password`
   uses it. Only a SHA-256 hash of the token is stored (`PasswordReset`); a link works once, for
   `PASSWORD_RESET_HOURS`, and a newer link voids older ones. Code: `apps/api/src/auth/password-reset.service.ts`.
-- The vendor shared secret is returned only to admins (`presentVendor`, `SEES_VENDOR_SECRET`); SampCode has no separate super admin role.
+- The vendor shared secret is returned only to admins and to super admins signed in with a session, never through an API key (`presentVendor`, `seesVendorSecret`; PR #43).
 
-## On open pull requests (not yet on `main`)
+## Since milestone 20 (merged 2026-11-05 and 2026-11-06)
 
-| PR  | Adds                                                                                     | ADR                                                  |
-| --- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| #27 | Quantum Design System: `@zapx/quantum` theme engine with enforced contrast               | [0027](adr/0027-quantum-design-system.md)            |
-| #29 | Neon AI theme (default), sidebar app shell, `GET /api/dashboard` home screen             | [0028](adr/0028-neon-dashboard.md)                   |
-| #30 | Loops, blocks and calculated variables compiled into ordinary pages; question bank       | [0029](adr/0029-blueprint-core-engineering.md)       |
-| #31 | Translation memory and glossary, right-to-left, URL variables, least fill, QA test cases | [0030](adr/0030-blueprint-multilingual-and-qa.md)    |
-| #32 | CAPI evidence and interview areas, supervision, appeals, email distribution              | [0031](adr/0031-blueprint-fieldwork-and-security.md) |
-| #33 | MaxDiff and conjoint (computed designs), recodes, AI research assistant, CAPI video      | [0032](adr/0032-blueprint-research-intelligence.md)  |
-| #34 | Automation rules, data residency and retention, cleaning, chart dashboards, SMS          | [0033](adr/0033-blueprint-enterprise-scale.md)       |
-| #35 | Maintainer handbook in [handbook/](handbook/README.md)                                   | —                                                    |
-
-They are stacked in that order. #28 (integrations set up in the CRM) is separate, based on `main`.
+| PR  | Adds                                                                                                   | ADR                                                  |
+| --- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| #27 | Quantum Design System: `@zapx/quantum` theme engine with enforced contrast                             | [0027](adr/0027-quantum-design-system.md)            |
+| #29 | Neon AI theme (default), sidebar app shell, `GET /api/dashboard` home screen                           | [0028](adr/0028-neon-dashboard.md)                   |
+| #30 | Loops, blocks and calculated variables compiled into ordinary pages; question bank                     | [0029](adr/0029-blueprint-core-engineering.md)       |
+| #31 | Translation memory and glossary, right-to-left, URL variables, least fill, QA test cases               | [0030](adr/0030-blueprint-multilingual-and-qa.md)    |
+| #32 | CAPI evidence and interview areas, supervision, appeals, email distribution                            | [0031](adr/0031-blueprint-fieldwork-and-security.md) |
+| #33 | MaxDiff and conjoint (computed designs), recodes, AI research assistant, CAPI video                    | [0032](adr/0032-blueprint-research-intelligence.md)  |
+| #34 | Automation rules, data residency and retention, cleaning, chart dashboards, SMS                        | [0033](adr/0033-blueprint-enterprise-scale.md)       |
+| #35 | Maintainer handbook in [handbook/](handbook/README.md) (refreshed in #42)                              | —                                                    |
+| #36 | Security fixes S1–S3: vendor secret for admins, password change and reset, AWS secret list             | —                                                    |
+| #37 | Webcam eye tracking (experimental, opt-in)                                                             | [0034](adr/0034-webcam-eye-tracking.md)              |
+| #38 | Integrations (Claude, IPinfo, Deepgram, Twilio, Stripe, S3) set in Settings → Integrations (#28)       | [0035](adr/0035-integrations-in-the-crm.md)          |
+| #39 | Neon design on every studio page and the CAPI app                                                      | 0028 addendum                                        |
+| #41 | Super admin console: organizations, plans, web and mobile features, live entitlements                  | [0036](adr/0036-super-admin.md)                      |
+| #40 | Android and iOS app (`apps/mobile`, Expo), gated by the super admin's mobile features                  | [0037](adr/0037-mobile-app.md)                       |
+| #43 | Super admins see the vendor shared secret, never through an API key                                    | —                                                    |
+| #44 | Node 26 LTS, Docker `node:26-bookworm-slim` and `nginx:1.31-alpine`                                    | —                                                    |
+| #45 | Security fixes S4–S9: shared rate limits, `SIGNING_KEYS_SECRET`, script nonce, more row-level security | —                                                    |
+| #46 | Neon confirm dialogs instead of `window.confirm`                                                       | —                                                    |
 
 ## Decisions, contracts and operations
 
@@ -289,9 +297,11 @@ They are stacked in that order. #28 (integrations set up in the CRM) is separate
   `x-zapx-csrf` header. API clients can use `Authorization: Bearer`.
 - Every studio query is scoped by `tenantId` from the session, and project, survey and vendor lookups
   also by the member's project access. Postgres row-level security on `Response` backs up the
-  studio's respondent-data reads (not system paths, and not other tables yet; see ADR 0012). It only
+  studio's respondent-data reads, and since PR #45 also `CatiCase`, `CatiCall`, `DoNotCall`, `Contact`,
+  `Invitation`, `BackCheck` and `QualityAppeal` (not system paths; see ADR 0012). It only
   applies when the API's database role is not a superuser; check `GET /api/audit/security`.
-- Rate limits on login, sign-up and respondent endpoints (in memory, per API process), plus
+- Rate limits on login, sign-up and respondent endpoints, shared by every API task through the
+  `RateLimitBucket` table (`THROTTLE_STORE=database`, the production default; PR #45), plus
   account lockout after repeated wrong passwords.
 - Passwords can be changed by their owner and reset with one-time links (see Passwords above).
 - Survey text and piped answers are rendered as text, never HTML.
@@ -304,7 +314,7 @@ They are stacked in that order. #28 (integrations set up in the CRM) is separate
   server, not AWS yet. Jobs are polled from PostgreSQL (fine for hundreds an hour).
 - AI proposals return a full definition, so very long questionnaires may need to be imported in parts.
 - The Claude provider has been tested with a scripted fake; it needs an API key to be exercised live.
-- Grid questions are single choice per row. MaxDiff and conjoint are on open PR #33.
+- Grid questions are single choice per row. MaxDiff and conjoint exist (PR #33).
 - Back navigation is optional per survey and re-shows the previous visible page.
 - The fieldwork dashboard and review queue read response rows in the API process; very large
   surveys need SQL aggregates or a reporting store.
@@ -319,7 +329,7 @@ They are stacked in that order. #28 (integrations set up in the CRM) is separate
 - Media are public by id and served by the API from the file store; no recorded voice-over.
   Transcription of recordings exists (M17); transcription of typed open answers does not.
 - Analysis reads rows in the API process (up to 200,000 interviews); weighting exists (M15), but
-  nets, banner books and scheduled delivery do not (chart dashboards are on open PR #34).
+  nets, banner books and scheduled delivery do not (chart dashboards came in PR #34).
 - SSO (OpenID Connect and SAML) has been tested against test providers, not a real one; SAML has
   no single logout or encrypted assertions. SCIM covers users, not groups. Billing (Stripe) is
   tested against a fake Stripe only.

@@ -1,8 +1,8 @@
 # Database
 
 SampCode stores everything in one **PostgreSQL 16** database, accessed only through **Prisma 6**
-(`packages/db`). This file lists every table (Prisma "model"), field, relationship and index on branch
-`mobile-app` (PR #40, the top of the stack), generated from `packages/db/prisma/schema.prisma` and checked against the
+(`packages/db`). This file lists every table (Prisma "model"), field, relationship and index on `main`
+(commit `68f4531`), generated from `packages/db/prisma/schema.prisma` and checked against the
 migrations. SampCode does not use MongoDB.
 
 ## 1. The essentials
@@ -11,7 +11,7 @@ migrations. SampCode does not use MongoDB.
 | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Database name           | `zapx` locally and in Docker (`.env.example`, `docker-compose.yml`); on AWS `DB_NAME` (default `zapx`, `apps/api/src/database-url.ts`)                                                                                                                                                                                                                                                        |
 | Connection setting      | `DATABASE_URL=postgresql://user:password@host:5432/zapx?connection_limit=10&pool_timeout=20`, or `DB_HOST` + `DB_USER` + `DB_PASSWORD` (+ `DB_PORT`, `DB_NAME`, `DB_SSLMODE`, `DB_CONNECTION_LIMIT`)                                                                                                                                                                                          |
-| Schema file             | `packages/db/prisma/schema.prisma` (55 models on branch `mobile-app`, 22 enums)                                                                                                                                                                                                                                                                                                               |
+| Schema file             | `packages/db/prisma/schema.prisma` (56 models on `main`, 22 enums)                                                                                                                                                                                                                                                                                                                            |
 | Migrations              | `packages/db/prisma/migrations/` — 30 folders (the last two, `20261118000000_integrations_in_crm` from PR #38 and `20261119000000_super_admin` from PR #41), one per milestone/phase, applied in name order                                                                                                                                                                                   |
 | Client used by the code | `PrismaService` (`apps/api/src/common/prisma.service.ts`), which extends the generated `PrismaClient` from `@zapx/db`                                                                                                                                                                                                                                                                         |
 | Seed                    | `packages/db/src/seed.ts`: one organization "Demo tenant" (marked as the platform operator) and an admin account whose email and password are set by `SEED_EMAIL` and `SEED_PASSWORD`; from PR #41 also a super admin in the same organization (`SEED_SUPER_EMAIL`, `SEED_SUPER_PASSWORD`) (the development defaults are in `seed.ts`; never use them outside your laptop). Development only. |
@@ -75,24 +75,25 @@ erDiagram
 
 ## 3. Tables by area
 
-| Area                      | Tables                                                                                                                                                              |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Organizations and people  | `Tenant`, `User`, `ProjectMember`, `TenantSso`, `SsoRequest`, `TenantScim`, `ApiKey`, `RevokedSession`, `PasswordReset` _(branch `security-fixes`)_, `BillingEvent` |
-| Surveys                   | `Project`, `Survey`, `SurveyVersion`, `ChangeSet`, `QaRun`, `QaTestCase`, `LibraryItem`, `GlossaryTerm`, `MediaAsset`, `BlockExposure`                              |
-| Fieldwork and responses   | `Vendor`, `Response`, `QuotaCount`, `OpenEndFingerprint`, `FraudBlock`, `Capture`, `CapiAssignment`, `BackCheck`, `QualityAppeal`                                   |
-| Phone (CATI)              | `CatiCase`, `CatiCall`, `CatiSettings`, `DoNotCall`, `CatiDialer`, `CatiDial`                                                                                       |
-| Distribution              | `Contact`, `Distribution`, `Invitation`                                                                                                                             |
-| Integrations and outboxes | `RedirectEvent`, `OutboundCallback`, `Webhook`, `WebhookDelivery`                                                                                                   |
-| AI                        | `TenantAiPolicy`, `AiUsage`                                                                                                                                         |
-| Jobs and files            | `Job`, `StoredFile`                                                                                                                                                 |
-| Analysis                  | `Report`                                                                                                                                                            |
-| Automation _(PR #34)_     | `AutomationRule`, `AutomationRun`, `Notification`                                                                                                                   |
-| Platform _(PR #38, #41)_  | `PlatformIntegration`, `SubscriptionPlan`, `PlatformAutomation`, `PlatformAutomationRun`                                                                            |
-| Audit                     | `AuditEvent`                                                                                                                                                        |
+| Area                      | Tables                                                                                                                                             |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Organizations and people  | `Tenant`, `User`, `ProjectMember`, `TenantSso`, `SsoRequest`, `TenantScim`, `ApiKey`, `RevokedSession`, `PasswordReset` _(PR #36)_, `BillingEvent` |
+| Surveys                   | `Project`, `Survey`, `SurveyVersion`, `ChangeSet`, `QaRun`, `QaTestCase`, `LibraryItem`, `GlossaryTerm`, `MediaAsset`, `BlockExposure`             |
+| Fieldwork and responses   | `Vendor`, `Response`, `QuotaCount`, `OpenEndFingerprint`, `FraudBlock`, `Capture`, `CapiAssignment`, `BackCheck`, `QualityAppeal`                  |
+| Phone (CATI)              | `CatiCase`, `CatiCall`, `CatiSettings`, `DoNotCall`, `CatiDialer`, `CatiDial`                                                                      |
+| Distribution              | `Contact`, `Distribution`, `Invitation`                                                                                                            |
+| Integrations and outboxes | `RedirectEvent`, `OutboundCallback`, `Webhook`, `WebhookDelivery`                                                                                  |
+| AI                        | `TenantAiPolicy`, `AiUsage`                                                                                                                        |
+| Jobs and files            | `Job`, `StoredFile`                                                                                                                                |
+| Analysis                  | `Report`                                                                                                                                           |
+| Automation _(PR #34)_     | `AutomationRule`, `AutomationRun`, `Notification`                                                                                                  |
+| Platform _(PR #38, #41)_  | `PlatformIntegration`, `SubscriptionPlan`, `PlatformAutomation`, `PlatformAutomationRun`                                                           |
+| Audit                     | `AuditEvent`                                                                                                                                       |
+| Rate limits _(PR #45)_    | `RateLimitBucket` (shared throttler counters, `THROTTLE_STORE=database`; key, hits, window end, blocked until)                                     |
 
-Tables that exist only on the open PR branches (not on `main`): `LibraryItem` (#30), `GlossaryTerm`,
+Tables added after milestone 20 (all now on `main`): `LibraryItem` (#30), `GlossaryTerm`,
 `BlockExposure`, `QaTestCase` (#31), `BackCheck`, `QualityAppeal`, `Contact`, `Distribution`,
-`Invitation` (#32), `AutomationRule`, `AutomationRun`, `Notification` (#34), `PlatformIntegration` (#38), `SubscriptionPlan`, `PlatformAutomation`, `PlatformAutomationRun` (#41). PR #41 also adds super admin columns to `Tenant` (subscription, suspension, feature overrides) and `User` (`superAdmin`, `featureOverrides`, `mobileAccess`, `lastSeenAt`, `lastClient`). Columns added by PR #27
+`Invitation` (#32), `AutomationRule`, `AutomationRun`, `Notification` (#34), `PlatformIntegration` (#38), `SubscriptionPlan`, `PlatformAutomation`, `PlatformAutomationRun` (#41), `RateLimitBucket` (#45). PR #41 also adds super admin columns to `Tenant` (subscription, suspension, feature overrides) and `User` (`superAdmin`, `featureOverrides`, `mobileAccess`, `lastSeenAt`, `lastClient`). Columns added by PR #27
 (`User.preferences`, `Tenant.appearanceDefaults`) and later phases are in migrations
 `20261110000000_quantum_appearance` onwards.
 
@@ -1395,4 +1396,4 @@ Indexes and constraints: `@@unique([automationId, dedupeKey])`, `@@index([create
 | `InvitationState`     | `QUEUED`, `SENT`, `FAILED`, `SKIPPED`                                                                                              |
 | `AutomationRunState`  | `PENDING`, `AWAITING_APPROVAL`, `RUNNING`, `DONE`, `SKIPPED`, `REJECTED`, `FAILED`                                                 |
 
-<!-- 55 models, 22 enums -->
+<!-- 56 models, 22 enums -->
