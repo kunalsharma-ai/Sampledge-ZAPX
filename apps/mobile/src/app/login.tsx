@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { Button, Card, ErrorNote, Field, Screen } from '@/components/ui';
 import { useSession } from '@/lib/session';
+import brandMark from '../../assets/images/splash-icon.png';
 import { usePalette } from '@/lib/theme';
 
 export default function Login() {
@@ -33,18 +33,19 @@ export default function Login() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen>
         <View style={{ alignItems: 'center', gap: 10, marginTop: 48, marginBottom: 12 }}>
-          <View style={{ backgroundColor: p.accent + '33', borderRadius: 24, padding: 16, borderWidth: 1, borderColor: p.edge }}>
-            <Ionicons name="flash" size={36} color={p.accent3} />
-          </View>
-          <Text style={{ color: p.text, fontSize: 30, fontWeight: '900', letterSpacing: 1 }}>ZAPX</Text>
+          <Image source={brandMark} style={{ width: 96, height: 96 }} accessibilityIgnoresInvertColors testID="brand-mark" />
+          <Text style={{ color: p.text, fontSize: 32, fontWeight: '900' }} accessibilityRole="header">
+            Samp<Text style={{ color: p.accent3 }}>Code</Text>
+          </Text>
+          <Text style={{ color: p.muted, fontWeight: '700', letterSpacing: 0.5 }}>Write. Run. Ship. · by Sampledge</Text>
           <Text style={{ color: p.muted, textAlign: 'center' }}>Build, program, test and launch surveys smarter with AI</Text>
         </View>
         <Card glow>
           <Field
-            label="ZAPX address"
+            label="SampCode address"
             value={server}
             onChangeText={setServer}
-            placeholder="zapx.yourcompany.com"
+            placeholder="sampcode.yourcompany.com"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"

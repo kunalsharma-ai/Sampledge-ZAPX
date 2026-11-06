@@ -40,7 +40,7 @@ export default function ForgotPasswordPage() {
         <h1>Reset your password</h1>
         {emailOn === false ? (
           <p className="muted">
-            This ZAPX does not send email. Ask an administrator of your organization for a password reset link (Settings → Team).
+            This SampCode does not send email. Ask an administrator of your organization for a password reset link (Settings → Team).
           </p>
         ) : sent ? (
           <p role="status">If an account with that email exists, we sent it a link to set a new password. Check your inbox.</p>

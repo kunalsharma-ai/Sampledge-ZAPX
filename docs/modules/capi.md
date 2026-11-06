@@ -99,7 +99,7 @@ interviewer at once). See [data quality](data-quality.md).
 
 With `TRANSCRIPTION=deepgram`, a `DEEPGRAM_API_KEY` and a `DEEPGRAM_MODEL` (the Deepgram model to use;
 there is no default), admins and programmers see **Transcribe N** under Quality & fieldwork →
-Photos and recordings. It asks first, because the recordings leave ZAPX: each recording without a
+Photos and recordings. It asks first, because the recordings leave SampCode: each recording without a
 transcript is sent to Deepgram in a background job (up to 200 per job), in the interview's language
 (the primary subtag, `fr` of `fr-CA`). The text appears under the recording in the review queue,
 marked as machine transcription.

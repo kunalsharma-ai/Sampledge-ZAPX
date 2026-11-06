@@ -108,7 +108,7 @@ export class ExportRunner {
     if (applied)
       columns.push({
         key: 'cleaning_rules',
-        label: 'Cleaning rules applied to this row (the answers stored in ZAPX are unchanged)',
+        label: 'Cleaning rules applied to this row (the answers stored in SampCode are unchanged)',
         get: (r) => applied!.get(r.id)?.join(' ') || null,
       });
     const name = survey.name.replace(/[^A-Za-z0-9_-]+/g, '_').slice(0, 60) || 'survey';

@@ -380,7 +380,7 @@ export class AutomationService {
         const url = `${config().STUDIO_URL.replace(/\/$/, '')}${link}`;
         for (const u of users) {
           await provider.send(
-            { to: { email: u.email, name: u.name }, subject: `[ZAPX] ${r.name}`, text: `${a.message || summary}\n\n${url}` },
+            { to: { email: u.email, name: u.name }, subject: `[SampCode] ${r.name}`, text: `${a.message || summary}\n\n${url}` },
             AbortSignal.timeout(20_000),
           );
           sent++;

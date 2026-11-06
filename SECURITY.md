@@ -10,7 +10,7 @@ Include what you found, how to reproduce it, and what an attacker could do with 
 access other people's data, run denial-of-service tests, or test against production without
 permission.
 
-## How ZAPX is protected
+## How SampCode is protected
 
 See [docs/security.md](docs/security.md) for the controls in the application and on AWS, and
 [docs/operations/github-security.md](docs/operations/github-security.md) for the repository.

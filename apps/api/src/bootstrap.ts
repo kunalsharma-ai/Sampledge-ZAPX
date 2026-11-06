@@ -93,4 +93,4 @@ export function configureApp(app: INestApplication) {
   return app;
 }
 
-export const logger = new Logger('ZAPX');
+export const logger = new Logger('SampCode');

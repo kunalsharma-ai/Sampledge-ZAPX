@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: ZAPX CAPI app API
+  title: SampCode CAPI app API
   version: 1.0.0
   description: |
     Used by the offline interviewer app (apps/capi). Requires a signed-in user with the INTERVIEWER

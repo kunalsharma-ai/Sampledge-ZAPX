@@ -69,7 +69,7 @@ export function Sampleon({
         <h2>SAMPLEON audiences</h2>
         <p className="muted small">
           SAMPLEON is not connected. An administrator sets SAMPLEON_URL, SAMPLEON_CLIENT_SECRET and SAMPLEON_OUTCOME_SECRET for the API, and
-          registers ZAPX as a survey host in SAMPLEON.
+          registers SampCode as a survey host in SAMPLEON.
         </p>
       </section>
     );

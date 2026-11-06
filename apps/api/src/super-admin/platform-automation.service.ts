@@ -278,7 +278,7 @@ export class PlatformAutomationService implements OnModuleInit, OnModuleDestroy 
           await provider.send(
             {
               to: { email: u.email, name: u.name },
-              subject: fill(a.subject || '[ZAPX] Your subscription', m.vars),
+              subject: fill(a.subject || '[SampCode] Your subscription', m.vars),
               text: fill(a.message || '', m.vars),
             },
             AbortSignal.timeout(20_000),

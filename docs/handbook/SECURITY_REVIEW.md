@@ -75,7 +75,7 @@ finding ends with what the fix changed.
   with `POST /api/vendors/:id/rotate-secret`.
 
 - **Fixed (PR #36):** `presentVendor(v, role)` returns `secret` only to ADMIN
-  (`SEES_VENDOR_SECRET`; ZAPX has no separate super admin role). Programmers and viewers get the
+  (`SEES_VENDOR_SECRET`; SampCode has no separate super admin role). Programmers and viewers get the
   rest of the vendor without it; programmers can still edit vendors and rotate the secret, but an
   admin hands the new secret to the vendor. Test: `apps/api/test/security-fixes.test.ts`. Sealing the column
   with `SecretBox` is still open (it needs a data migration of every vendor).

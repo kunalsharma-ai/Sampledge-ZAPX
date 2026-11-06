@@ -3,7 +3,7 @@
 Billing is optional and **off by default** (`BILLING=off`): plans are then set by an operator with
 `node apps/api/dist/cli/set-plan.js` ([plans](sso-scim-plans.md#plans-and-limits)). With
 `BILLING=stripe`, an organization's admins buy and manage their plan themselves and Stripe tells
-ZAPX what they pay for. ZAPX never sees card details.
+SampCode what they pay for. SampCode never sees card details.
 
 Status: tested against a fake Stripe API with real webhook signatures (`apps/api/test/m13.test.ts`),
 **not yet with a Stripe account**. Before charging anyone, run one purchase, one upgrade and one
@@ -12,13 +12,13 @@ cancellation in Stripe's test mode.
 ## Set up
 
 1. In Stripe, create a product per plan you sell and a recurring price for each. Plans and their
-   limits stay in ZAPX's code (`apps/api/src/plans/plans.ts`); Stripe only holds the price.
+   limits stay in SampCode's code (`apps/api/src/plans/plans.ts`); Stripe only holds the price.
 2. Add a webhook endpoint `${STUDIO_URL}/api/billing/webhook` with the events
    `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`
    and `customer.subscription.deleted`. Copy its signing secret.
 3. Turn on the customer portal (Billing → Customer portal) and allow plan changes between your
    prices if customers may switch plans themselves.
-4. Configure ZAPX:
+4. Configure SampCode:
 
 | Setting                 | Value                                                                                                     |
 | ----------------------- | --------------------------------------------------------------------------------------------------------- |
@@ -38,7 +38,7 @@ price are set.
   Checkout for a subscription, tied to the organization (`client_reference_id` and subscription
   metadata). The plan does not change when the admin returns; it changes when Stripe confirms.
 - **Webhooks** are checked against `STRIPE_WEBHOOK_SECRET` (HMAC-SHA256 over the raw body, 5 minute
-  tolerance) and applied once (`BillingEvent`). For every subscription event ZAPX reads the
+  tolerance) and applied once (`BillingEvent`). For every subscription event SampCode reads the
   subscription back from Stripe, so late or out-of-order events cannot set an old state.
 - **Statuses:** `active` and `trialing` give the paid plan. `past_due` keeps it while Stripe retries
   the payment (the panel asks the admin to update the payment method). `canceled`, `unpaid`,
@@ -55,5 +55,5 @@ price are set.
 ## Limits
 
 - One subscription with one price per organization; no seat-based quantities, usage-based billing,
-  coupons in ZAPX, or invoices shown inside ZAPX (they are in the Stripe portal).
-- Taxes, currencies and invoicing rules are configured in Stripe, not ZAPX.
+  coupons in SampCode, or invoices shown inside SampCode (they are in the Stripe portal).
+- Taxes, currencies and invoicing rules are configured in Stripe, not SampCode.

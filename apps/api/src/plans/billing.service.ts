@@ -3,7 +3,7 @@
  * a plan with Stripe Checkout and manage payment details in the Stripe customer portal, and Stripe's
  * signed webhooks keep the organization's plan in step with its subscription.
  *
- * ZAPX never sees card details. Plans and their limits stay in code (plans.ts); Stripe only says which
+ * SampCode never sees card details. Plans and their limits stay in code (plans.ts); Stripe only says which
  * price an organization pays for (STRIPE_PRICES maps plan codes to Stripe price IDs). Every webhook is
  * checked against STRIPE_WEBHOOK_SECRET, applied once (BillingEvent), and answered by re-reading the
  * subscription from Stripe, so events that arrive late or out of order cannot set an old state.

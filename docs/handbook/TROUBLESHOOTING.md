@@ -25,7 +25,7 @@ Where logs go:
 
 | Where you run it              | API / worker logs                                                          | Studio / runtime / CAPI                     |
 | ----------------------------- | -------------------------------------------------------------------------- | ------------------------------------------- |
-| `pnpm dev`                    | the terminal (Nest `Logger`, context `ZAPX`)                               | the terminal, plus the browser console      |
+| `pnpm dev`                    | the terminal (Nest `Logger`, context `SampCode`)                           | the terminal, plus the browser console      |
 | `docker compose up`           | `docker compose logs -f api worker`                                        | `docker compose logs -f studio`; browser    |
 | AWS (after `terraform apply`) | CloudWatch log groups `/zapx/<env>/api`, `/zapx/<env>/worker`, `…/migrate` | `/zapx/<env>/studio`; runtime/CAPI = S3+CDN |
 
@@ -573,7 +573,7 @@ Only members with `User.superAdmin = true`, signed in with a session (never an A
 database:
 
 ```bash
-node apps/api/dist/cli/set-operator.js <org id or admin email>   # once: the organization that runs ZAPX
+node apps/api/dist/cli/set-operator.js <org id or admin email>   # once: the organization that runs SampCode
 node apps/api/dist/cli/set-super-admin.js <email>                # add --remove to take it away
 ```
 

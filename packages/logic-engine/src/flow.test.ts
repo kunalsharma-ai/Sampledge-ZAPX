@@ -417,7 +417,7 @@ describe('blueprint phase 2: URL variables and least-fill blocks', () => {
     const messages = checkFlow(bad).map((i) => i.message);
     expect(messages).toEqual([
       expect.stringContaining('"AGE" is used more than once'),
-      expect.stringContaining('"uid" is used by ZAPX'),
+      expect.stringContaining('"uid" is used by SampCode'),
       expect.stringContaining('"seg" is read twice'),
     ]);
   });
@@ -435,7 +435,7 @@ describe('blueprint phase 2: URL variables and least-fill blocks', () => {
     expect(shown).toEqual({ C1: 10, C2: 10, C3: 10 });
   });
 
-  it('round-trips through ZAPX XML', () => {
+  it('round-trips through SampCode XML', () => {
     const back = fromZapxXml(toZapxXml(def));
     expect(back.warnings).toEqual([]);
     expect(surveyDefinitionSchema.parse(back.definition)).toEqual(def);

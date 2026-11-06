@@ -1,7 +1,7 @@
 /**
  * A minimal SAML 2.0 identity provider for tests (Milestone 13). It builds Responses with an
  * Assertion signed by xml-crypto (RSA-SHA256, exclusive c14n) and can be told to misbehave (wrong
- * audience, wrong issuer, expired, unsigned, signed by another key) to test that ZAPX refuses them.
+ * audience, wrong issuer, expired, unsigned, signed by another key) to test that SampCode refuses them.
  *
  * Keys are generated per test run (testIdpKeys, needs the openssl command); none are stored in the repo.
  */
@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { SignedXml } from 'xml-crypto';
 
 /** A throwaway key pair and self-signed certificate, made with openssl for this test run only. */
-export function testIdpKeys(cn = 'ZAPX test IdP') {
+export function testIdpKeys(cn = 'SampCode test IdP') {
   const dir = mkdtempSync(join(tmpdir(), 'zapx-saml-'));
   try {
     execFileSync(
@@ -106,7 +106,7 @@ export function samlResponse(a: SamlAssertionInput): string {
   return Buffer.from(xml).toString('base64');
 }
 
-/** The AuthnRequest ID and RelayState from the redirect URL ZAPX produced. */
+/** The AuthnRequest ID and RelayState from the redirect URL SampCode produced. */
 export async function readAuthnRequest(url: string) {
   const { inflateRawSync } = await import('node:zlib');
   const u = new URL(url);

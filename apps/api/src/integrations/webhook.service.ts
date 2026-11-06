@@ -68,7 +68,7 @@ export class WebhookService {
   /** Queue a test event for one webhook, whatever it subscribes to. */
   async test(tenantId: string, webhookId: string) {
     return this.prisma.webhookDelivery.create({
-      data: this.row(tenantId, webhookId, TEST_EVENT, { message: 'Test event from ZAPX. No action is needed.' }),
+      data: this.row(tenantId, webhookId, TEST_EVENT, { message: 'Test event from SampCode. No action is needed.' }),
     });
   }
 

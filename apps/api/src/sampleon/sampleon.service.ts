@@ -2,15 +2,15 @@
  * SAMPLEON integration (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md).
  *
  * Ownership: SAMPLEON decides who is invited, when, and where a respondent is routed next;
- * SUPPLY360 owns the respondents; ZAPX hosts the survey and reports verified outcomes. ZAPX
+ * SUPPLY360 owns the respondents; SampCode hosts the survey and reports verified outcomes. SampCode
  * therefore keeps no respondent list, no invitation engine and no second quota service here, only
  * a record of each audience request so the studio can show where it stands.
  *
- *   Independent ZAPX survey:  studio → POST SAMPLEON /api/v1/audience-requests (source ZAPX)
+ *   Independent SampCode survey:  studio → POST SAMPLEON /api/v1/audience-requests (source SampCode)
  *                             → a person approves in SAMPLEON → SAMPLEON invites via SUPPLY360
  *                             → respondent enters /s/{survey}?vid=SAMPLEON&uid={token}
  *                             → outcome redirect + signed S2S to SAMPLEON (SAMPLEON vendor adapter)
- *                             → SAMPLEON events back to ZAPX (POST /api/v1/sampleon/events).
+ *                             → SAMPLEON events back to SampCode (POST /api/v1/sampleon/events).
  *   PROJEXA-linked survey:    PROJEXA creates the request with the launch URL shown by
  *                             GET /api/surveys/{id}/sampleon; outcomes reach SAMPLEON the same way,
  *                             and progress goes to PROJEXA.
@@ -44,7 +44,7 @@ const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
 
 /**
  * What the studio sends. Criteria and quota conditions use SUPPLY360's attribute catalogue and are
- * validated by SAMPLEON; ZAPX passes them through unchanged.
+ * validated by SAMPLEON; SampCode passes them through unchanged.
  */
 const submitSchema = z
   .object({
@@ -78,7 +78,7 @@ const submitSchema = z
     path: ['targeting'],
   });
 
-/** The part of SAMPLEON's event envelope ZAPX reads (full schema: @sampledge/contracts events.ts). */
+/** The part of SAMPLEON's event envelope SampCode reads (full schema: @sampledge/contracts events.ts). */
 const envelopeSchema = z.object({
   specVersion: z.literal('1.0'),
   eventId: z.string().uuid(),
@@ -166,7 +166,7 @@ export class SampleonService {
     return { launchUrl: SampleonService.launchUrl(survey.id), vendorId: vendor.id, vendorCode: vendor.code };
   }
 
-  /** Independent ZAPX workflow: ask SAMPLEON for an audience. Invitations wait for approval in SAMPLEON. */
+  /** Independent SampCode workflow: ask SAMPLEON for an audience. Invitations wait for approval in SAMPLEON. */
   async submit(user: AuthUser, surveyId: string, body: unknown) {
     if (!SampleonService.configured()) throw new ServiceUnavailableException('The SAMPLEON integration is not configured');
     const survey = await this.surveys.getSurvey(user, surveyId);

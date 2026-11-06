@@ -1,7 +1,7 @@
 /**
  * A minimal OpenID Connect provider for tests (Milestone 8). It is not a real identity provider: it
  * issues RS256 ID tokens for whatever claims the test sets, checks PKCE and the client secret, and
- * can be told to misbehave (wrong audience, wrong nonce) to test that ZAPX refuses the sign-in.
+ * can be told to misbehave (wrong audience, wrong nonce) to test that SampCode refuses the sign-in.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer, type Server } from 'node:http';

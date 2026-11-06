@@ -3,7 +3,7 @@ import { config } from '../config';
 import { ALL_ROLES, Public, Roles } from '../auth/decorators';
 
 /**
- * Settings the ZAPX mobile app (apps/mobile) needs from the server it signs in to. Feature access is
+ * Settings the SampCode mobile app (apps/mobile) needs from the server it signs in to. Feature access is
  * not here: that is GET /api/me/entitlements?surface=mobile, controlled by the super admin.
  */
 @Controller('mobile')

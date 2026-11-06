@@ -2,8 +2,8 @@
 /**
  * Vendor (sample source) settings: how respondents are redirected at the end, which callbacks
  * are sent, and the delivery and redirect logs. Two integration types:
- *   Direct  – ZAPX resolves redirects and sends signed callbacks itself.
- *   PROJEXA – ZAPX sits behind PROJEXA and follows PROJEXA's documented survey-platform contract.
+ *   Direct  – SampCode resolves redirects and sends signed callbacks itself.
+ *   PROJEXA – SampCode sits behind PROJEXA and follows PROJEXA's documented survey-platform contract.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
@@ -174,7 +174,7 @@ export function VendorEditor({
         <label className="field">
           Integration
           <select value={v.integration} onChange={(e) => setV({ ...v, integration: e.target.value as Vendor['integration'] })}>
-            <option value="DIRECT">Direct: ZAPX redirects and calls back</option>
+            <option value="DIRECT">Direct: SampCode redirects and calls back</option>
             <option value="PROJEXA">PROJEXA: traffic comes through PROJEXA</option>
           </select>
         </label>
@@ -197,9 +197,9 @@ export function VendorEditor({
             test respondent end to end before sending live traffic.
           </p>
           <p className="muted small" style={{ margin: 0 }}>
-            In PROJEXA, set this survey&apos;s client link to the ZAPX live link with <span className="mono">vid={v.code || 'CODE'}</span>{' '}
-            and <span className="mono">uid={'{session_token}'}</span>. ZAPX sends respondents to{' '}
-            <span className="mono">/r/&#123;status&#125;?token=…</span> and confirms each outcome with a signed{' '}
+            In PROJEXA, set this survey&apos;s client link to the SampCode live link with{' '}
+            <span className="mono">vid={v.code || 'CODE'}</span> and <span className="mono">uid={'{session_token}'}</span>. SampCode sends
+            respondents to <span className="mono">/r/&#123;status&#125;?token=…</span> and confirms each outcome with a signed{' '}
             <span className="mono">POST /api/v1/s2s/outcome</span>.
           </p>
           <div className="row">

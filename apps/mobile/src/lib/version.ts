@@ -11,9 +11,9 @@ export function compareVersions(a: string, b: string): number {
 
 /** Why this app may not sign in to that server, or null when it may. */
 export function versionProblem(appVersion: string, server: { service?: unknown; minimumAppVersion?: unknown } | null): string | null {
-  if (!server || server.service !== 'zapx') return 'This address is not a ZAPX server. Check it with your administrator.';
+  if (!server || server.service !== 'zapx') return 'This address is not a SampCode server. Check it with your administrator.';
   const min = typeof server.minimumAppVersion === 'string' ? server.minimumAppVersion : null;
   if (min && compareVersions(appVersion, min) < 0)
-    return `This version of the app (${appVersion}) is too old for your ZAPX server. Update ZAPX from the App Store or Google Play.`;
+    return `This version of the app (${appVersion}) is too old for your SampCode server. Update SampCode from the App Store or Google Play.`;
   return null;
 }

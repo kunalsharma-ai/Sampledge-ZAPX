@@ -5,12 +5,17 @@ What was built when, taken from the repository's pull requests. Dates are when t
 for most, a module guide in [docs/modules/](../modules/).
 
 The format follows [Keep a Changelog](https://keepachangelog.com/): newest first, grouped by
-release. ZAPX has no version numbers or git tags yet, so entries are grouped by milestone or PR.
+release. SampCode (called ZAPX until 2026-11-06) has no version numbers or git tags yet, so entries are grouped by milestone or PR.
 
-## Unreleased (open pull requests, not on `main`)
+## SAMPLEON, CI, docs and the SampCode name (merged 2026-11-06, PRs #47–#50)
 
 - PR #47, branch `claude/sampleon-survey-host`: SAMPLEON integration (survey host and audience
-  requests). Not described in this handbook yet.
+  requests); see [docs/modules/sampleon.md](../modules/sampleon.md). Not described in this handbook yet.
+- PR #49, branch `claude/ci-free-minutes`: GitHub Actions CI workflow changes.
+- PR #48, branch `docs-final-handoff`: docs brought in line with `main` after #46.
+- PR #50, branch `rename-sampcode`: the product is renamed **SampCode** (formerly ZAPX) with the new logo,
+  icon and favicon in the studio, the CAPI app and the mobile app; internal identifiers keep `zapx`
+  (ADR 0038, [docs/brand/](../brand/README.md)).
 
 ## Clean-up: Node 26, security S4–S9, confirm dialogs (merged 2026-11-06, PRs #44–#46)
 

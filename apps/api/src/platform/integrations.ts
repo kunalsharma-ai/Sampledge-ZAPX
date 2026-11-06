@@ -46,7 +46,7 @@ export interface IntegrationDef {
   name: string;
   category: 'AI' | 'Data quality' | 'Interviews' | 'Billing' | 'Storage';
   purpose: string;
-  /** What leaves ZAPX when it is on (shown next to the switch). */
+  /** What leaves SampCode when it is on (shown next to the switch). */
   privacy: string;
   signupUrl: string;
   fields: FieldDef[];

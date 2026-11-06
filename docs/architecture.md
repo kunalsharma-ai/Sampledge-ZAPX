@@ -1,7 +1,7 @@
-# ZAPX architecture (Milestones 1 to 20 and PRs #27–#46)
+# SampCode architecture (Milestones 1 to 20 and PRs #27–#46)
 
 The full plan, including the module map and roadmap, is in the project's
-"ZAPX architecture and first milestone" document. This file records what the code does today and
+"SampCode architecture and first milestone" document. This file records what the code does today and
 the rules every later module must follow.
 
 ## Core rules
@@ -38,7 +38,7 @@ draft are sent as delimited data, and the system prompt tells the model not to f
 inside them; even so, the human review step is the real safeguard.
 
 File intake (`apps/api/src/imports`): files are classified by extension and content (zip/PDF magic
-bytes, no binary in text). The ZAPX template (XLSX/CSV) is parsed deterministically with per-row
+bytes, no binary in text). The SampCode template (XLSX/CSV) is parsed deterministically with per-row
 confidence. DOCX is converted to plain text with mammoth; PDFs go to the model as documents.
 
 ## QA Laboratory (Milestone 2)
@@ -90,8 +90,8 @@ It never contains logic.
 ## Redirect & Vendor Integration (Milestone 4)
 
 Redirects, callbacks, the redirect log and the vendor API form one separable module: pure logic in
-`packages/redirect-core`, database access only in `RedirectRepository`, and the rest of ZAPX sees
-only the abstract `RedirectService`. Direct vendors are resolved by ZAPX with the precedence
+`packages/redirect-core`, database access only in `RedirectRepository`, and the rest of SampCode sees
+only the abstract `RedirectService`. Direct vendors are resolved by SampCode with the precedence
 vendor + country > vendor > project + country > project > organization; PROJEXA vendors follow
 PROJEXA's documented survey-platform contract (not yet verified against a live PROJEXA). Outcome
 callbacks go through a PostgreSQL outbox with retries, a dead letter and manual replay. Details:

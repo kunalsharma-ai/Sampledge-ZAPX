@@ -1,7 +1,7 @@
 /**
  * Blueprint phase 4 over the API: MaxDiff and conjoint estimation, design download, recodes and
  * calculated variables with lineage in analysis and exports, and the research assistant (a fake
- * provider: tables are computed by ZAPX, findings without a real table citation are dropped).
+ * provider: tables are computed by SampCode, findings without a real table citation are dropped).
  */
 import { vi } from 'vitest';
 

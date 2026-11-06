@@ -27,7 +27,7 @@ NB-1002,+91 98200 07919,Ravi Iyer,Delhi,Silver
 Interviewers open **Calls** (top bar), pick a survey and take the next case.
 
 - Callbacks that are due come first, then retries and new cases, oldest first.
-- The number is a `tel:` link; dial with your phone or softphone. ZAPX does not dial or record.
+- The number is a `tel:` link; dial with your phone or softphone. SampCode does not dial or record.
 - **Start interview** opens the survey in a new tab. Read each question aloud and enter the answers.
   If the call drops, record a callback; starting again resumes where it stopped.
 - **How did the call end?**
@@ -91,7 +91,7 @@ Checks at the moment of dialling: the case is still open for that interviewer, a
 on the do-not-call list.
 
 **Recordings.** Both sides are recorded from the moment the respondent answers, after the notice.
-When Twilio has the recording, ZAPX copies it into the interview's recordings (the same private
+When Twilio has the recording, SampCode copies it into the interview's recordings (the same private
 captures as CAPI recordings: same access, review queue, transcription, retention and erasure) and
 then deletes it at Twilio. A call that did not lead to an interview keeps no recording: it is deleted
 at Twilio without being copied. If a copy fails it is retried hourly, five times; after that the

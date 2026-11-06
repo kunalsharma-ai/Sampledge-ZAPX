@@ -1,14 +1,14 @@
 /*
- * ZAPX Interviewer service worker: keeps the app usable without a connection.
+ * SampCode Interviewer service worker: keeps the app usable without a connection.
  * - Navigations: network first, falling back to the cached app shell.
  * - Built assets (/assets/*, hashed): cache first.
  * - Survey media (/api/public/media/*) come from the media cache the app fills when it downloads
  *   surveys; ids never change content, so cache first. No other /api request is cached; survey
  *   packages and interviews live in IndexedDB.
  */
-const CACHE = 'zapx-capi-v1';
+const CACHE = 'zapx-capi-v2'; // v2: SampCode icons
 const MEDIA_CACHE = 'zapx-capi-media';
-const SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
+const SHELL = ['/', '/manifest.webmanifest', '/icon.svg', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

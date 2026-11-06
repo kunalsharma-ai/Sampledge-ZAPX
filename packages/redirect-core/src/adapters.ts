@@ -1,17 +1,17 @@
 /**
- * Partner adapters. ZAPX talks to every redirect partner through this interface:
+ * Partner adapters. SampCode talks to every redirect partner through this interface:
  *
- *   DIRECT  – ZAPX resolves redirects itself (static / dynamic / hybrid, with the configurable
+ *   DIRECT  – SampCode resolves redirects itself (static / dynamic / hybrid, with the configurable
  *             precedence in layers.ts) and sends optional signed callbacks to the vendor.
- *   PROJEXA – ZAPX is a "client survey platform" behind PROJEXA, per PROJEXA's
+ *   PROJEXA – SampCode is a "client survey platform" behind PROJEXA, per PROJEXA's
  *             docs/SURVEY_INTEGRATION.md: the browser goes to {base}/r/{status}?token=..., and
  *             the outcome is confirmed by a signed POST {base}/api/v1/s2s/outcome.
- *   SAMPLEON – ZAPX is the survey host behind SAMPLEON, the Sampledge audience and routing engine.
+ *   SAMPLEON – SampCode is the survey host behind SAMPLEON, the Sampledge audience and routing engine.
  *             SAMPLEON deliberately uses the same survey-host contract as PROJEXA
  *             (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md §5.3), so the two share one implementation:
  *             the respondent id is SAMPLEON's opaque session token, the browser returns to
  *             {base}/r/{status}?token=..., and the outcome is confirmed by a signed S2S POST.
- *             SAMPLEON only counts a complete after that confirmation, and SAMPLEON (not ZAPX)
+ *             SAMPLEON only counts a complete after that confirmation, and SAMPLEON (not SampCode)
  *             decides whether to route the respondent to another survey.
  *
  * Adapters are pure: no network, no database, no clock except the `nowMs` passed in.
@@ -152,7 +152,7 @@ export const directAdapter: IntegrationAdapter<DirectConfig> = {
 
 // ---- PROJEXA ------------------------------------------------------------------------------------
 
-/** PROJEXA status slugs (docs/SURVEY_INTEGRATION.md). ZAPX always sends the primary slug. */
+/** PROJEXA status slugs (docs/SURVEY_INTEGRATION.md). SampCode always sends the primary slug. */
 export const PROJEXA_SLUGS: Record<RedirectStatus, string> = {
   complete: 'complete',
   terminate: 'terminate',
@@ -175,7 +175,7 @@ function surveyHostAdapter<C extends ProjexaConfig | SampleonConfig>(kind: C['ki
   return {
     kind,
 
-    /** The respondent id ZAPX received is the partner's opaque session token. */
+    /** The respondent id SampCode received is the partner's opaque session token. */
     redirect(config, r, status) {
       const slug = PROJEXA_SLUGS[status];
       const url = `${trimBase(config.baseUrl)}/r/${slug}?token=${encodeURIComponent(r.uid)}`;

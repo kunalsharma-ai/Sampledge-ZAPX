@@ -1,4 +1,4 @@
-# ZAPX on AWS (Milestone 13). One stack per environment (staging, production): see README.md.
+# SampCode on AWS (Milestone 13). One stack per environment (staging, production): see README.md.
 terraform {
   required_version = ">= 1.6"
   required_providers {

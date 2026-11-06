@@ -1,5 +1,5 @@
 /*
- * ZAPX Quantum Design System: base styles for the studio.
+ * SampCode Quantum Design System: base styles for the studio.
  * Colour, density and motion tokens (--q-*) come from the theme engine (@zapx/quantum) and are set
  * on <html> at runtime; the layout ships the default theme's values so nothing depends on scripts.
  * The older names (--bg, --panel, --accent, ...) are aliases, so every existing screen follows the

@@ -73,7 +73,7 @@ describe('eye-tracking questions', () => {
     expect(codes).toContain('warning:EXPERIMENTAL');
   });
 
-  it('round-trip through ZAPX XML with their areas of interest', () => {
+  it('round-trip through SampCode XML with their areas of interest', () => {
     const xml = toZapxXml(def);
     expect(xml).toContain('<aoi code="1"');
     const back = fromZapxXml(xml);

@@ -1,5 +1,5 @@
 /**
- * Encrypts secrets that ZAPX must be able to read back (e.g. a partner's client secret) with
+ * Encrypts secrets that SampCode must be able to read back (e.g. a partner's client secret) with
  * AES-256-GCM. Format: "v1.<iv>.<tag>.<ciphertext>" (base64url). The key comes from SECRETS_KEY.
  *
  * This is the seam for AWS KMS: a KmsSecretBox with the same interface can wrap a data key with

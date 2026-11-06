@@ -1,5 +1,5 @@
 /**
- * AI model gateway. Every AI call in ZAPX goes through `run()`, which applies, in order:
+ * AI model gateway. Every AI call in SampCode goes through `run()`, which applies, in order:
  *
  *   1. provider and model selection per task (configuration only, nothing hardcoded),
  *   2. tenant permissions (AI on/off, allowed tasks),
@@ -183,7 +183,7 @@ export class AiGateway {
       await deny(
         'circuit_open',
         new AiError(
-          'The AI service is failing right now, so ZAPX paused AI requests for a minute. Try again shortly.',
+          'The AI service is failing right now, so SampCode paused AI requests for a minute. Try again shortly.',
           503,
           'CIRCUIT_OPEN',
         ),

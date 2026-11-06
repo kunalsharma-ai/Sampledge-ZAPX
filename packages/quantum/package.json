@@ -2,7 +2,7 @@
   "name": "@zapx/quantum",
   "version": "0.1.0",
   "private": true,
-  "description": "ZAPX Quantum Design System: theme presets, design tokens and the theme engine that turns a person's appearance settings into CSS custom properties with checked contrast. No framework dependencies.",
+  "description": "SampCode Quantum Design System: theme presets, design tokens and the theme engine that turns a person's appearance settings into CSS custom properties with checked contrast. No framework dependencies.",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

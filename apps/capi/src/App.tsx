@@ -1,5 +1,5 @@
 /**
- * ZAPX Interviewer (CAPI). Sign in once online, download assigned surveys, then interview with or
+ * SampCode Interviewer (CAPI). Sign in once online, download assigned surveys, then interview with or
  * without a connection. Finished interviews sync automatically when the device is back online,
  * or with "Sync now".
  */
@@ -182,10 +182,10 @@ export function App() {
     <div className="capi">
       <header className="capi-top">
         <strong className="capi-brand">
-          <span className="capi-brand-mark" aria-hidden="true">
-            Z
+          <img className="capi-brand-mark" src="/icon.svg" alt="" width={28} height={28} />
+          <span>
+            Samp<span className="capi-brand-code">Code</span> Interviewer
           </span>
-          ZAPX Interviewer
         </strong>
         <span className={`capi-pill ${online ? 'ok' : 'off'}`} data-testid="connection">
           {online ? 'Online' : 'Offline'}
@@ -398,10 +398,10 @@ function SignIn({ online, again, onSignedIn }: { online: boolean; again: Intervi
   return (
     <main className="capi-main capi-narrow">
       <h1 className="capi-brand">
-        <span className="capi-brand-mark" aria-hidden="true">
-          Z
+        <img className="capi-brand-mark" src="/icon.svg" alt="" width={28} height={28} />
+        <span>
+          Samp<span className="capi-brand-code">Code</span> Interviewer
         </span>
-        ZAPX Interviewer
       </h1>
       {again ? <p>Your session has ended. Sign in again to sync; your interviews are safe on this device.</p> : null}
       {!online ? <p className="capi-problem">You are offline. Signing in needs a connection the first time.</p> : null}

@@ -1,5 +1,5 @@
 /**
- * ZAPX XML (Professional Programmer workspace, blueprint phase 1).
+ * SampCode XML (Professional Programmer workspace, blueprint phase 1).
  *
  * The canonical survey definition stays the single source of truth; XML is a second way to write
  * it, like the JSON view. `toZapxXml` and `fromZapxXml` round-trip every field of the definition.
@@ -189,7 +189,7 @@ const textOf = (el: XmlElement): string =>
     .join('')
     .trim();
 
-// ---- Writing ZAPX XML -----------------------------------------------------------------------------
+// ---- Writing SampCode XML -----------------------------------------------------------------------------
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const attr = (k: string, v: unknown) =>
@@ -239,7 +239,7 @@ function questionXml(q: Question, ind: string): string {
   return `${out}${ind}</${q.type}>\n`;
 }
 
-/** The definition as ZAPX XML. `fromZapxXml(toZapxXml(def))` gives back the same definition. */
+/** The definition as SampCode XML. `fromZapxXml(toZapxXml(def))` gives back the same definition. */
 export function toZapxXml(def: SurveyDefinition): string {
   let out = `<?xml version="1.0" encoding="UTF-8"?>\n<survey${attr('schemaVersion', def.schemaVersion)}${attr('title', def.title)}${attr('language', def.language)}>\n`;
   out += textEl('welcome', def.welcome, '  ');
@@ -287,7 +287,7 @@ export function toZapxXml(def: SurveyDefinition): string {
   return `${out}</survey>\n`;
 }
 
-// ---- Reading ZAPX XML -----------------------------------------------------------------------------
+// ---- Reading SampCode XML -----------------------------------------------------------------------------
 
 export interface XmlWarning {
   line: number;
@@ -396,7 +396,7 @@ const QUESTION_SCHEMAS = {
 } as const;
 const shapeKeys = (schema: { shape: Record<string, unknown> }) => new Set(Object.keys(schema.shape));
 
-/** Read ZAPX XML. Unknown elements and attributes are reported, not silently ignored. */
+/** Read SampCode XML. Unknown elements and attributes are reported, not silently ignored. */
 export function fromZapxXml(src: string): XmlReadResult {
   const warnings: XmlWarning[] = [];
   const warn = (w: XmlWarning) => warnings.push(w);
@@ -546,7 +546,7 @@ export function fromZapxXml(src: string): XmlReadResult {
 function readQuestion(el: XmlElement, warn: (w: XmlWarning) => void): Record<string, unknown> | null {
   const schema = QUESTION_SCHEMAS[el.name as keyof typeof QUESTION_SCHEMAS];
   if (!schema) {
-    warn({ line: el.line, message: `<${el.name}> is not a ZAPX question type; it was ignored.` });
+    warn({ line: el.line, message: `<${el.name}> is not a SampCode question type; it was ignored.` });
     return null;
   }
   const allowed = shapeKeys(schema as unknown as { shape: Record<string, unknown> });
@@ -603,14 +603,14 @@ export interface MigrationResult extends XmlReadResult {
 
 const DECIPHER_QUESTION = new Set(['radio', 'checkbox', 'select', 'text', 'textarea', 'number', 'float', 'html']);
 const DECIPHER_IGNORED: Record<string, string> = {
-  exec: 'Python code (<exec>) cannot run in ZAPX; rewrite it as calculated variables or conditions.',
+  exec: 'Python code (<exec>) cannot run in SampCode; rewrite it as calculated variables or conditions.',
   style: 'Custom styles (<style>) are not imported; use the Design tab.',
   res: 'Resource strings (<res>) are not imported; translate text in the Languages tab.',
   quota: 'Decipher quotas live in a separate quota sheet; rebuild them with the quota table builder.',
   loop: 'Loops are not converted automatically; recreate them in Survey settings → Loops.',
   logic: 'Logic nodes (<logic>) are not imported.',
   note: 'Notes are not imported.',
-  samplesources: 'Sample sources are configured as vendors in ZAPX.',
+  samplesources: 'Sample sources are configured as vendors in SampCode.',
   goto: 'Goto jumps are not supported; use page conditions.',
   define: 'Reusable lists (<define>) are not expanded; insert the rows directly.',
 };

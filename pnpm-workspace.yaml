@@ -22,7 +22,7 @@ overrides:
   uuid@<11.1.1: '^11.1.1'
 
 auditConfig:
-  # minimatch 3/5 inside exceljs's zip writer (archiver): it only matches ZAPX's own fixed patterns,
+  # minimatch 3/5 inside exceljs's zip writer (archiver): it only matches SampCode's own fixed patterns,
   # never user input, and minimatch 10+ changed its API so it cannot be forced (docs/security.md).
   ignoreGhsas:
     - GHSA-g3hv-75wg-m249

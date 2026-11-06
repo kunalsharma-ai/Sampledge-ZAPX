@@ -172,7 +172,7 @@ export class SurveysController {
 
   /**
    * Build a survey link. Vendor links carry vid/uid/cc and, if the vendor requires it, an HMAC
-   * signature. Test links are signed by ZAPX, are flagged in the data and never count toward quotas.
+   * signature. Test links are signed by SampCode, are flagged in the data and never count toward quotas.
    */
   @Post('surveys/:id/links')
   @Roles(...CAN_EDIT)

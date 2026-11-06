@@ -2,7 +2,7 @@
  * Webcam gaze estimation (experimental), the maths only: features from face landmarks, a ridge
  * regression fitted during calibration, and the calibration error. No camera or model code here, so
  * it is tested on its own. The host supplies the face landmarks (the runtime uses MediaPipe's face
- * landmarker, served from ZAPX).
+ * landmarker, served from SampCode).
  *
  * This is an appearance-free, regression-based estimate: where the irises sit between the eye
  * corners, how open the eyes are, and the head's position and turn, mapped to the screen by a fit to

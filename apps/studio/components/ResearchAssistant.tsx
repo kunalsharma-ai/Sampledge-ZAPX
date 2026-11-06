@@ -1,6 +1,6 @@
 'use client';
 /**
- * AI research assistant (blueprint phase 4). ZAPX computes the tables; the AI only reads them and
+ * AI research assistant (blueprint phase 4). SampCode computes the tables; the AI only reads them and
  * must cite a table for every finding. The tables are always shown next to the answer so a
  * researcher can check each statement.
  */
@@ -80,7 +80,7 @@ export function ResearchAssistant({ surveyId, aiConfigured }: { surveyId: string
     <section className="panel stack" aria-labelledby="assistant-h" data-testid="research-assistant">
       <h2 id="assistant-h">Research assistant</h2>
       <p className="muted small">
-        Ask a question about the completes. ZAPX computes the tables (the same frequencies and crosstabs as above) and the AI reads only
+        Ask a question about the completes. SampCode computes the tables (the same frequencies and crosstabs as above) and the AI reads only
         those tables; every finding cites the table it comes from. Open answers are never sent. Check findings against the tables before you
         report them.
       </p>

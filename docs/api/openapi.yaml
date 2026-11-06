@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
-  title: ZAPX Vendor API
+  title: SampCode Vendor API
   version: 1.0.0
   description: |
     Partner-facing API for sample vendors. Every request is authenticated with the vendor id and an
-    HMAC-SHA256 signature made with the vendor's shared secret (shown in the ZAPX studio):
+    HMAC-SHA256 signature made with the vendor's shared secret (shown in the SampCode studio):
 
         signature = hex(HMAC_SHA256(secret, timestamp + "." + METHOD + "." + pathWithQuery))
 

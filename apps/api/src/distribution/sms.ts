@@ -1,7 +1,7 @@
 /**
  * SMS sending for invitations and reminders (blueprint phase 5).
  *
- * - Off by default (SMS_PROVIDER=off): no text message leaves ZAPX.
+ * - Off by default (SMS_PROVIDER=off): no text message leaves SampCode.
  * - Provider: Twilio Programmable Messaging (`POST /2010-04-01/Accounts/{sid}/Messages.json`, 201
  *   when queued). Another provider is one class implementing SmsProvider.
  *

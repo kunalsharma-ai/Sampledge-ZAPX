@@ -66,6 +66,6 @@ describe('app version check', () => {
     expect(compareVersions('1.0', '1.0.0')).toBe(0);
     expect(versionProblem('1.0.0', { service: 'zapx', minimumAppVersion: null })).toBeNull();
     expect(versionProblem('1.0.0', { service: 'zapx', minimumAppVersion: '1.2.0' })).toMatch(/too old/);
-    expect(versionProblem('1.0.0', null)).toMatch(/not a ZAPX server/);
+    expect(versionProblem('1.0.0', null)).toMatch(/not a SampCode server/);
   });
 });
