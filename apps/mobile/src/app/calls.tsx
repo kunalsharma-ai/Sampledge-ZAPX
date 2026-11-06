@@ -140,7 +140,7 @@ function CallDesk() {
           ) : current.dialer ? (
             <>
               <T muted>
-                Numbers are hidden for this survey: ZAPX rings your phone and then connects the respondent
+                Numbers are hidden for this survey: SampCode rings your phone and then connects the respondent
                 {current.dialer.record ? ' (the call is recorded)' : ''}.
               </T>
               <Button

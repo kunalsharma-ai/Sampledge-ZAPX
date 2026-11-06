@@ -1,6 +1,6 @@
 # API documentation
 
-The ZAPX backend is a REST API under `/api`, served by `apps/api` on port 4000. This file explains the
+The SampCode backend is a REST API under `/api`, served by `apps/api` on port 4000. This file explains the
 common rules, walks through the main flows with **real requests and responses** (captured from a
 local run on 2026-11-05; ids shortened), and then lists **all 283 endpoints** with who may call them
 and the exact handler.
@@ -284,7 +284,7 @@ A wrong signature answers `401 {"message":"Invalid vendor credentials"}` and is 
 `vendor_api.denied`. Page with `?since=<next>`; filter with `surveyId`; one respondent:
 `GET /api/v1/vendor/outcomes/:uid`.
 
-### Webhooks (ZAPX calls you)
+### Webhooks (SampCode calls you)
 
 Events: `response.finished`, `response.review_decided`, `survey.published`, `survey.status_changed`,
 `quota.full` _(PR #34)_, `automation.fired` _(PR #34)_, plus `webhook.test`. Each POST carries

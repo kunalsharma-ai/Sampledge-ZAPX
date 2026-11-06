@@ -1,9 +1,9 @@
 # Database
 
-ZAPX stores everything in one **PostgreSQL 16** database, accessed only through **Prisma 6**
+SampCode stores everything in one **PostgreSQL 16** database, accessed only through **Prisma 6**
 (`packages/db`). This file lists every table (Prisma "model"), field, relationship and index on branch
 `mobile-app` (PR #40, the top of the stack), generated from `packages/db/prisma/schema.prisma` and checked against the
-migrations. ZAPX does not use MongoDB.
+migrations. SampCode does not use MongoDB.
 
 ## 1. The essentials
 
@@ -160,7 +160,7 @@ jobs, callbacks and automation runs). Patterns worth knowing:
 | Atomic quota counting | `takeQuotaPlaces` in `apps/api/src/quotas/quota-places.ts`                                                                                 | quotas never overfill                                 |
 | Outbox rows           | `OutboundCallback`, `WebhookDelivery`, `Job`, `AutomationRun`, `Invitation`                                                                | work is recorded in the same database, then delivered |
 | Tenant-scoped client  | `prisma.forTenant(tenantId)` for studio reads of responses, exports, review, fieldwork, analysis                                           | second line of defence (RLS)                          |
-| Encrypted columns     | `TenantSso.clientSecretSealed`, `Vendor.partnerSecretEnc`, `Webhook.secretEnc`, `CatiCase.phoneSealed`, `User.phoneSealed` via `SecretBox` | secrets ZAPX must read back                           |
+| Encrypted columns     | `TenantSso.clientSecretSealed`, `Vendor.partnerSecretEnc`, `Webhook.secretEnc`, `CatiCase.phoneSealed`, `User.phoneSealed` via `SecretBox` | secrets SampCode must read back                       |
 | Hashed columns        | `ApiKey.secretHash`, `TenantScim.secretHash`, `Response.sessionTokenHash`, `ipHash`, `deviceHash`, `DoNotCall.phoneHash`                   | never store the original                              |
 
 ## 7. Migrations
@@ -580,7 +580,7 @@ Indexes and constraints: `@@index([tenantId, surveyId, createdAt])`.
 
 #### RedirectEvent
 
-Redirect audit log: every outcome redirect ZAPX resolved, with the level that supplied it.
+Redirect audit log: every outcome redirect SampCode resolved, with the level that supplied it.
 
 | Field        | Type       | Required | Key / default            | Meaning                                                                         |
 | ------------ | ---------- | -------- | ------------------------ | ------------------------------------------------------------------------------- |

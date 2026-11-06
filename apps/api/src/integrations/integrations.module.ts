@@ -1,7 +1,7 @@
 /**
  * Redirect & Vendor Integration module. Owns: redirect resolution and its audit log, the
  * callback outbox and worker, partner adapters (DIRECT, PROJEXA), the vendor API and outbound
- * webhooks. Public surface for the rest of ZAPX: RedirectService and WebhookService. Pure logic: @zapx/redirect-core.
+ * webhooks. Public surface for the rest of SampCode: RedirectService and WebhookService. Pure logic: @zapx/redirect-core.
  */
 import { Module } from '@nestjs/common';
 import { LocalSecretBox, SecretBox } from '../platform/secret-box';

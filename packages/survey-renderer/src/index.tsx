@@ -1465,7 +1465,7 @@ ${EYETRACK_CSS}
 /** Ready-made looks offered in the Experience Studio. Each is a partial theme. */
 export const THEME_PRESETS: Record<string, { name: string; theme: Partial<Theme> }> = {
   zapx: {
-    name: 'ZAPX',
+    name: 'SampCode',
     theme: { accent: '#2f5bea', background: '#f6f7fb', surface: '#ffffff', text: '#1b1f2a', font: 'system', radius: 12 },
   },
   clinical: {

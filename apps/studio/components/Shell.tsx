@@ -17,12 +17,12 @@ import {
   Sparkles,
   Workflow,
   X,
-  Zap,
   type LucideIcon,
 } from 'lucide-react';
 import { api, hasFeature, type Me } from '@/lib/api';
 import { useMe } from '@/lib/useMe';
 import { ThemeMenu } from '@/components/quantum/ThemeMenu';
+import { BrandMark, BrandWordmark } from '@/components/neon/Brand';
 import { GlobalSearch } from '@/components/neon/GlobalSearch';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
@@ -85,7 +85,7 @@ function PlanCard({ me }: { me: Me }) {
   return (
     <div className="nx-plan" data-testid="sidebar-plan">
       <div className="nx-plan-title">
-        <Sparkles size={15} aria-hidden="true" /> ZAPX {plan.plan.name}
+        <Sparkles size={15} aria-hidden="true" /> SampCode {plan.plan.name}
       </div>
       <div className="small muted">
         {used.toLocaleString()} completes this month{limit ? ` of ${limit.toLocaleString()}` : ' (unlimited)'}
@@ -125,13 +125,11 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
     <div className={`nx-app${navOpen ? ' nav-open' : ''}`}>
       <aside className="nx-sidebar" aria-label="Main">
         <div className="nx-sidebar-head">
-          <Link href="/" className="nx-logo" aria-label="ZAPX home">
-            <span className="nx-logo-mark" aria-hidden="true">
-              <Zap size={20} strokeWidth={2.6} />
-            </span>
+          <Link href="/" className="nx-logo" aria-label="SampCode home">
+            <BrandMark size={40} className="nx-logo-mark" />
             <span className="nx-logo-text">
-              <span className="nx-logo-word">ZAPX</span>
-              <span className="nx-logo-sub">Survey programming &amp; QA by Sampledge</span>
+              <BrandWordmark className="nx-logo-word" />
+              <span className="nx-logo-sub">Write. Run. Ship. &middot; by Sampledge</span>
             </span>
           </Link>
           <button className="nx-icon-btn nx-only-mobile" onClick={() => setNavOpen(false)} aria-label="Close menu">
@@ -228,8 +226,8 @@ export function Shell({ children, crumbs, forInterviewers }: { children: ReactNo
             <section className="panel" data-testid="interviewer-notice">
               <h1>Use the interviewer app</h1>
               <p>
-                Your account is for interviewing. For face-to-face interviews, sign in to the ZAPX interviewer (CAPI) app on your tablet or
-                phone. For phone interviews, open <Link href="/calls">Calls</Link>.
+                Your account is for interviewing. For face-to-face interviews, sign in to the SampCode interviewer (CAPI) app on your tablet
+                or phone. For phone interviews, open <Link href="/calls">Calls</Link>.
               </p>
             </section>
           ) : (

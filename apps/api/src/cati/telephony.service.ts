@@ -1,14 +1,14 @@
 /**
  * Phone dialer for CATI (Milestone 19).
  *
- * The interviewer presses Call. ZAPX asks the telephony provider to ring the interviewer's own phone;
- * when they answer, the provider asks ZAPX what to do and is told to dial the respondent from the
- * organization's caller id and bridge the two. The respondent's number goes from ZAPX to the provider
+ * The interviewer presses Call. SampCode asks the telephony provider to ring the interviewer's own phone;
+ * when they answer, the provider asks SampCode what to do and is told to dial the respondent from the
+ * organization's caller id and bridge the two. The respondent's number goes from SampCode to the provider
  * only: on surveys that use the dialer, interviewers never see it.
  *
  * - Off by default (TELEPHONY=off), and off per survey until a programmer turns it on.
  * - Recording is a separate per-survey choice. The respondent hears a notice before the call is
- *   connected. The recording is copied into ZAPX as a private capture of the interview (same access,
+ *   connected. The recording is copied into SampCode as a private capture of the interview (same access,
  *   retention and erasure as CAPI recordings) and then deleted at the provider. A call without an
  *   interview keeps no recording.
  * - Provider: Twilio Programmable Voice (REST API + TwiML webhooks signed with X-Twilio-Signature).
@@ -405,7 +405,7 @@ export class TelephonyService {
     await this.prisma.catiDial.update({ where: { id: d.id }, data: { status, ...(ENDED.has(status) ? { endedAt: new Date() } : {}) } });
   }
 
-  /** A recording is ready at the provider: copy it into ZAPX, then delete it there. */
+  /** A recording is ready at the provider: copy it into SampCode, then delete it there. */
   async onRecording(dialId: string, params: Record<string, unknown>) {
     const d = await this.dialById(dialId);
     const sid = String(params.RecordingSid ?? '');

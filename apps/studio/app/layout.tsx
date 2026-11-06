@@ -10,7 +10,11 @@ import './quantum.css';
 import './neon.css';
 import './neon-pages.css';
 
-export const metadata = { title: 'ZAPX Studio', description: 'SAMPLEDGE ZAPX survey programming studio' };
+export const metadata = {
+  title: 'SampCode',
+  description: 'SampCode by Sampledge: write, run and ship surveys. AI survey programming, QA, fieldwork and analysis.',
+  applicationName: 'SampCode',
+};
 
 const declarations = (vars: Record<string, string>) =>
   Object.entries(vars)

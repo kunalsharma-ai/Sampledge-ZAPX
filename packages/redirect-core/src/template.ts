@@ -9,7 +9,7 @@ export interface TemplateValues {
   CC: string;
   /** Status word after mapping. */
   STATUS: string;
-  /** ZAPX response id. */
+  /** SampCode response id. */
   RID: string;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Server side of the ZAPX mobile app: server identification and minimum app version, the mobile
+ * Server side of the SampCode mobile app: server identification and minimum app version, the mobile
  * settings, the new token after a password change, and the mobile feature set for a Bearer client.
  */
 import { vi } from 'vitest';

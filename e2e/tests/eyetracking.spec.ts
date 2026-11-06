@@ -1,7 +1,7 @@
 /**
  * Webcam eye tracking (experimental) through the UI: the question in the editor (picture and an
  * area of interest), a respondent who agrees and turns on the camera (the face model is served by
- * ZAPX and loads; the browser's fake camera shows no face, so the task ends as "no face found"), a
+ * SampCode and loads; the browser's fake camera shows no face, so the task ends as "no face found"), a
  * respondent who skips, and the results in Analysis from recorded answers.
  *
  * Gaze estimation on a real face is not exercised here: the test camera has no face, and the
@@ -85,7 +85,7 @@ test('eye tracking: editor, consent, camera with no face, skip, and results', as
   await page.getByRole('button', { name: 'Publish' }).click();
   await expect(page.getByText(/Published version 1/)).toBeVisible();
 
-  // --- A respondent agrees: the camera starts and the face model (served by ZAPX) loads ---
+  // --- A respondent agrees: the camera starts and the face model (served by SampCode) loads ---
   const ctx = await browser.newContext({ baseURL: 'http://localhost:5173' });
   const r = await ctx.newPage();
   await r.goto(`/s/${survey.id}?vid=PN&uid=${run}-a`);

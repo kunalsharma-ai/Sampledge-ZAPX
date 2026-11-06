@@ -69,15 +69,15 @@ export class PasswordResetService {
       `Hello ${to.name},`,
       '',
       byAdmin
-        ? 'An administrator of your ZAPX organization created a link for you to set a new password.'
-        : 'Someone asked to reset the password of your ZAPX account. If it was not you, ignore this email.',
+        ? 'An administrator of your SampCode organization created a link for you to set a new password.'
+        : 'Someone asked to reset the password of your SampCode account. If it was not you, ignore this email.',
       '',
       `Set a new password: ${url}`,
       '',
       `The link works once and expires in ${hours} hour${hours === 1 ? '' : 's'} (${expiresAt.toISOString()}).`,
     ].join('\n');
     try {
-      await provider.send({ to, subject: 'Reset your ZAPX password', text }, AbortSignal.timeout(15_000));
+      await provider.send({ to, subject: 'Reset your SampCode password', text }, AbortSignal.timeout(15_000));
       return true;
     } catch (e) {
       this.log.warn(`Could not email a password reset link: ${(e as Error).message}`);

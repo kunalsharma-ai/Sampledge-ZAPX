@@ -96,7 +96,7 @@ function SaveState() {
         ? 'Your own appearance, saved to your account'
         : source === 'organization'
           ? 'Using your organization’s default'
-          : 'Using the ZAPX default'}
+          : 'Using the SampCode default'}
     </span>
   );
 }
@@ -248,7 +248,7 @@ export default function AppearancePage() {
                     Use the theme’s own accent
                   </Button>
                 ) : (
-                  <span className="muted small">Pick any colour; ZAPX adjusts it where needed so text stays readable.</span>
+                  <span className="muted small">Pick any colour; SampCode adjusts it where needed so text stays readable.</span>
                 )}
               </div>
               <Slider
@@ -323,7 +323,7 @@ export default function AppearancePage() {
             <div className="row">
               {source === 'personal' ? (
                 <Button onClick={() => void resetToOrganization()} data-testid="use-org-default">
-                  {organizationDefault ? 'Use the organization default' : 'Use the ZAPX default'}
+                  {organizationDefault ? 'Use the organization default' : 'Use the SampCode default'}
                 </Button>
               ) : null}
               {isAdmin ? (

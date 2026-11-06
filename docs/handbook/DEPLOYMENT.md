@@ -1,6 +1,6 @@
 # Testing, deployment and maintenance
 
-This file covers how ZAPX is tested, built, released, rolled back, backed up and monitored, and
+This file covers how SampCode is tested, built, released, rolled back, backed up and monitored, and
 what to do regularly to keep it healthy. Every section separates **Implemented** (exists in the
 repository and was checked) from **Recommended** (not built yet).
 

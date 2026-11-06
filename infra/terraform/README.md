@@ -1,4 +1,4 @@
-# ZAPX on AWS (Terraform)
+# SampCode on AWS (Terraform)
 
 One stack per environment (staging, production) in one AWS account and region. Status: the code
 passes `terraform validate` and plan tests against a mocked AWS provider (`tests/plan.tftest.hcl`,
@@ -97,7 +97,7 @@ health checks), then publishes the runtime and CAPI app to S3 and refreshes Clou
 
 ## Settings worth knowing
 
-- Non-secret ZAPX settings go in `app_environment` (see `.env.example`), e.g. `DEFAULT_PLAN`.
+- Non-secret SampCode settings go in `app_environment` (see `.env.example`), e.g. `DEFAULT_PLAN`.
   Provider settings (`AI_MODEL`, `BILLING`, `STRIPE_PRICES` and the rest) are easier to set in the
   CRM under Settings → Integrations. The stack already sets the addresses, the
   database parts, `FILE_STORE=s3`, the CloudFront headers and production flags.

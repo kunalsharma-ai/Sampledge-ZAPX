@@ -1,11 +1,11 @@
 /**
  * Blueprint phase 5: data residency and retention for an organization.
  *
- * Residency: ZAPX runs where it is deployed; it cannot move data between regions by itself. The
+ * Residency: SampCode runs where it is deployed; it cannot move data between regions by itself. The
  * deployment declares its region (DATA_REGION) and the organization says where its data must stay.
- * ZAPX shows whether the two match, lists which configured services send data outside the
+ * SampCode shows whether the two match, lists which configured services send data outside the
  * deployment, and can refuse those (AI, transcription, network reputation lookups) for the
- * organization. That is a control on what ZAPX sends, not a certification.
+ * organization. That is a control on what SampCode sends, not a certification.
  *
  * Retention: after the chosen number of days, interviews are erased (answers, link parameters,
  * device and network identifiers, location, evidence, photos and recordings; the row keeps its

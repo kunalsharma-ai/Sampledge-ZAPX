@@ -40,13 +40,13 @@ vendor's allowed hosts), hybrid (dynamic when present, else static).
 
 **Placeholders.** `[UID] [VID] [CC] [STATUS] [RID] [param:name]`, URL-encoded on substitution.
 
-**Signed redirects.** Optional: ZAPX appends `zts` (unix seconds) and
+**Signed redirects.** Optional: SampCode appends `zts` (unix seconds) and
 `zsig = hex HMAC-SHA256(vendor secret, URL up to and including zts)`.
 
 **Signed entry links.** Optional: `sig = hex HMAC-SHA256(vendor secret, sorted query without sig)`,
 optional `exp` (unix seconds).
 
-**Callbacks.** For the outcomes the vendor selects, ZAPX sends `GET <callback URL template>` with:
+**Callbacks.** For the outcomes the vendor selects, SampCode sends `GET <callback URL template>` with:
 
 | Header              | Value                                                                                        |
 | ------------------- | -------------------------------------------------------------------------------------------- |
@@ -66,10 +66,10 @@ callbacks. Callbacks to private or loopback addresses are blocked unless
 Follows PROJEXA `docs/SURVEY_INTEGRATION.md`.
 
 **Verification (Milestone 13).** `scripts/projexa-check.mjs` runs one respondent through both
-systems over their public APIs: PROJEXA test entry link → ZAPX survey → back to PROJEXA's
-`/r/complete` → ZAPX's signed S2S confirmation, which PROJEXA must mark verified. On 2026-11-02 it
+systems over their public APIs: PROJEXA test entry link → SampCode survey → back to PROJEXA's
+`/r/complete` → SampCode's signed S2S confirmation, which PROJEXA must mark verified. On 2026-11-02 it
 passed all 10 steps against PROJEXA branch `claude/milestone-20-ai-copilot` (commit 9c51e45) run
-locally next to ZAPX. PROJEXA has not been deployed yet, so it has **not been run against a live
+locally next to SampCode. PROJEXA has not been deployed yet, so it has **not been run against a live
 PROJEXA**; run it against the real address before the first live project:
 
 ```
@@ -81,11 +81,11 @@ ZAPX_EMAIL=admin@... ZAPX_PASSWORD=... node scripts/projexa-check.mjs
 It uses PROJEXA's test entry link (test sessions never count toward quotas, revenue, payout or vendor
 callbacks), creates a clearly named client, vendor and project on both sides and leaves them for
 inspection. The PROJEXA account must be an admin without two-step sign-in, and PROJEXA's
-organization must allow the ZAPX respondent host in its redirect domains.
+organization must allow the SampCode respondent host in its redirect domains.
 
-1. In PROJEXA, the client survey link is the ZAPX live link with `vid=<code>&uid={session_token}`.
-2. At the end ZAPX sends the browser to `{base}/r/{status}?token={session_token}` (primary slugs).
-3. If S2S is on and a client secret is stored, ZAPX queues
+1. In PROJEXA, the client survey link is the SampCode live link with `vid=<code>&uid={session_token}`.
+2. At the end SampCode sends the browser to `{base}/r/{status}?token={session_token}` (primary slugs).
+3. If S2S is on and a client secret is stored, SampCode queues
    `POST {base}/api/v1/s2s/outcome` with `{token, status, timestamp, signature}`,
    `signature = hex HMAC-SHA256(clientSecret, token + "." + status + "." + timestamp)`, a fresh
    timestamp on every attempt. 200 is delivered, 409 is a conflict (PROJEXA already holds another
@@ -107,5 +107,5 @@ Vendors can reconcile outcomes: `GET /api/v1/vendor/outcomes?since=&surveyId=&li
 ## Extracting it into a service
 
 Move `packages/redirect-core` and `apps/api/src/integrations` into a new service with its own
-database (the tables above), expose resolve/outcome endpoints, and give ZAPX an `HttpRedirectService`
+database (the tables above), expose resolve/outcome endpoints, and give SampCode an `HttpRedirectService`
 implementing `RedirectService`. The interview flow does not change.

@@ -3,7 +3,7 @@
  * sends each recording to a speech-to-text provider and keeps the text with the recording, so the
  * review queue can show what was said next to the answers.
  *
- * - Off by default (TRANSCRIPTION=off): no recording leaves ZAPX.
+ * - Off by default (TRANSCRIPTION=off): no recording leaves SampCode.
  * - Provider: Deepgram pre-recorded transcription (`POST /v1/listen`, the audio as the body). The
  *   model is a setting (DEEPGRAM_MODEL), never hardcoded. Another provider is one class.
  * - The transcript is personal data like the recording: same access, deleted with the recording.

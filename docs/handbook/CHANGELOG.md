@@ -5,10 +5,13 @@ What was built when, taken from the repository's pull requests. Dates are when t
 for most, a module guide in [docs/modules/](../modules/).
 
 The format follows [Keep a Changelog](https://keepachangelog.com/): newest first, grouped by
-release. ZAPX has no version numbers or git tags yet, so entries are grouped by milestone or PR.
+release. SampCode (called ZAPX until 2026-11-06) has no version numbers or git tags yet, so entries are grouped by milestone or PR.
 
 ## Unreleased (open pull requests, not on `main`)
 
+- 2026-11-06, branch `rename-sampcode`: the product is renamed **SampCode** (formerly ZAPX) with the new logo,
+  icon and favicon in the studio, the CAPI app and the mobile app; internal identifiers keep `zapx`
+  (ADR 0038, `docs/brand/`).
 - 2026-11-05, branch `security-s4-s9`: security review findings S4–S9 fixed (shared rate-limit store,
   `SIGNING_KEYS_SECRET`, studio script nonce, no session token in browser bodies, security lint rules,
   row-level security on seven more tables). Migration `20261120000000_security_hardening`.

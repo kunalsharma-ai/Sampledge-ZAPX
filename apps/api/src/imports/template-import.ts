@@ -1,5 +1,5 @@
 /**
- * Deterministic import of the ZAPX questionnaire template (XLSX or CSV): one row per question,
+ * Deterministic import of the SampCode questionnaire template (XLSX or CSV): one row per question,
  * termination or quota. No AI is involved, so the same file always gives the same survey. Every row
  * gets a confidence score and the issues found, which the programmer reviews before applying.
  */
@@ -562,7 +562,7 @@ export async function buildTemplateWorkbook(): Promise<Buffer> {
 
   const help = wb.addWorksheet('How to use');
   const lines = [
-    'ZAPX questionnaire template',
+    'SampCode questionnaire template',
     '',
     'One row per question, termination or quota. Replace the example rows with your own.',
     'Page: rows with the same Page value appear on one page. Leave it empty to give the question its own page.',

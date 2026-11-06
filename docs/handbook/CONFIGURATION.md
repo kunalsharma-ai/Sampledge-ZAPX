@@ -1,6 +1,6 @@
 # Configuration and environment variables
 
-Every setting ZAPX reads, where it is read, whether you must set it, and a placeholder value. No real
+Every setting SampCode reads, where it is read, whether you must set it, and a placeholder value. No real
 secret appears here; replace every `<…>` placeholder with your own value.
 
 ## Where settings come from
@@ -127,16 +127,16 @@ Provider switches are checked too: turning a provider on without its credentials
 
 ### Phone, email and SMS
 
-| Variable                                                                                                                       | Purpose                                                               | Default                                    |
-| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------ |
-| `TELEPHONY`                                                                                                                    | `off` or `twilio` (CATI dialer)                                       | `off`                                      |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_CALLER_ID` (E.164), `TELEPHONY_WEBHOOK_BASE` (public API URL ending `/api`) | required with `twilio`                                                | empty                                      |
-| `TWILIO_API_BASE`, `TELEPHONY_RING_SECONDS`                                                                                    | endpoint and ring time                                                | `https://api.twilio.com`, `30`             |
-| `EMAIL_PROVIDER` _(PR #32)_                                                                                                    | `off` or `sendgrid`                                                   | `off`                                      |
-| `SENDGRID_API_KEY`, `EMAIL_FROM` _(PR #32)_                                                                                    | required with `sendgrid` (`EMAIL_FROM` must be a verified sender)     | empty                                      |
-| `SENDGRID_API_BASE`, `EMAIL_FROM_NAME` _(PR #32)_                                                                              | endpoint and sender name                                              | `https://api.sendgrid.com`, `ZAPX surveys` |
-| `SMS_PROVIDER` _(PR #34)_                                                                                                      | `off` or `twilio` (uses the Twilio SID and token above)               | `off`                                      |
-| `SMS_FROM` _(PR #34)_                                                                                                          | E.164 number or Messaging Service SID (`MG…`), required with `twilio` | empty                                      |
+| Variable                                                                                                                       | Purpose                                                               | Default                                        |
+| ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | ---------------------------------------------- |
+| `TELEPHONY`                                                                                                                    | `off` or `twilio` (CATI dialer)                                       | `off`                                          |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_CALLER_ID` (E.164), `TELEPHONY_WEBHOOK_BASE` (public API URL ending `/api`) | required with `twilio`                                                | empty                                          |
+| `TWILIO_API_BASE`, `TELEPHONY_RING_SECONDS`                                                                                    | endpoint and ring time                                                | `https://api.twilio.com`, `30`                 |
+| `EMAIL_PROVIDER` _(PR #32)_                                                                                                    | `off` or `sendgrid`                                                   | `off`                                          |
+| `SENDGRID_API_KEY`, `EMAIL_FROM` _(PR #32)_                                                                                    | required with `sendgrid` (`EMAIL_FROM` must be a verified sender)     | empty                                          |
+| `SENDGRID_API_BASE`, `EMAIL_FROM_NAME` _(PR #32)_                                                                              | endpoint and sender name                                              | `https://api.sendgrid.com`, `SampCode surveys` |
+| `SMS_PROVIDER` _(PR #34)_                                                                                                      | `off` or `twilio` (uses the Twilio SID and token above)               | `off`                                          |
+| `SMS_FROM` _(PR #34)_                                                                                                          | E.164 number or Messaging Service SID (`MG…`), required with `twilio` | empty                                          |
 
 ### Background work, files and callbacks
 
@@ -155,7 +155,7 @@ Provider switches are checked too: turning a provider on without its credentials
 | `EXPORT_FILE_TTL_HOURS`                                  | export files are deleted after                                                            | `72`                |
 | `JOB_RETENTION_DAYS`, `WEBHOOK_DELIVERY_RETENTION_DAYS`  | housekeeping retention                                                                    | `30`, `30`          |
 
-S3 credentials are not ZAPX settings: the AWS SDK uses its normal chain (the ECS task role on AWS,
+S3 credentials are not SampCode settings: the AWS SDK uses its normal chain (the ECS task role on AWS,
 `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` elsewhere).
 
 ### Billing

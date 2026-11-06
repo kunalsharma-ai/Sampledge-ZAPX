@@ -95,7 +95,10 @@ export class AuthController {
     if (!user.superAdmin) {
       const t = await this.prisma.tenant.findUnique({ where: { id: user.tenantId }, select: { suspendedAt: true } });
       if (t?.suspendedAt)
-        throw new ForbiddenException({ message: 'Your organization is suspended. Contact the ZAPX administrator.', code: 'ORG_SUSPENDED' });
+        throw new ForbiddenException({
+          message: 'Your organization is suspended. Contact the SampCode administrator.',
+          code: 'ORG_SUSPENDED',
+        });
     }
     if (await this.sso.passwordBlocked(user.tenantId, user.role)) {
       throw new ForbiddenException({

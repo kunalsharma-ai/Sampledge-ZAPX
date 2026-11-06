@@ -128,7 +128,7 @@ export function checkFlow(def: SurveyDefinition): FlowIssue[] {
     varIds.add(key);
     if (RESERVED_LINK_PARAMS.includes(u.param))
       issues.push({
-        message: `URL variable ${u.id}: the link parameter "${u.param}" is used by ZAPX itself; choose another name.`,
+        message: `URL variable ${u.id}: the link parameter "${u.param}" is used by SampCode itself; choose another name.`,
         location: loc,
       });
     if (params.has(u.param))

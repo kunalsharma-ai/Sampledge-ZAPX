@@ -106,12 +106,12 @@ letters) is stored with the response as `geoCountry`.
 ## VPN, proxy and data-centre check (Milestone 16)
 
 Off by default. With `NETWORK_REPUTATION=ipinfo` and an `IPINFO_TOKEN` whose IPinfo plan includes
-privacy detection, ZAPX asks IPinfo about each online respondent's address when the interview
+privacy detection, SampCode asks IPinfo about each online respondent's address when the interview
 starts (only when the survey has quality and fraud checks on, never for test links or private
 addresses). Only the answer's words (`vpn`, `proxy`, `tor`, `relay`, `hosting`) are stored, as
 `networkFlags`; the address and IPinfo's full answer are not.
 
-- At completion ZAPX waits for a lookup that is still running (up to
+- At completion SampCode waits for a lookup that is still running (up to
   `NETWORK_REPUTATION_TIMEOUT_MS`, 2 seconds), so fast bots are scored with it. A lookup that
   fails or times out gives no flag; the interview is never delayed beyond that or refused.
 - An address is looked up once an hour per API process (in-memory cache keyed by its hash).

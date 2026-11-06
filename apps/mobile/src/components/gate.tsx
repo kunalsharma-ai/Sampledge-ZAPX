@@ -43,7 +43,7 @@ export function NotInPlan({ feature, suspended, mobileOff }: { feature: FeatureK
           {suspended
             ? 'The platform administrator has suspended this organization. Contact them to restore access.'
             : mobileOff
-              ? 'The platform administrator has not given you access to the mobile app. Use ZAPX on the web, or ask them to turn it on.'
+              ? 'The platform administrator has not given you access to the mobile app. Use SampCode on the web, or ask them to turn it on.'
               : 'Your platform administrator controls which features each subscription includes. Ask them to turn it on; it appears here as soon as they do.'}
         </Text>
         <View style={{ marginTop: 8 }}>

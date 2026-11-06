@@ -547,7 +547,7 @@ export default function DashboardPage() {
               <Robot size={74} platform={false} />
               <div>
                 <h2 id="copilot-title">
-                  ZAPX AI Copilot <Sparkles size={16} aria-hidden="true" className="nx-sparkle" />
+                  SampCode AI Copilot <Sparkles size={16} aria-hidden="true" className="nx-sparkle" />
                 </h2>
                 <p className="small muted" data-testid="ai-status">
                   {ai === null

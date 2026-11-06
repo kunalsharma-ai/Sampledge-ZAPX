@@ -88,7 +88,7 @@ let admin: Record<string, string>;
 let tenantId: string;
 let adminEmail: string;
 let projectId: string;
-const idp = testIdpKeys('ZAPX test IdP');
+const idp = testIdpKeys('SampCode test IdP');
 const otherIdp = testIdpKeys('Another IdP');
 const domain = `${run}.example`;
 
@@ -390,7 +390,7 @@ describe('SAML single sign-on', () => {
     const unsolicited = await post({
       SAMLResponse: samlResponse({ key: idp.key, inResponseTo: '', audience: entity(), acsUrl: acs(), nameID: `ana@${domain}` }),
     });
-    expect(decodeURIComponent(unsolicited.location)).toContain('Sign in from the ZAPX login page');
+    expect(decodeURIComponent(unsolicited.location)).toContain('Sign in from the SampCode login page');
     const email = `ana@${domain}`;
     await prisma.user.update({ where: { email }, data: { disabledAt: new Date() } });
     const req = await start(email);
@@ -490,7 +490,7 @@ describe('billing with Stripe', () => {
     expect((await tenant()).billingPeriodEnd?.getTime()).toBe(1_900_000_000_000);
     expect((await webhook(completed).expect(200)).body.result).toBe('duplicate');
 
-    // An upgrade in the portal: Stripe sends an update; ZAPX re-reads the subscription.
+    // An upgrade in the portal: Stripe sends an update; SampCode re-reads the subscription.
     stripe.subscriptions.set(`sub_${run}`, {
       ...stripe.subscriptions.get(`sub_${run}`)!,
       items: { data: [{ price: { id: 'price_business1' } }] },

@@ -1,7 +1,7 @@
 /**
  * Email sending for invitations and reminders (blueprint phase 3).
  *
- * - Off by default (EMAIL_PROVIDER=off): no email leaves ZAPX.
+ * - Off by default (EMAIL_PROVIDER=off): no email leaves SampCode.
  * - Provider: SendGrid v3 Mail Send (`POST /v3/mail/send`, 202 when accepted). Another provider is
  *   one class implementing EmailProvider.
  *

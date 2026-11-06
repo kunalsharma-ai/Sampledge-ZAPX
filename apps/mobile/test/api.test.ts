@@ -63,6 +63,6 @@ describe('ApiClient', () => {
     const api = new ApiClient('https://z.example', null, {}, async () => {
       throw new TypeError('Network request failed');
     });
-    await expect(api.get('/x')).rejects.toThrow(/Cannot reach ZAPX/);
+    await expect(api.get('/x')).rejects.toThrow(/Cannot reach SampCode/);
   });
 });

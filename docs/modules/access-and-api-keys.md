@@ -42,7 +42,7 @@ Rules:
   current role. Admin-only endpoints (team, settings, webhooks, audit log) never accept a key.
 - Keys cannot manage keys. They can expire (30 days, 90 days, 1 year or never) and are revoked at once.
 - Changes made with a key appear in the audit log under the creator, marked "via API key".
-- ZAPX stores only a SHA-256 hash of the secret part. A lost key cannot be recovered; create a new one.
+- SampCode stores only a SHA-256 hash of the secret part. A lost key cannot be recovered; create a new one.
 
 API: `GET/POST /api/api-keys`, `DELETE /api/api-keys/:id` (revoke).
 
@@ -55,7 +55,7 @@ syncs, members, project access, API keys, webhooks and settings.
 - Filter by action (or a group such as `webhook.*`), entity type, member and time range.
 - "Download CSV" exports up to 50,000 matching events (time, member, action, entity, details as
   JSON); spreadsheet formulas in values are neutralized. The export itself is audited.
-- Audit events cannot be edited or deleted through ZAPX.
+- Audit events cannot be edited or deleted through SampCode.
 
 API: `GET /api/audit?action=&entityType=&entityId=&actorId=&from=&to=&after=&take=`,
 `GET /api/audit/actions`, `GET /api/audit/export.csv`, `GET /api/audit/security`.

@@ -1,5 +1,5 @@
 /**
- * HMAC-SHA256 signing used across ZAPX integrations: signed entry links, signed redirects,
+ * HMAC-SHA256 signing used across SampCode integrations: signed entry links, signed redirects,
  * signed callbacks and authenticated vendor API requests. Comparisons are constant-time.
  */
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
@@ -76,7 +76,7 @@ export function verifySignedParams(
 
 // ---- Authenticated partner requests (vendor API) ----------------------------------------------
 
-/** String a vendor signs to call the ZAPX vendor API: `timestamp.METHOD.path?query`. */
+/** String a vendor signs to call the SampCode vendor API: `timestamp.METHOD.path?query`. */
 export const requestSigningString = (timestamp: string | number, method: string, pathWithQuery: string) =>
   `${timestamp}.${method.toUpperCase()}.${pathWithQuery}`;
 
@@ -98,15 +98,15 @@ export function verifyRequest(
 // ---- Sampledge service signatures (SAMPLEON) ---------------------------------------------------
 
 /**
- * The Sampledge service signature used between SAMPLEON, SUPPLY360, PROJEXA and ZAPX
+ * The Sampledge service signature used between SAMPLEON, SUPPLY360, PROJEXA and SampCode
  * (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md §5.0):
  *
  *   X-Sampledge-Client:    client id
  *   X-Sampledge-Timestamp: unix seconds
  *   X-Sampledge-Signature: v1=hex HMAC-SHA256(secret, ts + "." + METHOD + "." + path + "." + sha256hex(body))
  *
- * `path` includes the query string exactly as sent. SAMPLEON signs the webhooks it sends to ZAPX
- * the same way, as client "sampleon", with ZAPX's client secret.
+ * `path` includes the query string exactly as sent. SAMPLEON signs the webhooks it sends to SampCode
+ * the same way, as client "sampleon", with SampCode's client secret.
  */
 export function sampledgeCanonical(timestamp: string | number, method: string, path: string, body: string | Buffer | null | undefined) {
   return `${timestamp}.${method.toUpperCase()}.${path}.${createHash('sha256')

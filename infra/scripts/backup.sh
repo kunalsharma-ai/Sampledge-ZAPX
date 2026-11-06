@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Logical backup of the ZAPX database (pg_dump custom format). Keeps the newest $KEEP files.
+# Logical backup of the SampCode database (pg_dump custom format). Keeps the newest $KEEP files.
 # Usage: DATABASE_URL=postgresql://... infra/scripts/backup.sh [backup-dir]
 set -euo pipefail
 : "${DATABASE_URL:?set DATABASE_URL}"

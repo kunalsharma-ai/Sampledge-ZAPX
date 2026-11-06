@@ -26,7 +26,7 @@ export class SampleonController {
     return this.sampleon.connect(user, id);
   }
 
-  /** Ask SAMPLEON for an audience for an independent ZAPX survey. */
+  /** Ask SAMPLEON for an audience for an independent SampCode survey. */
   @Post('surveys/:id/sampleon/audience-requests')
   @Roles(...CAN_EDIT)
   submit(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown) {

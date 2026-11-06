@@ -154,8 +154,8 @@ export function SsoSettings() {
           {form.protocol === 'OIDC' ? (
             <>
               <p className="muted small" style={{ margin: 0 }}>
-                Microsoft Entra ID, Okta, Google Workspace, Keycloak and others. Register ZAPX as a web application at your provider with
-                this redirect address, then enter its details here.
+                Microsoft Entra ID, Okta, Google Workspace, Keycloak and others. Register SampCode as a web application at your provider
+                with this redirect address, then enter its details here.
               </p>
               <CopyField label="Redirect URI" value={state.callbackUrl} />
               <label className="field">
@@ -186,15 +186,15 @@ export function SsoSettings() {
           ) : (
             <>
               <p className="muted small" style={{ margin: 0 }}>
-                For identity providers that use SAML (AD FS, Entra ID, Okta, OneLogin, PingFederate). Add ZAPX as a SAML application with
-                these details or import the metadata, have it send the email address (as the name ID or an email attribute), and sign the
-                assertions. Sign-in starts from the ZAPX login page.
+                For identity providers that use SAML (AD FS, Entra ID, Okta, OneLogin, PingFederate). Add SampCode as a SAML application
+                with these details or import the metadata, have it send the email address (as the name ID or an email attribute), and sign
+                the assertions. Sign-in starts from the SampCode login page.
               </p>
               <CopyField label="Entity ID (audience)" value={state.saml.entityId} />
               <CopyField label="Assertion consumer service (ACS) URL" value={state.saml.acsUrl} />
               <p className="small" style={{ margin: 0 }}>
                 <a href="/api/auth/sso/saml/metadata" target="_blank" rel="noreferrer">
-                  Download ZAPX metadata (XML)
+                  Download SampCode metadata (XML)
                 </a>
               </p>
               <label className="field">
@@ -354,7 +354,7 @@ export function ScimSettings() {
           <p className="muted small" style={{ margin: 0 }}>
             Let your identity provider add, update and deactivate members. The role comes from the user&apos;s{' '}
             <span className="mono">roles</span> value: admin, programmer, viewer or interviewer (viewer if none). Deactivated or deleted
-            users are disabled in ZAPX; their history is kept. Groups are not supported.
+            users are disabled in SampCode; their history is kept. Groups are not supported.
           </p>
           <CopyField label="SCIM base URL" value={state.baseUrl} />
           {created ? (
@@ -499,7 +499,7 @@ export function Billing() {
       <section className="panel stack" data-testid="billing">
         <h2>Billing</h2>
         <p className="muted small" style={{ margin: 0 }}>
-          Online billing is not turned on for this ZAPX installation. Your plan is set by your ZAPX operator.
+          Online billing is not turned on for this SampCode installation. Your plan is set by your SampCode operator.
         </p>
       </section>
     );
@@ -547,7 +547,7 @@ export function Billing() {
             </div>
           ))}
           <p className="muted small" style={{ margin: 0 }}>
-            Payment is handled by Stripe; ZAPX never sees card details. Prices are shown on the Stripe page before you pay.
+            Payment is handled by Stripe; SampCode never sees card details. Prices are shown on the Stripe page before you pay.
           </p>
         </div>
       ) : null}

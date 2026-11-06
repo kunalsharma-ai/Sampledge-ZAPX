@@ -4,7 +4,7 @@
  * (`Response.networkFlags`). The quality score turns them into the anonymous_network and
  * datacenter_network flags (review evidence, never a block at the door).
  *
- * - Off by default (NETWORK_REPUTATION=off): no address leaves ZAPX.
+ * - Off by default (NETWORK_REPUTATION=off): no address leaves SampCode.
  * - The lookup runs after the interview has started and never delays or fails it; a slow or broken
  *   provider just means no flag.
  * - Private, loopback and link-local addresses are never sent.

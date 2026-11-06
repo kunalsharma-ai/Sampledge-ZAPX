@@ -1,6 +1,6 @@
-# ZAPX Quantum Design System
+# SampCode Quantum Design System
 
-Design architecture and modernization plan for the ZAPX studio (the staff application). It covers the
+Design architecture and modernization plan for the SampCode studio (the staff application). It covers the
 audit of what exists, the design system, the information architecture, and the phased plan. Phase 1
 (audit) and the first part of Phase 2 (tokens, theme engine, core components) are implemented; every
 later phase is a separate, independently testable pull request.

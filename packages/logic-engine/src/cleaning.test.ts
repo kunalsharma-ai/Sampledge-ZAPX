@@ -91,7 +91,7 @@ describe('rule-based cleaning', () => {
     expect(issues[0]!.code).toBe('CLEANING');
   });
 
-  it('round-trips through ZAPX XML', () => {
+  it('round-trips through SampCode XML', () => {
     const def = make([
       { id: 'C1', label: 'Impossible age', when: 'AGE > 99', target: 'AGE', action: 'clear' },
       { id: 'C5', when: 'AGE < 30 and WHY != "x"', target: 'BRAND', action: 'set', value: 99 },

@@ -49,7 +49,7 @@ export interface TranslateResult {
   usage?: AiTokenUsage;
 }
 
-/** A table computed by ZAPX, given to the research assistant as text. */
+/** A table computed by SampCode, given to the research assistant as text. */
 export interface InsightTable {
   /** T1, T2... so findings can cite it. */
   id: string;

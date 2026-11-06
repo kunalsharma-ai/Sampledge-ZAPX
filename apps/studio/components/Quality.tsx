@@ -515,7 +515,7 @@ function CaptureSettingsEditor({
     <section className="panel stack" data-testid="capture-settings">
       <div className="row">
         <h2 style={{ margin: 0 }}>Face-to-face capture</h2>
-        <span className="muted small">For interviews in the ZAPX Interviewer app. Part of the draft.</span>
+        <span className="muted small">For interviews in the SampCode Interviewer app. Part of the draft.</span>
       </div>
       <fieldset disabled={readOnly} className="stack" style={{ border: 0, padding: 0, margin: 0, gap: 8 }}>
         <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -697,7 +697,7 @@ function CapturesPanel({ surveyId, onTranscribed }: { surveyId: string; onTransc
     if (
       !(await confirm({
         title: `Send ${untranscribed} recording${untranscribed === 1 ? '' : 's'} to the transcription service?`,
-        message: 'The recordings leave ZAPX for this.',
+        message: 'The recordings leave SampCode for this.',
         confirmLabel: 'Send',
       }))
     )

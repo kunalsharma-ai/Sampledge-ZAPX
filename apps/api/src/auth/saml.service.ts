@@ -1,10 +1,10 @@
 /**
- * SAML 2.0 single sign-on (Milestone 13), next to OpenID Connect. ZAPX is the service provider:
+ * SAML 2.0 single sign-on (Milestone 13), next to OpenID Connect. SampCode is the service provider:
  * SP-initiated sign-in only, AuthnRequest by HTTP-Redirect, the response by HTTP-POST to the ACS URL.
  *
  * Checks (by @node-saml/node-saml, configured strictly here): the assertion is signed by one of the
- * organization's IdP certificates (wantAssertionsSigned), the Audience is ZAPX's entity ID, timestamps hold within 60 s of skew, and InResponseTo matches a
- * request ZAPX made in the last 10 minutes. ZAPX itself
+ * organization's IdP certificates (wantAssertionsSigned), the Audience is SampCode's entity ID, timestamps hold within 60 s of skew, and InResponseTo matches a
+ * request SampCode made in the last 10 minutes. SampCode itself
  * checks that the signed assertion's Issuer is the IdP entity ID (the library does not for sign-ins). Each request can be answered once: its row is deleted
  * when the response is checked, so a captured response cannot be replayed. IdP-initiated sign-in
  * (a response with no request) is refused, because it cannot be bound to a browser.
@@ -79,7 +79,7 @@ export class SamlService {
   private static base() {
     return config().STUDIO_URL.replace(/\/$/, '');
   }
-  /** ZAPX's entity ID; also the address of its metadata. */
+  /** SampCode's entity ID; also the address of its metadata. */
   static entityId() {
     return `${SamlService.base()}/api/auth/sso/saml/metadata`;
   }
@@ -144,7 +144,7 @@ export class SamlService {
     const relay = typeof body.RelayState === 'string' ? body.RelayState : '';
     if (!response) throw new SsoError('The identity provider did not send a sign-in response');
     if (!/^_[a-f0-9]{40}$/.test(relay)) {
-      throw new SsoError('Sign in from the ZAPX login page. Sign-ins started at the identity provider are not accepted.');
+      throw new SsoError('Sign in from the SampCode login page. Sign-ins started at the identity provider are not accepted.');
     }
     const req = await this.prisma.ssoRequest.findUnique({ where: { id: relay } });
     if (!req || req.expiresAt < new Date()) throw new SsoError('The sign-in took too long or was already used. Try again.');
@@ -176,7 +176,7 @@ export class SamlService {
     // The library checks the issuer only on logout messages, so the signed assertion's Issuer is checked here.
     if (profile.issuer !== c.samlIdpIssuer) throw new SsoVerifyError(`issuer ${String(profile.issuer)} is not ${c.samlIdpIssuer}`);
     if (profile.nameIDFormat === TRANSIENT) {
-      throw new SsoError('The identity provider sends a transient name ID; set it to persistent or email address for ZAPX');
+      throw new SsoError('The identity provider sends a transient name ID; set it to persistent or email address for SampCode');
     }
     const email = (attr(profile, EMAIL_ATTRS) || (/^[^@\s]+@[^@\s]+$/.test(profile.nameID) ? profile.nameID : '')).toLowerCase();
     if (!email) throw new SsoError('The identity provider did not share your email address');

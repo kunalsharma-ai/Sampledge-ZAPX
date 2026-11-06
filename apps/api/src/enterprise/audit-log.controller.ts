@@ -27,7 +27,7 @@ type Filter = z.infer<typeof filterSchema>;
 /**
  * The organization's audit trail (Milestone 6): every change to projects, surveys, vendors,
  * members, keys, webhooks, quality decisions and settings. Admins only. Read-only: nothing in
- * ZAPX can edit or delete audit events.
+ * SampCode can edit or delete audit events.
  */
 @Controller('audit')
 @Roles('ADMIN')

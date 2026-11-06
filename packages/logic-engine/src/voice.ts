@@ -31,7 +31,7 @@ const clean = (s: string) =>
     .trim();
 
 export function parseVoiceCommand(transcript: string): VoiceCommand {
-  const raw = transcript.trim().replace(/^(hey |ok |okay )?(zapx|zap x)[,:]?\s*/i, '');
+  const raw = transcript.trim().replace(/^(hey |ok |okay )?(sampcode|samp code|zapx|zap x)[,:]?\s*/i, '');
   const t = clean(raw);
   if (!t) return { kind: 'none' };
   if (/^(save|save (the )?(draft|survey|changes))( please)?$/.test(t)) return { kind: 'save' };

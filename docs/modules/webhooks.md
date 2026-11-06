@@ -1,6 +1,6 @@
 # Webhooks (Milestone 6)
 
-Settings → Webhooks (admins). ZAPX sends a JSON `POST` to your endpoint when something happens.
+Settings → Webhooks (admins). SampCode sends a JSON `POST` to your endpoint when something happens.
 
 ## Events
 

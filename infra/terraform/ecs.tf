@@ -61,7 +61,7 @@ resource "aws_iam_role_policy" "execution_secrets" {
   policy = data.aws_iam_policy_document.execution_secrets.json
 }
 
-# Used by ZAPX itself while running: the files bucket and nothing else.
+# Used by SampCode itself while running: the files bucket and nothing else.
 resource "aws_iam_role" "app" {
   name               = "${local.name}-app"
   assume_role_policy = data.aws_iam_policy_document.ecs_assume.json

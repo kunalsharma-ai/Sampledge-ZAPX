@@ -119,7 +119,10 @@ export class AuthGuard implements CanActivate {
     }
     if (ALWAYS_OPEN.has(path)) return;
     if (ent.suspended)
-      throw new ForbiddenException({ message: 'Your organization is suspended. Contact the ZAPX administrator.', code: 'ORG_SUSPENDED' });
+      throw new ForbiddenException({
+        message: 'Your organization is suspended. Contact the SampCode administrator.',
+        code: 'ORG_SUSPENDED',
+      });
     if (!ent.surfaceAllowed)
       throw new ForbiddenException({ message: 'The mobile app is not enabled for your account.', code: 'MOBILE_DISABLED' });
     const feature = featureForRoute(req.method, path);

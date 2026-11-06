@@ -1,4 +1,4 @@
-/** ZAPX Quantum Design System components. Styles live in app/quantum.css; tokens come from @zapx/quantum. */
+/** SampCode Quantum Design System components. Styles live in app/quantum.css; tokens come from @zapx/quantum. */
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { TextField, type TextFieldProps } from './TextField';
 export { Switch, type SwitchProps } from './Switch';

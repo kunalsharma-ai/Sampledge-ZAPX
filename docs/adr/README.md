@@ -42,5 +42,6 @@ they are accepted; a later record supersedes an earlier one.
 | [0035](0035-integrations-in-the-crm.md)          | Integrations set up in the CRM: sealed keys, env fallback, no restart      | Accepted                                               |
 | [0036](0036-super-admin.md)                      | Super admin: plans, features per surface (web/mobile), platform automation | Accepted                                               |
 | [0037](0037-mobile-app.md)                       | ZAPX mobile app: Expo, live super-admin feature gating                     | Accepted                                               |
+| [0038](0038-rename-to-sampcode.md)               | ZAPX renamed SampCode: user-facing name and artwork, identifiers kept      | Accepted                                               |
 
 Template: copy an existing record; sections are Context, Decision, Consequences.

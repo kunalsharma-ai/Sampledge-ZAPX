@@ -1,6 +1,6 @@
 # Architecture
 
-How ZAPX is put together and how a request travels through it. Code references are to branch
+How SampCode is put together and how a request travels through it. Code references are to branch
 `mobile-app` (PR #40, the top of the open stack). For the reasons behind each decision, read the ADRs in
 [docs/adr](../adr/README.md); this file describes what the code does.
 
@@ -8,7 +8,7 @@ How ZAPX is put together and how a request travels through it. Code references a
 
 ### What the application does
 
-ZAPX is a survey programming, testing, hosting and fieldwork platform for market research.
+SampCode is a survey programming, testing, hosting and fieldwork platform for market research.
 
 | Who                                           | Uses                                                                               | To                                                                                                  |
 | --------------------------------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |

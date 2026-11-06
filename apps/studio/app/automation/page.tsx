@@ -112,7 +112,7 @@ const blank = (): Omit<Rule, 'id' | 'description' | 'nextRunAt' | 'lastFiredAt' 
 
 /**
  * Blueprint phase 5: automation rules. When a survey event happens (or on a schedule) and the
- * conditions hold, ZAPX notifies people, emails them, sends a webhook or changes the survey's
+ * conditions hold, SampCode notifies people, emails them, sends a webhook or changes the survey's
  * status, optionally only after an administrator approves. Every run is logged here.
  */
 export default function AutomationPage() {
@@ -553,7 +553,7 @@ function RuleEditor({
               );
             }}
           >
-            <option value="notify">Notify in ZAPX</option>
+            <option value="notify">Notify in SampCode</option>
             <option value="email">Email</option>
             <option value="webhook">Send the automation.fired webhook</option>
             <option value="set_survey_status">Change the survey status</option>

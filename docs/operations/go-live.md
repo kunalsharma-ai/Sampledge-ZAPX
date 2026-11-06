@@ -1,6 +1,6 @@
 # Going live: what needs a person with the accounts
 
-Everything in ZAPX that could be built and tested without real accounts is done: milestones 1 to
+Everything in SampCode that could be built and tested without real accounts is done: milestones 1 to
 20 are merged into `main`, and the rest is in the open pull requests listed in
 [merge-order.md](merge-order.md) (the design system, the blueprint phases, the handbook, the security
 fixes, webcam eye tracking and integrations in the CRM). The steps below need credentials, accounts or
@@ -23,7 +23,7 @@ the guide with the details.
 
 ## Integrations are set up in the CRM
 
-Every third-party service is connected from inside ZAPX, not by editing server settings. An
+Every third-party service is connected from inside SampCode, not by editing server settings. An
 administrator of the organization that runs the installation (the first organization created; hand
 it over with `node apps/api/dist/cli/set-operator.js <member email>`) opens **Settings →
 Integrations**, pastes the key, presses **Test connection**, ticks **Turn on** and saves. The change

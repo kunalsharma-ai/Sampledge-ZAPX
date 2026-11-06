@@ -1,4 +1,4 @@
-/** Talking to the ZAPX API: sign-in, survey package download and sync. Only ever called online. */
+/** Talking to the SampCode API: sign-in, survey package download and sync. Only ever called online. */
 import { mediaIdsOf, parseSurveyDefinition } from '@zapx/survey-schema';
 import { defaultMediaUrl } from '@zapx/survey-renderer';
 import { captures, deviceId, interviews, meta, type Interviewer, type LocalInterview, type SurveyPackage } from './store';
@@ -25,7 +25,7 @@ export async function signIn(email: string, password: string): Promise<Interview
   const r = await call<{ user: Interviewer & { role: string } }>('/auth/login', { email, password });
   if (r.user.role !== 'INTERVIEWER') {
     await call('/auth/logout', {}).catch(() => undefined);
-    throw new Error('This app is for interviewers. Other team members use the ZAPX studio.');
+    throw new Error('This app is for interviewers. Other team members use the SampCode studio.');
   }
   const me: Interviewer = { id: r.user.id, name: r.user.name, email: r.user.email };
   await meta.set('interviewer', me);

@@ -1,4 +1,4 @@
-# Full ZAPX stack on one machine, no cloud services needed:
+# Full SampCode stack on one machine, no cloud services needed:
 #   docker compose up --build
 # Studio http://localhost:3000 · respondent runtime http://localhost:5173 · interviewer app http://localhost:5174 · API http://localhost:4000/api
 # For development with hot reload, run only the database: docker compose up postgres

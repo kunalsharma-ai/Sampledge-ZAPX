@@ -262,7 +262,7 @@ function XmlPane({ def, onApply, readOnly }: { def: SurveyDefinition; onApply: (
     const url = URL.createObjectURL(new Blob([text], { type: 'application/xml' }));
     const a = Object.assign(document.createElement('a'), {
       href: url,
-      download: `${def.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'survey'}.zapx.xml`,
+      download: `${def.title.replace(/[^\w-]+/g, '_').slice(0, 60) || 'survey'}.sampcode.xml`,
     });
     a.click();
     URL.revokeObjectURL(url);
@@ -270,8 +270,8 @@ function XmlPane({ def, onApply, readOnly }: { def: SurveyDefinition; onApply: (
   return (
     <section className="panel stack">
       <p className="muted small">
-        The survey as ZAPX XML. Edit it with autocomplete (Ctrl+Space), then apply: the change goes through the same checks as the Visual
-        Builder, so the two always show the same survey. Unknown elements and attributes are listed, never dropped silently.
+        The survey as SampCode XML. Edit it with autocomplete (Ctrl+Space), then apply: the change goes through the same checks as the
+        Visual Builder, so the two always show the same survey. Unknown elements and attributes are listed, never dropped silently.
       </p>
       <CodeEditor
         language="xml"
