@@ -136,7 +136,8 @@ export class SampleonService {
     const c = config();
     const existing = await this.prisma.vendor.findFirst({ where: { projectId, code: SAMPLEON_VENDOR_CODE, tenantId: user.tenantId } });
     if (existing) {
-      if (existing.deletedAt) throw new ConflictException('The SAMPLEON vendor of this project was deleted; restore it first');
+      if (existing.deletedAt)
+        throw new ConflictException('The SampAudience vendor (code SAMPLEON) of this project was deleted; restore it first');
       if (existing.integration !== 'SAMPLEON')
         throw new ConflictException(`Vendor code ${SAMPLEON_VENDOR_CODE} is already used by another vendor in this project`);
       return existing;
@@ -146,7 +147,7 @@ export class SampleonService {
       data: {
         tenantId: user.tenantId,
         projectId,
-        name: 'SAMPLEON',
+        name: 'SampAudience',
         code: SAMPLEON_VENDOR_CODE,
         integration: 'SAMPLEON',
         partnerBaseUrl: c.SAMPLEON_URL!.replace(/\/+$/, ''),
@@ -160,7 +161,7 @@ export class SampleonService {
   }
 
   async connect(user: AuthUser, surveyId: string) {
-    if (!SampleonService.configured()) throw new ServiceUnavailableException('The SAMPLEON integration is not configured');
+    if (!SampleonService.configured()) throw new ServiceUnavailableException('The SampAudience integration is not configured');
     const survey = await this.surveys.getSurvey(user, surveyId);
     const vendor = await this.ensureVendor(user, survey.projectId);
     return { launchUrl: SampleonService.launchUrl(survey.id), vendorId: vendor.id, vendorCode: vendor.code };
@@ -168,7 +169,7 @@ export class SampleonService {
 
   /** Independent SampCode workflow: ask SAMPLEON for an audience. Invitations wait for approval in SAMPLEON. */
   async submit(user: AuthUser, surveyId: string, body: unknown) {
-    if (!SampleonService.configured()) throw new ServiceUnavailableException('The SAMPLEON integration is not configured');
+    if (!SampleonService.configured()) throw new ServiceUnavailableException('The SampAudience integration is not configured');
     const survey = await this.surveys.getSurvey(user, surveyId);
     const input = parseBody(submitSchema, body);
     const tenant = await this.prisma.tenant.findUniqueOrThrow({ where: { id: user.tenantId }, select: { name: true } });
@@ -193,7 +194,7 @@ export class SampleonService {
     const res = await this.call('POST', '/api/v1/audience-requests', request, `zapx:${survey.id}:${randomBytes(8).toString('hex')}`);
     const ar = res as { audienceRequestId?: unknown; status?: unknown };
     if (typeof ar.audienceRequestId !== 'string' || !/^AR-[0-9A-HJKMNP-TV-Z]{26}$/.test(ar.audienceRequestId))
-      throw new BadGatewayException('SAMPLEON did not return an Audience Request ID');
+      throw new BadGatewayException('SampAudience did not return an Audience Request ID');
     const row = await this.prisma.sampleonAudienceRequest.create({
       data: {
         tenantId: user.tenantId,
@@ -230,7 +231,7 @@ export class SampleonService {
         body: text || undefined,
       });
     } catch (e) {
-      throw new BadGatewayException(`SAMPLEON could not be reached: ${(e as Error).message}`.slice(0, 300));
+      throw new BadGatewayException(`SampAudience could not be reached: ${(e as Error).message}`.slice(0, 300));
     }
     const raw = await res.text();
     let parsed: unknown = null;
@@ -241,14 +242,14 @@ export class SampleonService {
     }
     if (res.ok) return parsed;
     if (res.status >= 400 && res.status < 500)
-      throw new HttpException({ message: 'SAMPLEON refused the request', sampleon: parsed }, res.status);
-    throw new BadGatewayException({ message: `SAMPLEON answered ${res.status}`, sampleon: parsed });
+      throw new HttpException({ message: 'SampAudience refused the request', sampleon: parsed }, res.status);
+    throw new BadGatewayException({ message: `SampAudience answered ${res.status}`, sampleon: parsed });
   }
 
   /** Signed SAMPLEON event webhook. Each event is applied once; unknown requests are acknowledged. */
   async receive(req: InboundRequest) {
     const c = config();
-    if (!SampleonService.configured()) throw new ServiceUnavailableException('The SAMPLEON integration is not configured');
+    if (!SampleonService.configured()) throw new ServiceUnavailableException('The SampAudience integration is not configured');
     const raw = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? null));
     const reason = verifySampledgeRequest({
       headers: req.headers,

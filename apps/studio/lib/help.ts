@@ -310,7 +310,7 @@ const entries = {
   },
   'tab.distribute': {
     title: 'Distribution',
-    what: 'Get the survey to respondents: vendor links, a test link, email and SMS invitations, SAMPLEON audiences and the field status.',
+    what: 'Get the survey to respondents: vendor links, a test link, email and SMS invitations, SampAudience audiences and the field status.',
     how: [
       'Publish the survey first.',
       'Copy the link for each vendor, or send invitations to your own contacts.',
@@ -587,7 +587,7 @@ const entries = {
     where: 'Use it for customer and employee surveys where you own the contacts.',
   },
   'section.sampleon': {
-    title: 'SAMPLEON audiences',
+    title: 'SampAudience audiences',
     what: 'Order respondents from the SUPPLY360 panels: feasibility check, approval and automatic outcome reporting.',
     how: ['Describe the audience and check feasibility.', 'Send for approval, then launch.'],
     where: 'Use it when you need panel sample instead of your own contacts. Publish the survey first.',

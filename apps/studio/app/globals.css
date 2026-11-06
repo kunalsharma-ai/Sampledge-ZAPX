@@ -1088,3 +1088,25 @@ table.xtab tr.mean-row td {
   height: auto;
   padding: 8px 10px;
 }
+
+/* SampAudience (formerly SAMPLEON) lockup: the "dark" file is drawn for dark backgrounds. */
+.sa-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.sa-logo img {
+  height: 40px;
+  width: auto;
+}
+.sa-logo .sa-on-dark {
+  display: none;
+}
+[data-q-scheme='dark'] .sa-logo .sa-on-dark {
+  display: block;
+}
+[data-q-scheme='dark'] .sa-logo .sa-on-light {
+  display: none;
+}

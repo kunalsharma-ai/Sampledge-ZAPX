@@ -1,5 +1,7 @@
 # SAMPLEON integration
 
+> **Name change:** SAMPLEON is now shown to people as **SampAudience** (by Sampledge). The studio uses the new name and logo (`apps/studio/public/brand/sampaudience/`); the vendor code `SAMPLEON` (`vid=SAMPLEON`), the `SAMPLEON` integration value, API paths and `SAMPLEON_*` env vars are unchanged. Migration `20261122000000_sampaudience_vendor_name` renames the display name of existing integration vendors.
+
 SAMPLEON is the Sampledge audience, invitation and routing engine (repository
 `kunalsharma-ai/Sampleon`, design in its `docs/ECOSYSTEM_ARCHITECTURE.md`). In the ecosystem:
 

@@ -45,6 +45,17 @@ const TONE: Record<string, string> = {
 const label = (s: string) => (s.charAt(0).toUpperCase() + s.slice(1)).replace(/_/g, ' ');
 const today = (plusDays = 0) => new Date(Date.now() + plusDays * 86_400_000).toISOString().slice(0, 10);
 
+function SampAudienceTitle() {
+  return (
+    <h2 className="sa-logo">
+      <img className="sa-on-light" src="/brand/sampaudience/sampaudience-logo-light.svg" alt="SampAudience" width={170} height={40} />
+      <img className="sa-on-dark" src="/brand/sampaudience/sampaudience-logo-dark.svg" alt="SampAudience" width={170} height={40} />
+      <span>Audiences</span>
+      <InfoTip k="section.sampleon" />
+    </h2>
+  );
+}
+
 export function Sampleon({
   surveyId,
   surveyName,
@@ -63,30 +74,24 @@ export function Sampleon({
     load();
   }, [load]);
 
-  if (!view) return error ? <ErrorNote error={error} /> : <p className="muted">Loading SAMPLEON…</p>;
+  if (!view) return error ? <ErrorNote error={error} /> : <p className="muted">Loading SampAudience…</p>;
   if (!view.configured) {
     return (
       <section className="panel stack">
-        <h2>
-          SAMPLEON audiences
-          <InfoTip k="section.sampleon" />
-        </h2>
+        <SampAudienceTitle />
         <p className="muted small">
-          SAMPLEON is not connected. An administrator sets SAMPLEON_URL, SAMPLEON_CLIENT_SECRET and SAMPLEON_OUTCOME_SECRET for the API, and
-          registers SampCode as a survey host in SAMPLEON.
+          SampAudience is not connected. An administrator sets SAMPLEON_URL, SAMPLEON_CLIENT_SECRET and SAMPLEON_OUTCOME_SECRET for the API,
+          and registers SampCode as a survey host in SampAudience.
         </p>
       </section>
     );
   }
   return (
     <section className="panel stack">
-      <h2>
-        SAMPLEON audiences
-        <InfoTip k="section.sampleon" />
-      </h2>
+      <SampAudienceTitle />
       <p className="muted small">
-        Get respondents from the SUPPLY360 panels. SAMPLEON checks feasibility, a supply approver approves the audience before any
-        invitation goes out, and outcomes go back to SAMPLEON automatically.
+        Get respondents from the SUPPLY360 panels. SampAudience checks feasibility, a supply approver approves the audience before any
+        invitation goes out, and outcomes go back to SampAudience automatically.
       </p>
       {!live ? (
         <p className="small" style={{ color: 'var(--q-warn)' }}>
@@ -119,19 +124,19 @@ function ForProjexa({ surveyId, launchUrl, readOnly }: { surveyId: string; launc
   };
   return (
     <div className="stack">
-      <h3>For a PROJEXA project</h3>
+      <h3>For a SampTrek project</h3>
       <p className="muted small">
-        Connect the survey, then paste the launch link and the survey ID into the project&apos;s SAMPLEON tab in PROJEXA. PROJEXA sends the
-        request with the project&apos;s targets and quotas.
+        Connect the survey, then paste the launch link and the survey ID into the project&apos;s SampAudience tab in SampTrek. SampTrek
+        sends the request with the project&apos;s targets and quotas.
       </p>
       <div>
         <button onClick={connect} disabled={readOnly || busy}>
-          {busy ? 'Connecting…' : connected ? 'Connected' : 'Connect to SAMPLEON'}
+          {busy ? 'Connecting…' : connected ? 'Connected' : 'Connect to SampAudience'}
         </button>
       </div>
       <ErrorNote error={error} />
       {connected ? (
-        <p className="small muted">Outcomes go back to SAMPLEON through the {connected.vendorCode} vendor of this project.</p>
+        <p className="small muted">Outcomes go back to SampAudience through the {connected.vendorCode} vendor of this project.</p>
       ) : null}
       <CopyField label="Survey ID" value={surveyId} />
       <CopyField label="Launch link" value={connected?.launchUrl ?? launchUrl} />
@@ -305,12 +310,12 @@ function NewRequest({
       <ErrorNote error={error} />
       {sent ? (
         <p className="small" style={{ color: 'var(--q-good)' }}>
-          Sent as <span className="mono">{sent}</span>. A supply approver reviews it in SAMPLEON before anyone is invited.
+          Sent as <span className="mono">{sent}</span>. A supply approver reviews it in SampAudience before anyone is invited.
         </p>
       ) : null}
       <div>
         <button className="primary" disabled={readOnly || busy || !countriesOk}>
-          {busy ? 'Sending…' : 'Send to SAMPLEON'}
+          {busy ? 'Sending…' : 'Send to SampAudience'}
         </button>
       </div>
     </form>
@@ -338,7 +343,7 @@ function Requests({ rows }: { rows: RequestRow[] }) {
               <td className="mono small" style={{ whiteSpace: 'nowrap' }}>
                 {r.audienceRequestId}
               </td>
-              <td>{r.sourcePlatform === 'PROJEXA' ? 'PROJEXA project' : 'This survey'}</td>
+              <td>{r.sourcePlatform === 'PROJEXA' ? 'SampTrek project' : 'This survey'}</td>
               <td>
                 <span className={`badge ${TONE[r.status] ?? ''}`}>{label(r.status)}</span>
               </td>
@@ -349,7 +354,7 @@ function Requests({ rows }: { rows: RequestRow[] }) {
               <td className="small muted">
                 {r.lastEventType
                   ? `${r.lastEventType.replace(/[._]/g, ' ')} · ${new Date(r.lastEventAt!).toLocaleString()}`
-                  : 'Waiting for SAMPLEON'}
+                  : 'Waiting for SampAudience'}
               </td>
             </tr>
           ))}

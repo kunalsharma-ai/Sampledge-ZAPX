@@ -14,7 +14,7 @@ export interface Vendor {
   id: string;
   name: string;
   code: string;
-  integration: 'DIRECT' | 'PROJEXA';
+  integration: 'DIRECT' | 'PROJEXA' | 'SAMPLEON';
   redirectMode: 'STATIC' | 'DYNAMIC' | 'HYBRID';
   staticUrls: StatusMap;
   statusWords: StatusMap;
@@ -175,7 +175,10 @@ export function VendorEditor({
           Integration
           <select value={v.integration} onChange={(e) => setV({ ...v, integration: e.target.value as Vendor['integration'] })}>
             <option value="DIRECT">Direct: SampCode redirects and calls back</option>
-            <option value="PROJEXA">PROJEXA: traffic comes through PROJEXA</option>
+            <option value="PROJEXA">SampTrek: traffic comes through SampTrek</option>
+            {v.integration === 'SAMPLEON' ? (
+              <option value="SAMPLEON">SampAudience: set up from the survey&apos;s Distribute tab</option>
+            ) : null}
           </select>
         </label>
         {!projexa ? (
@@ -193,18 +196,18 @@ export function VendorEditor({
       {projexa ? (
         <div className="stack" data-testid="projexa-settings">
           <p className="small" style={{ margin: 0, color: 'var(--warn)' }}>
-            Built from PROJEXA&apos;s documented survey-platform contract. It has not been tested against a running PROJEXA yet, so run a
+            Built from SampTrek&apos;s documented survey-platform contract. It has not been tested against a running SampTrek yet, so run a
             test respondent end to end before sending live traffic.
           </p>
           <p className="muted small" style={{ margin: 0 }}>
-            In PROJEXA, set this survey&apos;s client link to the SampCode live link with{' '}
+            In SampTrek, set this survey&apos;s client link to the SampCode live link with{' '}
             <span className="mono">vid={v.code || 'CODE'}</span> and <span className="mono">uid={'{session_token}'}</span>. SampCode sends
             respondents to <span className="mono">/r/&#123;status&#125;?token=…</span> and confirms each outcome with a signed{' '}
             <span className="mono">POST /api/v1/s2s/outcome</span>.
           </p>
           <div className="row">
             <label className="field" style={{ flex: 1 }}>
-              PROJEXA base URL
+              SampTrek base URL
               <input
                 value={v.partnerBaseUrl ?? ''}
                 placeholder="https://projexa.example.com"
@@ -212,13 +215,13 @@ export function VendorEditor({
               />
             </label>
             <label className="field" style={{ flex: 1 }}>
-              PROJEXA client secret {v.partnerSecretSet ? '(saved; leave empty to keep)' : ''}
+              SampTrek client secret {v.partnerSecretSet ? '(saved; leave empty to keep)' : ''}
               <input type="password" autoComplete="off" value={partnerSecret} onChange={(e) => setPartnerSecret(e.target.value)} />
             </label>
           </div>
           <label className="check">
             <input type="checkbox" checked={v.partnerS2s} onChange={(e) => setV({ ...v, partnerS2s: e.target.checked })} />
-            Confirm every outcome server to server (recommended by PROJEXA)
+            Confirm every outcome server to server (recommended by SampTrek)
           </label>
         </div>
       ) : (
