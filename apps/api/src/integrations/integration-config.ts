@@ -71,7 +71,7 @@ export function toIntegrationConfig(
   tenant: Pick<Tenant, 'redirectDefaults'> | null,
   box: SecretBox,
 ): IntegrationConfig {
-  if (vendor.integration === 'PROJEXA') {
+  if (vendor.integration === 'PROJEXA' || vendor.integration === 'SAMPLEON') {
     let clientSecret: string | null = null;
     if (vendor.partnerSecretEnc) {
       try {
@@ -80,7 +80,7 @@ export function toIntegrationConfig(
         clientSecret = null; // key rotated or corrupted: S2S is skipped and the delivery log says why
       }
     }
-    return { kind: 'PROJEXA', baseUrl: vendor.partnerBaseUrl ?? '', clientSecret, s2sEnabled: vendor.partnerS2s };
+    return { kind: vendor.integration, baseUrl: vendor.partnerBaseUrl ?? '', clientSecret, s2sEnabled: vendor.partnerS2s };
   }
   return {
     kind: 'DIRECT',

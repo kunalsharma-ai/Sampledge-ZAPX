@@ -174,7 +174,10 @@ test('cleaning, segments, dashboards, automation, governance, SMS channel and ar
   const retentionSaved = page.waitForResponse((r) => r.url().endsWith('/api/organization/governance') && r.request().method() === 'PUT');
   await gov.getByTestId('save-retention').click();
   expect((await (await retentionSaved).json()).retention).toEqual({ responsesDays: 365 });
+  // The switch updates the page at once and saves in the background: wait for the save.
+  const blockSaved = page.waitForResponse((r) => r.url().endsWith('/api/organization/governance') && r.request().method() === 'PUT');
   await gov.getByTestId('block-external').check();
+  expect((await (await blockSaved).json()).blockExternalProcessors).toBe(true);
   await expect(gov.getByRole('row', { name: /Transcription/ })).toContainText('Turned off');
   await shot(page, 'p5-governance', gov);
   const g = await (await page.request.get('/api/organization/governance')).json();

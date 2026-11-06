@@ -81,6 +81,18 @@ const schema = z
      * they survive a JWT_SECRET rotation. 32+ chars; required in production. Unset: derived from JWT_SECRET.
      */
     SIGNING_KEYS_SECRET: optionalString.refine((v) => !v || v.length >= 32, 'SIGNING_KEYS_SECRET must be at least 32 characters'),
+    /**
+     * SAMPLEON, the Sampledge audience and routing engine (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md).
+     * ZAPX sends audience requests for independent surveys to SAMPLEON and receives its signed events.
+     * Unset SAMPLEON_URL: the SAMPLEON integration is off.
+     */
+    SAMPLEON_URL: optionalString.refine((v) => !v || /^https?:\/\//.test(v), 'SAMPLEON_URL must be an http(s) URL'),
+    /** ZAPX's client id at SAMPLEON. */
+    SAMPLEON_CLIENT_ID: z.string().default('zapx'),
+    /** ZAPX's client secret at SAMPLEON: signs ZAPX's API calls and verifies SAMPLEON's webhooks. */
+    SAMPLEON_CLIENT_SECRET: optionalString,
+    /** The survey-host outcome secret SAMPLEON holds for ZAPX (S2S outcome confirmation). */
+    SAMPLEON_OUTCOME_SECRET: optionalString,
     NODE_ENV: z.string().default('development'),
     /** Callback outbox worker. "off" leaves delivery to another process (or to tests). */
     CALLBACK_WORKER: z.enum(['on', 'off']).default('on'),

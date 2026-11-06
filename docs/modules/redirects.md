@@ -8,7 +8,7 @@ Owner: maintainer (see `.github/CODEOWNERS`) · Decision: [ADR 0003](../adr/0003
 - Server-to-server callbacks (postbacks) to sample sources, with retries and a dead letter.
 - The redirect log and the callback delivery log.
 - The partner-facing vendor API (`/api/v1/vendor/...`, contract in [openapi.yaml](../api/openapi.yaml)).
-- Partner adapters: `DIRECT` and `PROJEXA`.
+- Partner adapters: `DIRECT`, `PROJEXA` and `SAMPLEON` (same survey-host contract as PROJEXA; see [sampleon.md](sampleon.md)).
 
 ## Code
 

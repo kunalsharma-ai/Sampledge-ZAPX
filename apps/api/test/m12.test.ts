@@ -279,7 +279,7 @@ describe('face-to-face capture', () => {
     clientId,
     surveyId,
     versionId,
-    answers: { SHOP: `Corner Market ${clientId.slice(0, 8)}`, SHELF: `shelf-${clientId.slice(0, 8)}` },
+    answers: { SHOP: `Corner Market ${parseInt(clientId.slice(0, 8), 16)}`, SHELF: `shelf-${clientId.slice(0, 8)}` },
     startedAt: new Date(Date.now() - 3_600_000).toISOString(),
     finishedAt: new Date(Date.now() - 3_000_000).toISOString(),
     durationMs: 540_000,
