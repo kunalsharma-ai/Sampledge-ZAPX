@@ -8,11 +8,12 @@ x-api-env: &api-env
   DATABASE_URL: postgresql://zapx:zapx@postgres:5432/zapx?connection_limit=10&pool_timeout=20
   JWT_SECRET: ${JWT_SECRET:-local-compose-secret-change-me-0123456789}
   SECRETS_KEY: ${SECRETS_KEY:-local-compose-secrets-key-change-me-012345}
+  SIGNING_KEYS_SECRET: ${SIGNING_KEYS_SECRET:-}
   RUNTIME_BASE_URL: ${RUNTIME_BASE_URL:-http://localhost:5173}
   CAPI_APP_URL: ${CAPI_APP_URL:-http://localhost:5174}
   STUDIO_URL: ${STUDIO_URL:-http://localhost:3000}
   ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
-  COOKIE_SECURE: 'false'
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   AI_MODEL: ${AI_MODEL:-}
   AI_PRICING: ${AI_PRICING:-}
