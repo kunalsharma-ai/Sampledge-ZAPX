@@ -35,6 +35,8 @@ import { ExportService } from './exports/export.service';
 import { VendorsController } from './vendors/vendors.controller';
 import { LibraryController } from './library/library.controller';
 import { IntegrationsModule } from './integrations/integrations.module';
+import { SampleonController } from './sampleon/sampleon.controller';
+import { SampleonService } from './sampleon/sampleon.service';
 import { CapiAppealsController, FieldworkController } from './fieldwork/fieldwork.controller';
 import { FieldworkService } from './fieldwork/fieldwork.service';
 import { DistributionController, UnsubscribeController } from './distribution/distribution.controller';
@@ -150,8 +152,10 @@ import { PlatformAutomationService } from './super-admin/platform-automation.ser
     GovernanceController,
     EntitlementsController,
     SuperAdminController,
+    SampleonController,
   ],
   providers: [
+    SampleonService,
     IntegrationSettingsService,
     CatiService,
     TelephonyService,

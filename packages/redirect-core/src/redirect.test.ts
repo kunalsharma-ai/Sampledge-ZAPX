@@ -17,6 +17,9 @@ import {
   verifySignedRedirectUrl,
   type DirectConfig,
   type ProjexaConfig,
+  type SampleonConfig,
+  sampledgeServiceHeaders,
+  verifySampledgeRequest,
   type RespondentContext,
 } from './index';
 
@@ -234,5 +237,51 @@ describe('PROJEXA adapter (per docs/SURVEY_INTEGRATION.md)', () => {
   });
   it('sends no S2S without a client secret', () => {
     expect(planCallback({ ...p, clientSecret: null }, token, 'complete')).toBeNull();
+  });
+});
+
+describe('SAMPLEON adapter (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md §5.3)', () => {
+  const s: SampleonConfig = { kind: 'SAMPLEON', baseUrl: 'https://sampleon.test', clientSecret: 'host-secret', s2sEnabled: true };
+  const session = resp({ uid: 'ses_TOKEN' });
+  it('returns the browser to SAMPLEON, which decides about routing', () => {
+    expect(resolveRedirect(s, session, 'terminate')).toMatchObject({
+      url: 'https://sampleon.test/r/terminate?token=ses_TOKEN',
+      source: 'partner',
+    });
+  });
+  it('confirms the outcome with the signature SAMPLEON verifies (cross-checked vector)', () => {
+    const planned = planCallback(s, session, 'complete')!;
+    expect(planned.url).toBe('https://sampleon.test/api/v1/s2s/outcome');
+    const body = JSON.parse(prepareCallback(s, planned, 'R1:complete', 1_800_000_000_000).body!);
+    // Same value as @sampledge/contracts outcomeSignature('host-secret', 'ses_TOKEN', 'complete', 1800000000).
+    expect(body.signature).toBe('b71a78b630de21fa5f5e0e5e7b4ae4921174437b66ec395c7c7f9a04ac785bc7');
+    expect(classifyDelivery(s, 409)).toBe('conflict');
+  });
+});
+
+describe('Sampledge service signatures', () => {
+  const body = '{"a":1}';
+  const path = '/api/v1/audience-requests';
+  it('matches the @sampledge/contracts signRequest vector', () => {
+    expect(
+      sampledgeServiceHeaders({ clientId: 'zapx', secret: 'zapx-secret', method: 'POST', path, body, nowMs: 1_800_000_000_000 }),
+    ).toEqual({
+      'X-Sampledge-Client': 'zapx',
+      'X-Sampledge-Timestamp': '1800000000',
+      'X-Sampledge-Signature': 'v1=c512e8d2a421c930d585c1c05d2d58bc8a76732be2d36f5a1a00d18ea7695557',
+    });
+  });
+  it('verifies only the expected client, secret, body and time window', () => {
+    const now = 1_800_000_000_000;
+    const raw = sampledgeServiceHeaders({ clientId: 'sampleon', secret: 'k', method: 'POST', path, body, nowMs: now });
+    const headers = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k.toLowerCase(), v]));
+    const check = (over: Partial<Parameters<typeof verifySampledgeRequest>[0]>) =>
+      verifySampledgeRequest({ headers, method: 'POST', path, body, expectedClient: 'sampleon', secret: 'k', nowMs: now, ...over });
+    expect(check({})).toBeNull();
+    expect(check({ secret: 'other' })).toBe('Bad signature');
+    expect(check({ body: '{"a":2}' })).toBe('Bad signature');
+    expect(check({ expectedClient: 'projexa' })).toBe('Unknown client');
+    expect(check({ nowMs: now + 301_000 })).toBe('Timestamp outside the allowed window');
+    expect(check({ headers: {} })).toBe('Missing signature headers');
   });
 });

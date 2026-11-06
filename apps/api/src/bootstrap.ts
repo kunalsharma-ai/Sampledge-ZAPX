@@ -67,11 +67,12 @@ export function configureApp(app: INestApplication) {
   app.use(cookieParser());
   // SCIM clients send application/scim+json (Milestone 8). Registering a JSON parser replaces Nest's
   // default one, so this parser reads both types (with the default 100 kB limit).
-  // The Stripe webhook (Milestone 13) is verified over the exact bytes received, so they are kept for that path.
+  // The Stripe webhook (Milestone 13) and SAMPLEON events are verified over the exact bytes received, so they are kept for those paths.
   (app as NestExpressApplication).useBodyParser('json', {
     type: ['application/json', 'application/scim+json'],
     verify: (req: { url?: string; rawBody?: Buffer }, _res: unknown, buf: Buffer) => {
-      if (req.url?.startsWith('/api/billing/webhook')) req.rawBody = buf;
+      // SAMPLEON events are signed over the exact bytes too (Sampledge service signature).
+      if (req.url?.startsWith('/api/billing/webhook') || req.url?.startsWith('/api/v1/sampleon/')) req.rawBody = buf;
     },
   });
   app.setGlobalPrefix('api');

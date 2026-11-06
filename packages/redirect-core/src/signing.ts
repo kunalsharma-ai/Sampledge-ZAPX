@@ -2,7 +2,7 @@
  * HMAC-SHA256 signing used across ZAPX integrations: signed entry links, signed redirects,
  * signed callbacks and authenticated vendor API requests. Comparisons are constant-time.
  */
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { appendQuery } from './template';
 
 export const hmacHex = (secret: string, message: string) => createHmac('sha256', secret).update(message).digest('hex');
@@ -93,4 +93,63 @@ export function verifyRequest(
   if (!withinWindow(input.timestamp, nowMs)) return { ok: false, reason: 'stale_timestamp' };
   const expected = hmacHex(secret, requestSigningString(input.timestamp!, input.method, input.pathWithQuery));
   return safeEqualHex(expected, input.signature) ? { ok: true } : { ok: false, reason: 'bad_signature' };
+}
+
+// ---- Sampledge service signatures (SAMPLEON) ---------------------------------------------------
+
+/**
+ * The Sampledge service signature used between SAMPLEON, SUPPLY360, PROJEXA and ZAPX
+ * (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md §5.0):
+ *
+ *   X-Sampledge-Client:    client id
+ *   X-Sampledge-Timestamp: unix seconds
+ *   X-Sampledge-Signature: v1=hex HMAC-SHA256(secret, ts + "." + METHOD + "." + path + "." + sha256hex(body))
+ *
+ * `path` includes the query string exactly as sent. SAMPLEON signs the webhooks it sends to ZAPX
+ * the same way, as client "sampleon", with ZAPX's client secret.
+ */
+export function sampledgeCanonical(timestamp: string | number, method: string, path: string, body: string | Buffer | null | undefined) {
+  return `${timestamp}.${method.toUpperCase()}.${path}.${createHash('sha256')
+    .update(body ?? '')
+    .digest('hex')}`;
+}
+
+export function sampledgeServiceHeaders(opts: {
+  clientId: string;
+  secret: string;
+  method: string;
+  path: string;
+  body?: string | null;
+  nowMs?: number;
+}): Record<string, string> {
+  const ts = String(unixSeconds(opts.nowMs));
+  return {
+    'X-Sampledge-Client': opts.clientId,
+    'X-Sampledge-Timestamp': ts,
+    'X-Sampledge-Signature': `v1=${hmacHex(opts.secret, sampledgeCanonical(ts, opts.method, opts.path, opts.body ?? ''))}`,
+  };
+}
+
+/** Verify a Sampledge-signed request from `expectedClient`; returns the reason it fails, or null. */
+export function verifySampledgeRequest(opts: {
+  headers: Record<string, string | string[] | undefined>;
+  method: string;
+  path: string;
+  body: string | Buffer | null | undefined;
+  expectedClient: string;
+  secret: string;
+  nowMs?: number;
+}): string | null {
+  const h = (k: string) => {
+    const v = opts.headers[k];
+    return Array.isArray(v) ? v[0] : v;
+  };
+  const client = h('x-sampledge-client');
+  const ts = h('x-sampledge-timestamp');
+  const sig = h('x-sampledge-signature');
+  if (!client || !ts || !sig) return 'Missing signature headers';
+  if (client !== opts.expectedClient) return 'Unknown client';
+  if (!withinWindow(ts, opts.nowMs)) return 'Timestamp outside the allowed window';
+  const given = sig.startsWith('v1=') ? sig.slice(3) : '';
+  return safeEqualHex(hmacHex(opts.secret, sampledgeCanonical(ts, opts.method, opts.path, opts.body)), given) ? null : 'Bad signature';
 }

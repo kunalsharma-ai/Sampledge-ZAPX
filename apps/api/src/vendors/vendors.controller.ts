@@ -24,7 +24,7 @@ const vendorSchema = z
   .object({
     name: z.string().min(1).max(120),
     code: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Letters, digits, _ or - only'),
-    integration: z.enum(['DIRECT', 'PROJEXA']).default('DIRECT'),
+    integration: z.enum(['DIRECT', 'PROJEXA', 'SAMPLEON']).default('DIRECT'),
     redirectMode: z.enum(['STATIC', 'DYNAMIC', 'HYBRID']).default('STATIC'),
     staticUrls: statusMap(URL_TEMPLATE).prefault({}),
     statusWords: statusMap(z.string().min(1).max(60)).prefault({}),
@@ -49,8 +49,8 @@ const vendorSchema = z
     presetId: z.string().optional(),
   })
   .superRefine((v, ctx) => {
-    if (v.integration === 'PROJEXA' && !v.partnerBaseUrl)
-      ctx.addIssue({ code: 'custom', path: ['partnerBaseUrl'], message: 'PROJEXA needs its base URL' });
+    if (v.integration !== 'DIRECT' && !v.partnerBaseUrl)
+      ctx.addIssue({ code: 'custom', path: ['partnerBaseUrl'], message: `${v.integration} needs its base URL` });
   });
 
 const previewSchema = z.object({

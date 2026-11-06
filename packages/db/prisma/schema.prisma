@@ -107,6 +107,9 @@ enum VendorIntegration {
   DIRECT
   /// ZAPX is a client survey platform behind PROJEXA (PROJEXA docs/SURVEY_INTEGRATION.md).
   PROJEXA
+  /// ZAPX is the survey host behind SAMPLEON, the Sampledge audience and routing engine. Same
+  /// survey-host contract as PROJEXA (SAMPLEON docs/ECOSYSTEM_ARCHITECTURE.md §5.3).
+  SAMPLEON
 }
 
 enum CallbackState {
@@ -1453,4 +1456,43 @@ model RateLimitBucket {
   blockedUntil DateTime?
 
   @@index([windowEnds])
+}
+
+/// An audience request with SAMPLEON for a ZAPX survey. ZAPX never selects or invites respondents:
+/// SAMPLEON owns targeting, feasibility, approval, invitations, quotas and routing, and SUPPLY360
+/// owns the respondents. ZAPX keeps this row so the studio can show progress, updated from
+/// SAMPLEON's signed events. `sourcePlatform` is ZAPX for independent surveys (ZAPX created the
+/// request) and PROJEXA when PROJEXA created it for a PROJEXA-linked survey.
+model SampleonAudienceRequest {
+  id                String    @id @default(cuid())
+  tenantId          String
+  surveyId          String
+  /// SAMPLEON's Audience Request ID (AR-…), the correlation id of every event.
+  audienceRequestId String    @unique
+  sourcePlatform    String
+  status            String
+  title             String?
+  countries         String[]  @default([])
+  requiredCompletes Int
+  completes         Int       @default(0)
+  remaining         Int?
+  /// Latest project.quota_updated payload: progress, byCountry, quotas.
+  progress          Json      @default("{}")
+  /// project.quota_updated sequence; older snapshots arriving late are ignored.
+  progressSequence  Int       @default(0)
+  lastEventType     String?
+  lastEventAt       DateTime?
+  createdById       String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tenantId, surveyId])
+}
+
+/// SAMPLEON events already processed (deduplicated by event id).
+model SampleonInboundEvent {
+  eventId           String   @id
+  type              String
+  audienceRequestId String?
+  receivedAt        DateTime @default(now())
 }

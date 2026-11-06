@@ -125,8 +125,8 @@ export class CallbackWorker implements OnApplicationBootstrap, OnModuleDestroy {
       await finish('FAILED', null, `vendor integration changed to ${cfg.kind}`, 0);
       return 'failed';
     }
-    if (cfg.kind === 'PROJEXA' && !cfg.clientSecret) {
-      await finish('FAILED', null, 'PROJEXA client secret is missing or cannot be decrypted', 0);
+    if (cfg.kind !== 'DIRECT' && !cfg.clientSecret) {
+      await finish('FAILED', null, `${cfg.kind} client secret is missing or cannot be decrypted`, 0);
       return 'failed';
     }
     const adapter = adapterFor(cfg);
