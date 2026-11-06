@@ -66,7 +66,7 @@ const ELSEWHERE = [
   { name: 'Webhooks', where: 'Organization settings › Webhooks' },
   { name: 'API keys', where: 'Organization settings › API keys' },
   { name: 'AI limits and budget per organization', where: 'Organization settings › AI' },
-  { name: 'PROJEXA, panels and other sample vendors', where: 'Each project › Vendors (choose PROJEXA as the integration)' },
+  { name: 'SampTrek, panels and other sample vendors', where: 'Each project › Vendors (choose SampTrek as the integration)' },
 ];
 
 function status(i: Integration): { text: string; cls: string } {

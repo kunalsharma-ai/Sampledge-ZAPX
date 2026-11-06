@@ -122,10 +122,10 @@ function ForProjexa({ surveyId, launchUrl, readOnly }: { surveyId: string; launc
   };
   return (
     <div className="stack">
-      <h3>For a PROJEXA project</h3>
+      <h3>For a SampTrek project</h3>
       <p className="muted small">
-        Connect the survey, then paste the launch link and the survey ID into the project&apos;s SampAudience tab in PROJEXA. PROJEXA sends
-        the request with the project&apos;s targets and quotas.
+        Connect the survey, then paste the launch link and the survey ID into the project&apos;s SampAudience tab in SampTrek. SampTrek
+        sends the request with the project&apos;s targets and quotas.
       </p>
       <div>
         <button onClick={connect} disabled={readOnly || busy}>
@@ -341,7 +341,7 @@ function Requests({ rows }: { rows: RequestRow[] }) {
               <td className="mono small" style={{ whiteSpace: 'nowrap' }}>
                 {r.audienceRequestId}
               </td>
-              <td>{r.sourcePlatform === 'PROJEXA' ? 'PROJEXA project' : 'This survey'}</td>
+              <td>{r.sourcePlatform === 'PROJEXA' ? 'SampTrek project' : 'This survey'}</td>
               <td>
                 <span className={`badge ${TONE[r.status] ?? ''}`}>{label(r.status)}</span>
               </td>

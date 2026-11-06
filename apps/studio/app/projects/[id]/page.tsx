@@ -94,8 +94,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   + Sampledge preset
                 </button>
                 <button onClick={() => setEditing(emptyVendor())}>+ Custom vendor</button>
-                <button onClick={() => setEditing({ ...emptyVendor(), name: 'PROJEXA', code: 'PX', integration: 'PROJEXA' })}>
-                  + PROJEXA
+                <button onClick={() => setEditing({ ...emptyVendor(), name: 'SampTrek', code: 'PX', integration: 'PROJEXA' })}>
+                  + SampTrek
                 </button>
               </div>
               {vendors.length === 0 ? <p className="muted">Add a vendor to send live traffic. Each vendor has its own redirects.</p> : null}
@@ -108,7 +108,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       </td>
                       <td>
                         {v.integration === 'PROJEXA' ? (
-                          <span className="badge">projexa</span>
+                          <span className="badge">SampTrek</span>
                         ) : v.integration === 'SAMPLEON' ? (
                           <span className="badge">SampAudience</span>
                         ) : (
