@@ -12,6 +12,7 @@ import { CopyField, ErrorNote } from '@/components/Shell';
 import { SuperAdminFrame, StatusBadge, ago, fmtDate, type PlanRow } from '@/components/super-admin/SuperAdminFrame';
 import { FeatureMatrix, SURFACES, type FeatureDef, type Surface } from '@/components/super-admin/FeatureMatrix';
 import { ActivityFeed, type ActivityEvent } from '@/components/super-admin/ActivityFeed';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Overrides = Partial<Record<Surface, Record<string, boolean>>>;
 
@@ -109,7 +110,10 @@ function Subscription({ d, plans, onSaved }: { d: Detail; plans: PlanRow[]; onSa
   return (
     <section className="panel nx-card stack" data-testid="subscription">
       <div className="nx-card-head">
-        <h2>Subscription</h2>
+        <h2>
+          Subscription
+          <InfoTip k="sa.subscription" />
+        </h2>
         <StatusBadge status={o.subscriptionStatus} suspended={!!o.suspendedAt} />
       </div>
       {o.suspendedAt ? (
@@ -226,7 +230,10 @@ function OrgFeatures({ d, features, onSaved }: { d: Detail; features: FeatureDef
   return (
     <section className="panel nx-card stack" data-testid="org-features">
       <div className="nx-card-head">
-        <h2>Features</h2>
+        <h2>
+          Features
+          <InfoTip k="sa.features" />
+        </h2>
         <span className="muted small">
           From the {d.plan.name} plan{changes ? `, with ${changes} change${changes === 1 ? '' : 's'} for this organization` : ''}
         </span>
@@ -450,6 +457,7 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
   const i = d?.integrations;
   return (
     <SuperAdminFrame
+      help="sa.organization"
       title={d?.organization.name ?? 'Organization'}
       intro={d ? `Registered ${fmtDate(d.organization.createdAt)} · ${d.organization.planName} plan` : undefined}
     >
@@ -465,7 +473,10 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
             />
             <section className="panel nx-card stack" data-testid="org-integrations">
               <div className="nx-card-head">
-                <h2>Integrations</h2>
+                <h2>
+                  Integrations
+                  <InfoTip k="sa.orgOwnIntegrations" />
+                </h2>
                 <Link href="/super-admin/integrations" className="small">
                   All integrations
                 </Link>
@@ -510,7 +521,10 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
           </div>
           <section className="panel nx-card stack" style={{ marginTop: 16 }} data-testid="org-members">
             <div className="nx-card-head">
-              <h2>Members</h2>
+              <h2>
+                Members
+                <InfoTip k="sa.members" />
+              </h2>
               <span className="muted small">{d.members.length} in this organization</span>
             </div>
             <div className="scroll-x">
@@ -536,7 +550,10 @@ export default function OrganizationPage({ params }: { params: Promise<{ id: str
           </section>
           <section className="panel nx-card" style={{ marginTop: 16 }}>
             <div className="nx-card-head">
-              <h2>Activity</h2>
+              <h2>
+                Activity
+                <InfoTip k="sa.activity" />
+              </h2>
               <Link href={`/super-admin/activity?org=${d.organization.id}`} className="small">
                 All activity of this organization
               </Link>

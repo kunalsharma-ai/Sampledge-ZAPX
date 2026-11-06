@@ -10,6 +10,7 @@ import { useMe } from '@/lib/useMe';
 import { PageHeader } from '@/components/neon/PageHeader';
 import { FolderOpen } from 'lucide-react';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Project {
   id: string;
@@ -59,12 +60,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <ErrorNote error={error} />
       ) : (
         <>
-          <PageHeader icon={FolderOpen} eyebrow="Project" title={project.name}>
+          <PageHeader icon={FolderOpen} eyebrow="Project" title={project.name} help="page.project">
             {project.client ? `Client: ${project.client}` : 'No client set'}
           </PageHeader>
           <div className="grid2" style={{ marginTop: 16 }}>
             <section className="panel stack">
-              <h2>Surveys</h2>
+              <h2>
+                Surveys
+                <InfoTip k="section.projectSurveys" />
+              </h2>
               {project.surveys.length === 0 ? <p className="muted">No surveys yet.</p> : null}
               <table className="data">
                 <tbody>
@@ -88,7 +92,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
             <section className="panel stack">
               <div className="row">
-                <h2 style={{ margin: 0 }}>Sample vendors</h2>
+                <h2 style={{ margin: 0 }}>
+                  Sample vendors
+                  <InfoTip k="section.vendors" />
+                </h2>
                 <div style={{ flex: 1 }} />
                 <button onClick={() => setEditing({ ...emptyVendor(), name: 'Sampledge', code: 'SE', ...presetSampledge() })}>
                   + Sampledge preset
@@ -153,7 +160,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </div>
           <section className="panel stack" style={{ marginTop: 16 }} data-testid="project-redirect-defaults">
             <div className="row">
-              <h2 style={{ margin: 0 }}>Project redirect defaults</h2>
+              <h2 style={{ margin: 0 }}>
+                Project redirect defaults
+                <InfoTip k="section.redirectDefaults" />
+              </h2>
               <span className="muted small">Used by direct vendors for any status or word they leave empty.</span>
               <div style={{ flex: 1 }} />
               <button onClick={() => setShowDefaults(!showDefaults)} aria-expanded={showDefaults}>

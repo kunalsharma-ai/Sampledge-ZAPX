@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface Contacts {
   total: number;
@@ -149,7 +150,10 @@ export function EmailInvitations({ surveyId, readOnly, live }: { surveyId: strin
 
   return (
     <section className="panel stack" data-testid="email-invitations">
-      <h2 style={{ margin: 0 }}>Email and SMS invitations</h2>
+      <h2 style={{ margin: 0 }}>
+        Email and SMS invitations
+        <InfoTip k="section.invitations" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         Each contact gets a personal link. Columns of the contact list other than email, name and language are added to the link as
         parameters (use them as URL variables). Every email has a one-click unsubscribe link, and people who opt out are never emailed again

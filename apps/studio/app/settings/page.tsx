@@ -17,6 +17,7 @@ import { DataGovernance } from '@/components/DataGovernance';
 import { Billing, PlanUsage, ScimSettings, SsoSettings } from '@/components/Identity';
 import { PageHeader } from '@/components/neon/PageHeader';
 import { KeyRound, Settings } from 'lucide-react';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Task = 'architect' | 'translate' | 'insights';
 const TASK_NAMES: Record<Task, string> = {
@@ -96,7 +97,7 @@ export default function SettingsPage() {
   if (me && me.role === 'PROGRAMMER') {
     return (
       <Shell crumbs={<Link href="/">Dashboard</Link>}>
-        <PageHeader icon={KeyRound} title="API keys" />
+        <PageHeader icon={KeyRound} title="API keys" help="page.apiKeys" />
         <ApiKeys isAdmin={false} />
       </Shell>
     );
@@ -131,6 +132,7 @@ export default function SettingsPage() {
         tone={0}
         eyebrow="Administration"
         title="Organization settings"
+        help="page.settings"
         actions={
           <>
             {me?.canManageIntegrations ? (
@@ -149,7 +151,10 @@ export default function SettingsPage() {
       <ErrorNote error={error} />
       <div className="grid2" style={{ marginTop: 16 }}>
         <section className="panel stack" data-testid="ai-settings">
-          <h2>AI</h2>
+          <h2>
+            AI
+            <InfoTip k="section.ai" />
+          </h2>
           {ai ? (
             <p className="small muted" style={{ margin: 0 }} data-testid="ai-status">
               {ai.status.configured
@@ -268,7 +273,10 @@ export default function SettingsPage() {
         </section>
 
         <section className="panel stack" data-testid="org-redirect-defaults">
-          <h2>Organization redirect defaults</h2>
+          <h2>
+            Organization redirect defaults
+            <InfoTip k="section.orgRedirects" />
+          </h2>
           <p className="muted small" style={{ margin: 0 }}>
             The last fallback for direct vendors, after vendor + country, vendor, project + country and project settings.
           </p>

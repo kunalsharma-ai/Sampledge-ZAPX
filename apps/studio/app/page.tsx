@@ -38,6 +38,7 @@ import { CreateSurveyDialog, type StartMode } from '@/components/neon/CreateSurv
 import { Donut, Funnel, ShareBars, TrendChart } from '@/components/neon/Charts';
 import { Globe, Robot } from '@/components/neon/Illustrations';
 import { LatestSurveyPreview } from '@/components/neon/LatestSurveyPreview';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type SurveyStatus = 'DRAFT' | 'LIVE' | 'PAUSED' | 'CLOSED';
 interface Summary {
@@ -296,7 +297,10 @@ export default function DashboardPage() {
 
           {/* ---- Journey ---- */}
           <section className="panel nx-card" aria-labelledby="journey-title">
-            <h2 id="journey-title">Survey journey</h2>
+            <h2 id="journey-title">
+              Survey journey
+              <InfoTip k="section.dashJourney" />
+            </h2>
             <ol className="nx-journey">
               {[
                 { icon: Palette, label: 'Design & program', value: data?.surveys.byStatus.DRAFT, unit: 'in programming' },
@@ -328,7 +332,10 @@ export default function DashboardPage() {
           <div className="nx-chart-grid">
             <section className="panel nx-card nx-span-2" aria-labelledby="trend-title">
               <div className="nx-card-head">
-                <h2 id="trend-title">Survey performance</h2>
+                <h2 id="trend-title">
+                  Survey performance
+                  <InfoTip k="section.dashTrend" />
+                </h2>
                 <span className="small muted">Last 30 days · live data</span>
               </div>
               {data ? (
@@ -345,7 +352,10 @@ export default function DashboardPage() {
               )}
             </section>
             <section className="panel nx-card" aria-labelledby="funnel-title">
-              <h2 id="funnel-title">Respondent journey</h2>
+              <h2 id="funnel-title">
+                Respondent journey
+                <InfoTip k="section.dashFunnel" />
+              </h2>
               {data && r!.total ? (
                 <Funnel
                   stages={[
@@ -360,7 +370,10 @@ export default function DashboardPage() {
               )}
             </section>
             <section className="panel nx-card" aria-labelledby="status-title">
-              <h2 id="status-title">Response overview</h2>
+              <h2 id="status-title">
+                Response overview
+                <InfoTip k="section.dashStatus" />
+              </h2>
               {data && r!.total ? (
                 <Donut
                   total={r!.total}
@@ -394,7 +407,10 @@ export default function DashboardPage() {
               )}
             </section>
             <section className="panel nx-card" aria-labelledby="device-title">
-              <h2 id="device-title">Device distribution</h2>
+              <h2 id="device-title">
+                Device distribution
+                <InfoTip k="section.dashDevice" />
+              </h2>
               {data && r!.total ? (
                 <>
                   <ul className="nx-devices">
@@ -430,7 +446,10 @@ export default function DashboardPage() {
               )}
             </section>
             <section className="panel nx-card" aria-labelledby="reach-title">
-              <h2 id="reach-title">Global reach</h2>
+              <h2 id="reach-title">
+                Global reach
+                <InfoTip k="section.dashReach" />
+              </h2>
               <div className="nx-reach">
                 <div className="nx-reach-globe">
                   <Globe size={150} />
@@ -455,7 +474,10 @@ export default function DashboardPage() {
           {/* ---- Capabilities ---- */}
           <section className="panel nx-card" aria-labelledby="cap-title">
             <div className="nx-card-head">
-              <h2 id="cap-title">Create, program, test &amp; launch</h2>
+              <h2 id="cap-title">
+                Create, program, test &amp; launch
+                <InfoTip k="section.dashCapabilities" />
+              </h2>
               <span className="small muted">
                 {latest ? <>Opens in your latest survey: {latest.name}</> : 'Create a survey to open these tools'}
               </span>
@@ -487,7 +509,10 @@ export default function DashboardPage() {
           {/* ---- Recent surveys ---- */}
           <section className="panel nx-card" aria-labelledby="recent-title">
             <div className="nx-card-head">
-              <h2 id="recent-title">Recent surveys</h2>
+              <h2 id="recent-title">
+                Recent surveys
+                <InfoTip k="section.dashRecent" />
+              </h2>
             </div>
             {!data ? (
               <p className="muted">Loading…</p>
@@ -548,6 +573,7 @@ export default function DashboardPage() {
               <div>
                 <h2 id="copilot-title">
                   SampCode AI Copilot <Sparkles size={16} aria-hidden="true" className="nx-sparkle" />
+                  <InfoTip k="section.dashCopilot" />
                 </h2>
                 <p className="small muted" data-testid="ai-status">
                   {ai === null
@@ -596,7 +622,10 @@ export default function DashboardPage() {
 
           <section className="panel nx-card" aria-labelledby="look-title">
             <div className="nx-card-head">
-              <h2 id="look-title">Choose your look</h2>
+              <h2 id="look-title">
+                Choose your look
+                <InfoTip k="section.dashLook" />
+              </h2>
               <Link href="/appearance" className="small">
                 More options
               </Link>

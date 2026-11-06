@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { CopyField, ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface RequestRow {
   id: string;
@@ -50,6 +51,7 @@ function SampAudienceTitle() {
       <img className="sa-on-light" src="/brand/sampaudience/sampaudience-logo-light.svg" alt="SampAudience" width={170} height={40} />
       <img className="sa-on-dark" src="/brand/sampaudience/sampaudience-logo-dark.svg" alt="SampAudience" width={170} height={40} />
       <span>Audiences</span>
+      <InfoTip k="section.sampleon" />
     </h2>
   );
 }

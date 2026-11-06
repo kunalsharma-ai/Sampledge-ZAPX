@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface InterviewerRow {
   id: string;
@@ -108,7 +109,10 @@ export function Supervisor({ surveyId, readOnly }: { surveyId: string; readOnly:
   return (
     <section className="panel stack" data-testid="supervisor">
       <div className="row">
-        <h2 style={{ margin: 0 }}>Supervisor dashboard</h2>
+        <h2 style={{ margin: 0 }}>
+          Supervisor dashboard
+          <InfoTip k="section.supervisor" />
+        </h2>
         <span className="muted small">Face-to-face interviews, from what interviewers have synced.</span>
         <span style={{ flex: 1 }} />
         <button type="button" className="secondary" onClick={() => void load()}>

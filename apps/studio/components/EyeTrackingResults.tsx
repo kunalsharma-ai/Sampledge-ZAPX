@@ -9,6 +9,7 @@ import type { SurveyDefinition } from '@zapx/survey-schema';
 import { api } from '@/lib/api';
 import { ErrorNote } from './Shell';
 import { mediaSrc } from './MediaLibrary';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 interface EyeOut {
   questionId: string;
@@ -104,7 +105,10 @@ export function EyeTrackingResults({ surveyId, def }: { surveyId: string; def: S
   const r = out?.result;
   return (
     <section className="panel stack" data-testid="eye-results">
-      <h2 style={{ margin: 0 }}>Eye tracking (experimental)</h2>
+      <h2 style={{ margin: 0 }}>
+        Eye tracking (experimental)
+        <InfoTip k="section.eyeResults" />
+      </h2>
       <p className="muted small" style={{ margin: 0 }}>
         Gaze is estimated from each respondent&apos;s webcam in their browser. It has not been validated on real webcams, so treat the
         heatmap and the figures below as approximate. &quot;Time to first look&quot; is the first estimated gaze point in the area, not a

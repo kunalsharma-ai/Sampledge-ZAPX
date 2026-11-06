@@ -37,6 +37,7 @@ import { useMe } from '@/lib/useMe';
 import { api } from '@/lib/api';
 import { ComponentPreview } from './ComponentPreview';
 import { PageHeader } from '@/components/neon/PageHeader';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 /** Miniature of a preset in the active scheme: page, light, a panel, a primary action and text. */
 function Swatch({ appearance }: { appearance: Appearance }) {
@@ -129,7 +130,7 @@ export default function AppearancePage() {
 
   return (
     <Shell crumbs={<Link href="/">Dashboard</Link>} forInterviewers>
-      <PageHeader icon={Palette} tone={4} eyebrow="Quantum Design System" title="Appearance" actions={<SaveState />}>
+      <PageHeader icon={Palette} tone={4} eyebrow="Quantum Design System" title="Appearance" help="page.appearance" actions={<SaveState />}>
         Changes apply at once and follow you to every device you sign in on.
       </PageHeader>
 
@@ -139,6 +140,7 @@ export default function AppearancePage() {
             <div className="row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
               <h2 className="q-section-title" style={{ margin: 0 }}>
                 <Palette size={18} aria-hidden /> Theme
+                <InfoTip k="section.appTheme" />
               </h2>
               <SegmentedControl
                 label="Theme list layout"
@@ -174,6 +176,7 @@ export default function AppearancePage() {
           <Surface>
             <h2 className="q-section-title">
               <SlidersHorizontal size={18} aria-hidden /> Mode, density and motion
+              <InfoTip k="section.appMode" />
             </h2>
             <div className="q-settings-grid">
               <div className="q-setting">
@@ -231,6 +234,7 @@ export default function AppearancePage() {
           <Surface>
             <h2 className="q-section-title">
               <Sparkles size={18} aria-hidden /> Colour and light
+              <InfoTip k="section.appColour" />
             </h2>
             <div className="q-settings-grid">
               <div className="q-setting">
@@ -270,6 +274,7 @@ export default function AppearancePage() {
           <Surface>
             <h2 className="q-section-title">
               <Accessibility size={18} aria-hidden /> Accessibility
+              <InfoTip k="section.appAccess" />
             </h2>
             <Switch
               checked={appearance.highContrast}
@@ -314,6 +319,7 @@ export default function AppearancePage() {
           <Surface>
             <h2 className="q-section-title">
               <Building2 size={18} aria-hidden /> Organization default
+              <InfoTip k="section.appOrgDefault" />
             </h2>
             <p className="muted small" style={{ marginTop: 0 }}>
               {organizationDefault
@@ -368,6 +374,7 @@ function AreaThemes({ appearance, update }: { appearance: Appearance; update: (p
     <Surface>
       <h2 className="q-section-title">
         <Layers size={18} aria-hidden /> Theme by area
+        <InfoTip k="section.appByArea" />
       </h2>
       <p className="muted small" style={{ marginTop: 0 }}>
         Give an area of the studio its own theme family, for example a calm light theme for Analysis. Light or dark mode, accent, density
@@ -424,6 +431,7 @@ function WorkspacePresets({
     <Surface>
       <h2 className="q-section-title">
         <Bookmark size={18} aria-hidden /> Workspace presets
+        <InfoTip k="section.appPresets" />
       </h2>
       <p className="muted small" style={{ marginTop: 0 }}>
         Saved looks for your organization (theme, mode, area themes and the rest). Picking one replaces your current appearance.

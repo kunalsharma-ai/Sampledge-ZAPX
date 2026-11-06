@@ -32,7 +32,11 @@ export default function MembersPage() {
   const patch = (id: string, body: Record<string, unknown>) => api(`/super/users/${id}`, { method: 'PATCH', body }).then(load, setError);
 
   return (
-    <SuperAdminFrame title="Members" intro="Every account on this installation. Open a member's organization to change their own features.">
+    <SuperAdminFrame
+      help="sa.members"
+      title="Members"
+      intro="Every account on this installation. Open a member's organization to change their own features."
+    >
       <ErrorNote error={error} />
       <section className="panel nx-card">
         <input

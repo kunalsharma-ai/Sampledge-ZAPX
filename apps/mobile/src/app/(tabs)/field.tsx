@@ -34,7 +34,7 @@ export default function Field() {
       ) : null}
       {supervise ? (
         <>
-          <H2>Supervise a survey</H2>
+          <H2 help="h.superviseSurvey">Supervise a survey</H2>
           {!has('projects') ? (
             <T muted>Your plan does not include Projects, so surveys cannot be listed here.</T>
           ) : (

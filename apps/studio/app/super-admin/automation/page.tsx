@@ -12,6 +12,7 @@ import { ErrorNote } from '@/components/Shell';
 import { SuperAdminFrame, ago, fmtTime, type PlanRow } from '@/components/super-admin/SuperAdminFrame';
 import type { FeatureDef } from '@/components/super-admin/FeatureMatrix';
 import { useConfirm } from '@/components/neon/ConfirmDialog';
+import { InfoTip } from '@/components/neon/InfoTip';
 
 type Params = { days?: number; percent?: number; status?: string };
 type Action = { type: string } & Record<string, unknown>;
@@ -345,6 +346,7 @@ export default function SuperAutomationPage() {
 
   return (
     <SuperAdminFrame
+      help="sa.automation"
       title="Automation"
       intro="Let SampCode handle subscriptions on its own: warn before they end, suspend or downgrade when they end, start trials, and alert you about usage. Rules are checked every minute."
       actions={
@@ -370,6 +372,7 @@ export default function SuperAutomationPage() {
           <div className="nx-card-head">
             <h2>
               <Zap size={18} aria-hidden="true" /> Ready-made rules
+              <InfoTip k="sa.readyRules" />
             </h2>
             <span className="muted small">One click adds the rule switched on. You can change it afterwards.</span>
           </div>
@@ -393,7 +396,10 @@ export default function SuperAutomationPage() {
 
       {editing === '__new' && vocab ? (
         <section className="panel nx-card" style={{ marginTop: 16 }}>
-          <h2>New rule</h2>
+          <h2>
+            New rule
+            <InfoTip k="sa.newRule" />
+          </h2>
           <RuleBuilder
             vocab={vocab}
             plans={plans}
@@ -413,7 +419,10 @@ export default function SuperAutomationPage() {
 
       <section className="panel nx-card stack" style={{ marginTop: 16 }} data-testid="rules">
         <div className="nx-card-head">
-          <h2>Your rules</h2>
+          <h2>
+            Your rules
+            <InfoTip k="sa.yourRules" />
+          </h2>
           <span className="muted small">{rules?.filter((r) => r.enabled).length ?? 0} on</span>
         </div>
         {rules && !rules.length ? <p className="muted small">No rules yet. Add a ready-made one above.</p> : null}
@@ -495,7 +504,10 @@ export default function SuperAutomationPage() {
 
       <section className="panel nx-card" style={{ marginTop: 16 }} data-testid="runs">
         <div className="nx-card-head">
-          <h2>What automation did</h2>
+          <h2>
+            What automation did
+            <InfoTip k="sa.autoRuns" />
+          </h2>
         </div>
         {runs.length ? (
           <div className="scroll-x">

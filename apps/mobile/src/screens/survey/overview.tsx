@@ -69,7 +69,7 @@ export function Overview({ survey: q }: { survey: Q }) {
               </Grid>
               {a.error ? <ErrorNote message={a.error} /> : null}
               <IfFeature feature="surveys.publish">
-                <H2>Launch control</H2>
+                <H2 help="h.launch">Launch control</H2>
                 <Card>
                   <Button title="Publish draft" icon="rocket-outline" onPress={() => void publish(s)} busy={a.busy} testID="publish" />
                   <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
@@ -100,7 +100,7 @@ export function Overview({ survey: q }: { survey: Q }) {
                   </T>
                 ) : null}
               </IfFeature>
-              <H2>Versions</H2>
+              <H2 help="h.versions">Versions</H2>
               <List
                 items={s.versions}
                 empty="No versions."

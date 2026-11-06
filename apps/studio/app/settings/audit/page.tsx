@@ -75,7 +75,7 @@ export default function AuditPage() {
 
   return (
     <Shell crumbs={crumbs}>
-      <PageHeader icon={ScrollText} tone={5} eyebrow="Administration" title="Audit log">
+      <PageHeader icon={ScrollText} tone={5} eyebrow="Administration" title="Audit log" help="page.audit">
         Every change in the organization, newest first. Audit events cannot be edited or deleted.
       </PageHeader>
       <form

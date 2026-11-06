@@ -292,3 +292,61 @@ h2 {
   background: var(--bad);
   box-shadow: 0 10px 30px -12px rgba(251, 113, 133, 0.75);
 }
+
+/* "i" help cards (Info.tsx, text in help.ts) */
+button.capi-info {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  margin-left: 8px;
+  padding: 0;
+  vertical-align: middle;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--zx-accent-soft);
+  color: var(--text);
+  font:
+    italic 700 0.85rem/1 Georgia,
+    serif;
+  box-shadow: none;
+}
+.capi-info-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(5 3 20 / 0.65);
+}
+.capi-info-card {
+  width: min(420px, 100%);
+  max-height: 85vh;
+  overflow: auto;
+  padding: 18px;
+  border: 1px solid var(--accent);
+  border-radius: 18px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--glow);
+}
+.capi-info-card h3 {
+  margin: 0 0 10px;
+}
+.capi-info-card strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.capi-info-card p,
+.capi-info-card ol {
+  margin: 4px 0 0;
+}
+.capi-info-card button {
+  margin-top: 14px;
+}
